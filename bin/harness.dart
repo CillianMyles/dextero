@@ -21,4 +21,3 @@ Future<void> main(List<String> args) async {
   );
   exitCode = result.exitCode;
 }
-

@@ -1,8 +1,10 @@
 name: dart_harness_cli_spike
-description: Minimal spike validating Dart as a native harness CLI.
+description: Spike validating Dart as a native CLI and typed agent harness.
 version: 0.0.1
 publish_to: none
 
 environment:
   sdk: ">=3.10.0 <4.0.0"
 
+dev_dependencies:
+  test: ^1.26.0

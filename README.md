@@ -20,6 +20,38 @@ The spike intentionally implements one narrow harness primitive:
 It uses only `dart:io` and `dart:convert`; there are no package dependencies or
 external runtime requirements after compilation.
 
+## Agent primitives
+
+The spike now also sketches the next layer of a harness without choosing an
+LLM vendor:
+
+- `ToolDefinition`, `ToolCall`, and `ToolResult` provide the JSON-shaped wire
+  types;
+- `Tool` is the typed execution boundary;
+- `ReadFileTool` demonstrates a workspace-scoped tool;
+- `RunProcessTool` demonstrates direct executable/argument execution without a
+  shell;
+- `AgentModel` is the adapter seam for an OpenAI, Anthropic, or local model;
+- `AgentLoop` runs a bounded model → tool → model loop, returning tool errors
+  to the model instead of crashing the run.
+
+Run the deterministic demo model through both sample tools:
+
+```sh
+cd spikes/002-dart-harness-cli
+dart run bin/agent_demo.dart
+```
+
+The scripted model is deliberately not pretending to be intelligent. It makes
+the orchestration protocol runnable while keeping provider SDK and API-key
+decisions outside this feasibility spike.
+
+Run the primitive tests with:
+
+```sh
+dart test
+```
+
 ## Run from source
 
 ```sh
@@ -75,6 +107,10 @@ Test host: macOS Arm64, Dart SDK 3.10.8.
   normal system dynamic loader.
 - macOS to Windows x64 and macOS to macOS x64 cross-compilation were rejected;
   the installed SDK offered Linux cross-targets only.
+- The typed agent layer passes four tests covering successful tool dispatch,
+  unknown-tool recovery, workspace traversal rejection, and argv-based process
+  execution.
+- The deterministic agent demo runs from source and as an AOT executable.
 
 ## Known limits
 
@@ -83,6 +119,10 @@ Test host: macOS Arm64, Dart SDK 3.10.8.
   accept an executable and argument array separately by default.
 - The spike does not implement streaming output, cancellation, timeouts,
   process-tree termination, output limits, environment filtering, or sandboxing.
+- JSON Schema is exposed to model adapters but sample tool implementations do
+  their own minimal runtime validation; production code should centralise it.
+- Tool calls run sequentially. Independent calls could later be scheduled in
+  parallel once cancellation and resource limits exist.
 - It does not test native packages, MCP, browser automation, Windows execution,
   or Linux execution; the Linux artifact was inspected but not run on Linux.
 - A standalone Dart executable includes the Dart runtime, not arbitrary native
