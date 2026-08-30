@@ -112,4 +112,4 @@ Puppeteer browser action, and one experimental desktop action behind the same
 typed Dart tool interface.
 
 See also:
-[Dart as a computer-use and coding harness](../../resources/docs/dart-computer-use-coding-harness.md).
+[Dart, Flutter and Serverpod as a remote computer-use harness](../../resources/posts/2026-08-30-dart-computer-use-coding-harness.md).
