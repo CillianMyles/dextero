@@ -1,0 +1,82 @@
+import 'dart:convert';
+import 'dart:io';
+
+import '../tool.dart';
+import 'workspace_path.dart';
+
+final class EditFileTool implements Tool {
+  EditFileTool({required String root}) : _workspace = WorkspacePath(root);
+
+  final WorkspacePath _workspace;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'edit_file',
+    description:
+        'Replace one exact text occurrence in an existing UTF-8 workspace file.',
+    inputSchema: {
+      'type': 'object',
+      'properties': {
+        'path': {'type': 'string'},
+        'oldText': {
+          'type': 'string',
+          'description': 'Exact text that must occur exactly once.',
+        },
+        'newText': {'type': 'string'},
+      },
+      'required': ['path', 'oldText', 'newText'],
+      'additionalProperties': false,
+    },
+  );
+
+  @override
+  Future<Object?> call(JsonMap arguments) async {
+    final path = arguments['path'];
+    final oldText = arguments['oldText'];
+    final newText = arguments['newText'];
+    if (path is! String || path.isEmpty) {
+      throw const FormatException('path must be a non-empty string');
+    }
+    if (oldText is! String || oldText.isEmpty) {
+      throw const FormatException('oldText must be a non-empty string');
+    }
+    if (newText is! String) {
+      throw const FormatException('newText must be a string');
+    }
+
+    final filePath = await _workspace.resolveExisting(
+      path,
+      expectedType: FileSystemEntityType.file,
+    );
+    final file = File(filePath);
+    final content = await file.readAsString();
+    final matches = _countOccurrences(content, oldText);
+    if (matches == 0) {
+      throw StateError('oldText was not found in $path');
+    }
+    if (matches > 1) {
+      throw StateError(
+        'oldText occurs $matches times in $path; edit is ambiguous',
+      );
+    }
+
+    final updated = content.replaceFirst(oldText, newText);
+    await file.writeAsString(updated, flush: true);
+    return {
+      'path': path,
+      'replacements': 1,
+      'bytes': utf8.encode(updated).length,
+    };
+  }
+
+  int _countOccurrences(String content, String pattern) {
+    var count = 0;
+    var start = 0;
+    while (true) {
+      final match = content.indexOf(pattern, start);
+      if (match == -1) return count;
+      count++;
+      start = match + 1;
+    }
+  }
+}

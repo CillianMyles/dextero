@@ -1,11 +1,12 @@
 import 'dart:io';
 
 import '../tool.dart';
+import 'workspace_path.dart';
 
 final class ReadFileTool implements Tool {
-  ReadFileTool({required String root}) : _root = Directory(root).absolute;
+  ReadFileTool({required String root}) : _workspace = WorkspacePath(root);
 
-  final Directory _root;
+  final WorkspacePath _workspace;
 
   @override
   ToolDefinition get definition => const ToolDefinition(
@@ -31,13 +32,10 @@ final class ReadFileTool implements Tool {
       throw const FormatException('path must be a non-empty string');
     }
 
-    final rootPath = await _root.resolveSymbolicLinks();
-    final file = File('${_root.path}${Platform.pathSeparator}$path');
-    final filePath = await file.resolveSymbolicLinks();
-    final prefix = '$rootPath${Platform.pathSeparator}';
-    if (!filePath.startsWith(prefix)) {
-      throw ArgumentError('path escapes the configured workspace');
-    }
+    final filePath = await _workspace.resolveExisting(
+      path,
+      expectedType: FileSystemEntityType.file,
+    );
 
     return {'path': path, 'content': await File(filePath).readAsString()};
   }

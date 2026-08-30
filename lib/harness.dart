@@ -1,5 +1,9 @@
 export 'src/agent.dart';
+export 'src/codex_app_server_agent.dart';
 export 'src/model.dart';
 export 'src/tool.dart';
+export 'src/tools/bash_tool.dart';
+export 'src/tools/edit_file_tool.dart';
+export 'src/tools/list_files_tool.dart';
 export 'src/tools/read_file_tool.dart';
 export 'src/tools/run_process_tool.dart';

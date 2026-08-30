@@ -46,8 +46,8 @@ final class RunProcessTool implements Tool {
     );
     return {
       'exitCode': result.exitCode,
-      'stdout': result.stdout.toString().trimRight(),
-      'stderr': result.stderr.toString().trimRight(),
+      'stdout': result.stdout.toString(),
+      'stderr': result.stderr.toString(),
     };
   }
 }
