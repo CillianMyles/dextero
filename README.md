@@ -1,16 +1,35 @@
 # Dextero
 
-A work-in-progress typed coding-agent harness written in Dart.
+A work-in-progress typed, opinionated computer-agent harness written in Dart.
 
-## Question
+## Product direction
+
+Dextero is intended to be a **general-purpose computer agent**, not a coding
+agent with a few extra tools. Its job is to understand a task, coordinate work
+across the user's computer and connected services, and keep that work visible,
+controllable, and auditable.
+
+Coding is one important capability, but it is not the product boundary.
+Dextero should be able to use focused coding primitives itself when that is
+efficient, or invoke and supervise a specialist coding agent such as Codex or
+Pi when a task needs deeper repository work. The same delegation model should
+eventually apply to browser automation, research, communication, media, and
+other specialist systems.
+
+The opinionated part should live in orchestration and policy: typed contracts,
+local-first control, explicit permissions, risk-aware approvals, durable task
+state, strong auditability, and useful defaults rather than an unbounded bag of
+tools.
+
+## Original feasibility question
 
 Can Dart produce a small, fast-starting standalone CLI that executes a child
 process, captures its result as structured data, preserves its exit status,
 and cross-compiles from macOS to Linux?
 
-## Scope
+## Original spike scope
 
-The spike intentionally implements one narrow harness primitive:
+The project began by implementing one narrow harness primitive:
 
 - accept a command through `--run`;
 - execute it through the platform shell;
@@ -24,8 +43,8 @@ external runtime requirements after compilation.
 
 ## Agent primitives
 
-The spike now also sketches the next layer of a harness without choosing an
-LLM vendor:
+The spike now also sketches the next layer of a general agent harness without
+choosing an LLM vendor:
 
 - `ToolDefinition`, `ToolCall`, and `ToolResult` provide the JSON-shaped wire
   types;
@@ -187,20 +206,23 @@ best matches actual work is:
    reimplementing GitHub, OpenClaw, Strava, and every future integration.
 5. **`HttpFetchTool`** — start with GET/HEAD and enforce SSRF, redirect, content
    type, size, and timeout policies; never inherit ambient cookies or secrets.
-6. **Browser/CDP tool family** — valuable after the coding core, but keep it in
-   an isolated profile with DOM-first actions and approval for consequential
-   submissions.
+6. **Browser/CDP tool family** — essential to the broader computer-agent
+   direction; keep it in an isolated profile with DOM-first actions and
+   approval for consequential submissions.
 
-Do not build bespoke service tools, whole-desktop control, general deletion,
-Git mutation, or messaging/cron primitives before the MCP and approval/audit
-layers exist. Bash was historically dominant, but that is evidence for filling
-typed-tool gaps—not for making arbitrary shell execution the default.
+Do not build bespoke service tools, unrestricted whole-desktop control,
+general deletion, Git mutation, or messaging/cron primitives before the MCP
+and approval/audit layers exist. Bash was historically dominant, but that is
+evidence for filling typed-tool gaps—not for making arbitrary shell execution
+the default.
 
 ## Limitations
 
-Dextero currently has a credible agent kernel, not a complete coding harness.
-Compared with mature tools such as Pi or Codex CLI, the largest gaps are in
-control, state, safety, and user experience rather than the number of tools.
+Dextero currently has a credible agent kernel, not a complete general-purpose
+computer agent. Mature coding harnesses such as Pi and Codex CLI are useful
+benchmarks for the execution core, but coding is only one specialist domain
+Dextero should be able to use or delegate to. The largest gaps are in control,
+state, safety, delegation, and user experience rather than the number of tools.
 
 ### Sessions and context
 
@@ -233,23 +255,29 @@ control, state, safety, and user experience rather than the number of tools.
 - Tool schemas are exposed to model adapters, but runtime argument validation
   is implemented separately by each sample tool instead of centrally.
 
-### Coding workflow and UX
+### Capabilities and UX
 
 - File search, atomic multi-file patching, Git inspection, MCP, HTTP fetching,
-  language intelligence, and browser automation are not implemented.
+  browser automation, desktop control, and connected-service adapters are not
+  implemented.
 - There is no interactive TUI, diff review, session picker, live progress,
   permission controls, configuration profiles, shell completion, or stable
   JSONL automation interface.
 - Project instructions, skills, plugins, hooks, and dynamically registered
   tools are not yet supported.
+- There is no common delegation contract for invoking specialist agents,
+  monitoring their progress, steering them, enforcing scoped permissions, or
+  incorporating their results back into the parent task.
 
 ### Codex app-server boundary
 
 `CodexAppServerAgent` is intentionally a Dart client and tool host around Codex
 app-server. Codex still owns model execution, OAuth, context management, and
-much of the mature harness behaviour. This proves that Dart can extend and
-control Codex, but it does not prove that the provider-neutral `AgentLoop` can
-replace Codex or Pi.
+much of the mature coding-harness behaviour. This proves that Dart can extend
+and control a specialist coding agent. It does not prove that the
+provider-neutral `AgentLoop` can replace Codex or Pi—and replacement is not a
+product requirement if Dextero can invoke them cleanly when coding expertise is
+needed.
 
 The adapter also requires an installed Codex CLI, an existing login, and an
 experimental app-server API. It is suitable for the spike, not yet a stable
@@ -266,8 +294,8 @@ public wire contract.
 
 ## Future work
 
-The next milestones should build the harness machinery before expanding into
-many more service-specific tools:
+The next milestones should build the general orchestration machinery before
+expanding into many more service-specific tools:
 
 1. Define a typed event stream for model deltas, tool lifecycle events,
    approvals, output, usage, and errors.
@@ -275,24 +303,29 @@ many more service-specific tools:
    PTY support, and bounded background execution.
 3. Persist resumable sessions with checkpoints, token budgeting, context
    compaction, and crash recovery.
-4. Implement `SearchFilesTool`, atomic `ApplyPatchTool`, and read-only
-   `GitInspectTool`.
-5. Introduce a permission engine plus platform-specific OS sandbox adapters,
+4. Define a specialist-agent delegation protocol with scoped tasks,
+   permissions, progress events, steering, cancellation, and structured
+   results; use a coding agent as the first implementation.
+5. Implement `SearchFilesTool`, atomic `ApplyPatchTool`, and read-only
+   `GitInspectTool` as the core local-workspace capability set.
+6. Introduce a permission engine plus platform-specific OS sandbox adapters,
    environment filtering, network policy, and an audit trail.
-6. Add an MCP client and dynamic tool registry before creating bespoke service
+7. Add an MCP client and dynamic tool registry before creating bespoke service
    integrations.
-7. Implement a direct streaming model adapter, starting with the OpenAI
+8. Implement a direct streaming model adapter, starting with the OpenAI
    Responses API, while keeping the Codex app-server path available.
-8. Build interactive and non-interactive frontends: a TUI for humans and a
+9. Build interactive and non-interactive frontends: a TUI for humans and a
    versioned JSONL protocol for automation.
-9. Load project instructions, skills, configuration, and lifecycle hooks.
-10. Add parallel tool scheduling, subagents, observability, cross-platform
+10. Add browser automation and constrained desktop-control adapters behind the
+    same permission, approval, and audit model.
+11. Load project instructions, skills, configuration, and lifecycle hooks.
+12. Add parallel tool scheduling, observability, cross-platform
     integration tests, and fuzz tests for malformed model/tool responses.
 
 ## Verdict: VALIDATED
 
 **Question:** Can Dart act as the native CLI and subprocess orchestration layer
-of a computer-use or coding harness?
+of a general-purpose computer-agent harness?
 
 **Evidence:** The source compiled into a 5.53 MB macOS executable, started in
 about 10 ms, emitted structured child-process results, propagated error status,
