@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:dart_harness_cli_spike/harness.dart';
+import 'package:dextero/harness.dart';
 import 'package:test/test.dart';
 
 void main() {

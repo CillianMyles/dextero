@@ -1,4 +1,6 @@
-# Dart Harness CLI Spike
+# Dextero
+
+A work-in-progress typed coding-agent harness written in Dart.
 
 ## Question
 
@@ -46,7 +48,6 @@ LLM vendor:
 Run the deterministic demo model through both sample tools:
 
 ```sh
-cd spikes/002-dart-harness-cli
 dart run bin/agent_demo.dart
 ```
 
@@ -72,7 +73,6 @@ Authenticate once using the Codex CLI, then run the Dart demo:
 ```sh
 codex login
 codex login status
-cd spikes/002-dart-harness-cli
 dart run bin/codex_oauth_demo.dart
 ```
 
@@ -113,7 +113,6 @@ argv preservation, shell semantics, non-zero exits, and timeout termination.
 ## Run from source
 
 ```sh
-cd spikes/002-dart-harness-cli
 dart run bin/harness.dart --run 'printf dart-harness-ok'
 ```
 
@@ -128,7 +127,6 @@ Expected output on macOS:
 Build for the current machine:
 
 ```sh
-cd spikes/002-dart-harness-cli
 mkdir -p build
 dart compile exe bin/harness.dart -o build/harness
 ./build/harness --run 'printf dart-harness-ok'
@@ -244,4 +242,4 @@ Puppeteer browser action, and one experimental desktop action behind the same
 typed Dart tool interface.
 
 See also:
-[Dart, Flutter and Serverpod as a remote computer-use harness](../../resources/posts/2026-08-30-dart-computer-use-coding-harness.md).
+[Dart, Flutter and Serverpod as a remote computer-use harness](https://github.com/CillianMyles/dexter-workspace/blob/main/resources/posts/2026-08-30-dart-computer-use-coding-harness.md).

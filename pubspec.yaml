@@ -1,5 +1,5 @@
-name: dart_harness_cli_spike
-description: Spike validating Dart as a native CLI and typed agent harness.
+name: dextero
+description: A typed coding-agent harness written in Dart.
 version: 0.0.1
 publish_to: none
 

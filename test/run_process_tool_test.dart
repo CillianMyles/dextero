@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:dart_harness_cli_spike/harness.dart';
+import 'package:dextero/harness.dart';
 import 'package:test/test.dart';
 
 void main() {

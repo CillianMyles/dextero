@@ -124,8 +124,8 @@ final class CodexAppServerAgent {
         'id': 0,
         'params': {
           'clientInfo': {
-            'name': 'dart_harness_cli_spike',
-            'title': 'Dart Harness CLI Spike',
+            'name': 'dextero',
+            'title': 'Dextero',
             'version': '0.0.1',
           },
           'capabilities': {'experimentalApi': true},
