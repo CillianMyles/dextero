@@ -196,29 +196,98 @@ Git mutation, or messaging/cron primitives before the MCP and approval/audit
 layers exist. Bash was historically dominant, but that is evidence for filling
 typed-tool gaps—not for making arbitrary shell execution the default.
 
-## Known limits
+## Limitations
 
-- Passing a complete command to a shell is deliberate for this experiment but
-  is not a safe production API for untrusted input. A real harness should
-  accept an executable and argument array separately by default.
-- `RunProcessTool` does not yet implement streaming output, cancellation,
+Dextero currently has a credible agent kernel, not a complete coding harness.
+Compared with mature tools such as Pi or Codex CLI, the largest gaps are in
+control, state, safety, and user experience rather than the number of tools.
+
+### Sessions and context
+
+- Runs cannot be persisted, resumed, forked, or recovered after a crash.
+- There is no context-window accounting, token budgeting, automatic
+  compaction, or conversation summarisation.
+- Messages are handled as a single synchronous exchange; attachments, images,
+  checkpoints, and queued steering messages are not modelled yet.
+
+### Execution safety
+
+- Workspace path checks are useful guardrails, but they are not an OS-enforced
+  sandbox or security boundary.
+- There is no permission engine, risk-based approval policy, network policy,
+  command allow/deny policy, secret filtering, or audit record.
+- `BashTool` remains a high-privilege escape hatch. It bounds time and output,
+  but does not filter the environment, enforce resource limits, or guarantee
+  termination of the complete child process tree.
+- `RunProcessTool` does not yet support streaming output, cancellation,
   timeouts, output limits, environment filtering, or sandboxing.
-- `BashTool` has timeout and output bounds but does not yet guarantee
-  process-tree termination, filter the environment, or implement an approval
-  policy. It should remain an explicit high-privilege escape hatch.
-- JSON Schema is exposed to model adapters but sample tool implementations do
-  their own minimal runtime validation; production code should centralise it.
-- Tool calls run sequentially. Independent calls could later be scheduled in
-  parallel once cancellation and resource limits exist.
-- The Codex OAuth adapter depends on an installed Codex CLI, an existing login,
-  and an experimental app-server surface. It is appropriate for this spike, not
-  yet a frozen public wire contract.
-- It does not test native packages, MCP, browser automation, Windows execution,
-  or Linux execution; the Linux artifact was inspected but not run on Linux.
+
+### Model and execution engine
+
+- `AgentModel` is only an adapter seam. Dextero does not yet provide direct
+  production adapters with streaming, retries, backoff, usage accounting,
+  capability discovery, or provider-specific tool-call normalisation.
+- Tool calls run sequentially without cancellation, background execution,
+  interactive PTYs, incremental output events, lifecycle hooks, idempotency,
+  or subagent delegation.
+- Tool schemas are exposed to model adapters, but runtime argument validation
+  is implemented separately by each sample tool instead of centrally.
+
+### Coding workflow and UX
+
+- File search, atomic multi-file patching, Git inspection, MCP, HTTP fetching,
+  language intelligence, and browser automation are not implemented.
+- There is no interactive TUI, diff review, session picker, live progress,
+  permission controls, configuration profiles, shell completion, or stable
+  JSONL automation interface.
+- Project instructions, skills, plugins, hooks, and dynamically registered
+  tools are not yet supported.
+
+### Codex app-server boundary
+
+`CodexAppServerAgent` is intentionally a Dart client and tool host around Codex
+app-server. Codex still owns model execution, OAuth, context management, and
+much of the mature harness behaviour. This proves that Dart can extend and
+control Codex, but it does not prove that the provider-neutral `AgentLoop` can
+replace Codex or Pi.
+
+The adapter also requires an installed Codex CLI, an existing login, and an
+experimental app-server API. It is suitable for the spike, not yet a stable
+public wire contract.
+
+### Platform coverage
+
+- Native packages, MCP, browser automation, Windows execution, and Linux
+  execution have not been tested; the Linux artifact was inspected but not run.
 - A standalone Dart executable includes the Dart runtime, not arbitrary native
-  libraries or external tools used by the application.
-- Windows and macOS releases still need native build runners; current Dart
-  cross-compilation targets Linux.
+  libraries or external programs used by the application.
+- Windows and macOS releases still need native build runners; the current Dart
+  SDK only offered Linux cross-compilation from this host.
+
+## Future work
+
+The next milestones should build the harness machinery before expanding into
+many more service-specific tools:
+
+1. Define a typed event stream for model deltas, tool lifecycle events,
+   approvals, output, usage, and errors.
+2. Add cancellation, streaming process output, reliable process-tree cleanup,
+   PTY support, and bounded background execution.
+3. Persist resumable sessions with checkpoints, token budgeting, context
+   compaction, and crash recovery.
+4. Implement `SearchFilesTool`, atomic `ApplyPatchTool`, and read-only
+   `GitInspectTool`.
+5. Introduce a permission engine plus platform-specific OS sandbox adapters,
+   environment filtering, network policy, and an audit trail.
+6. Add an MCP client and dynamic tool registry before creating bespoke service
+   integrations.
+7. Implement a direct streaming model adapter, starting with the OpenAI
+   Responses API, while keeping the Codex app-server path available.
+8. Build interactive and non-interactive frontends: a TUI for humans and a
+   versioned JSONL protocol for automation.
+9. Load project instructions, skills, configuration, and lifecycle hooks.
+10. Add parallel tool scheduling, subagents, observability, cross-platform
+    integration tests, and fuzz tests for malformed model/tool responses.
 
 ## Verdict: VALIDATED
 
