@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:dextero_core/dextero_core.dart';
+import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
-import 'task_runtime.dart';
+import 'chat_runtime.dart';
 
 /// The first typed control-plane slice exposed to trusted controllers.
 final class ControlEndpoint extends Endpoint {
@@ -19,32 +19,60 @@ final class ControlEndpoint extends Endpoint {
     version: '0.0.1',
     startedAt: _startedAt,
     persistence: 'memory',
+    conversationId: ChatRuntime.conversationId,
+    retentionNotice: 'History is retained only until the server restarts.',
     databaseRequired: false,
     streamingAvailable: true,
   );
 
-  /// Starts work in the local core and streams its lifecycle and result.
-  Stream<TaskEvent> runTask(Session session, String prompt) async* {
-    final normalizedPrompt = prompt.trim();
-    if (normalizedPrompt.isEmpty || normalizedPrompt.length > 32000) {
-      throw ArgumentError.value(
-        prompt,
-        'prompt',
-        'must contain between 1 and 32000 characters',
-      );
-    }
-
-    await for (final event in TaskRuntime.runner.run(normalizedPrompt)) {
-      yield _toProtocolEvent(event);
-    }
+  /// Canonically accepts a user message before starting assistant work.
+  Future<ChatSubmission> submitMessage(
+    Session session,
+    ChatSubmitRequest request,
+  ) async {
+    final submission = await ChatRuntime.service.submit(
+      conversationId: request.conversationId,
+      message: request.message,
+      correlationId: request.correlationId,
+    );
+    return ChatSubmission(
+      conversationId: submission.conversationId,
+      runId: submission.runId,
+      correlationId: submission.correlationId,
+      userEntry: _toProtocolEntry(submission.userEntry),
+    );
   }
 
-  TaskEvent _toProtocolEvent(CoreTaskEvent event) => TaskEvent(
-    taskId: event.taskId,
-    sequence: event.sequence,
-    kind: TaskEventKind.values.byName(event.kind.name),
-    message: event.message,
-    timestamp: event.timestamp,
-    terminal: event.terminal,
+  /// Returns the complete process-local history for one conversation.
+  Future<List<ChatEntry>> history(
+    Session session,
+    String conversationId,
+  ) async => (await ChatRuntime.service.store.history(
+    conversationId,
+  )).map(_toProtocolEntry).toList(growable: false);
+
+  /// Replays entries after the cursor, then streams future appends.
+  Stream<ChatEntry> streamHistory(
+    Session session,
+    String conversationId,
+    int afterSequence,
+  ) => ChatRuntime.service.store
+      .watch(conversationId, afterSequence: afterSequence)
+      .map(_toProtocolEntry);
+
+  ChatEntry _toProtocolEntry(core.ChatHistoryEntry entry) => ChatEntry(
+    conversationId: entry.conversationId,
+    entryId: entry.entryId,
+    sequence: entry.sequence,
+    kind: ChatEntryKind.values.byName(entry.kind.name),
+    status: ChatEntryStatus.values.byName(entry.status.name),
+    content: entry.content,
+    createdAt: entry.createdAt,
+    correlationId: entry.correlationId,
+    source: ChatEntrySource.values.byName(entry.source.name),
+    truncated: entry.truncated,
+    runId: entry.runId,
+    toolCallId: entry.toolCallId,
+    toolName: entry.toolName,
   );
 }

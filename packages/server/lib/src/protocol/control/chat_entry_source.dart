@@ -11,30 +11,24 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
-enum TaskEventKind implements _i1.SerializableModel {
-  queued,
-  running,
-  output,
-  completed,
-  failed;
+enum ChatEntrySource implements _i1.SerializableModel {
+  user,
+  dextero,
+  codex;
 
-  static TaskEventKind fromJson(String name) {
+  static ChatEntrySource fromJson(String name) {
     switch (name) {
-      case 'queued':
-        return TaskEventKind.queued;
-      case 'running':
-        return TaskEventKind.running;
-      case 'output':
-        return TaskEventKind.output;
-      case 'completed':
-        return TaskEventKind.completed;
-      case 'failed':
-        return TaskEventKind.failed;
+      case 'user':
+        return ChatEntrySource.user;
+      case 'dextero':
+        return ChatEntrySource.dextero;
+      case 'codex':
+        return ChatEntrySource.codex;
       default:
         throw ArgumentError(
-          'Value "$name" cannot be converted to "TaskEventKind"',
+          'Value "$name" cannot be converted to "ChatEntrySource"',
         );
     }
   }

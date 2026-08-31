@@ -13,28 +13,31 @@
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
-enum TaskEventKind implements _i1.SerializableModel {
-  queued,
-  running,
-  output,
-  completed,
-  failed;
+enum ChatEntryKind implements _i1.SerializableModel {
+  userMessage,
+  assistantMessage,
+  toolCall,
+  toolResult,
+  lifecycle,
+  error;
 
-  static TaskEventKind fromJson(String name) {
+  static ChatEntryKind fromJson(String name) {
     switch (name) {
-      case 'queued':
-        return TaskEventKind.queued;
-      case 'running':
-        return TaskEventKind.running;
-      case 'output':
-        return TaskEventKind.output;
-      case 'completed':
-        return TaskEventKind.completed;
-      case 'failed':
-        return TaskEventKind.failed;
+      case 'userMessage':
+        return ChatEntryKind.userMessage;
+      case 'assistantMessage':
+        return ChatEntryKind.assistantMessage;
+      case 'toolCall':
+        return ChatEntryKind.toolCall;
+      case 'toolResult':
+        return ChatEntryKind.toolResult;
+      case 'lifecycle':
+        return ChatEntryKind.lifecycle;
+      case 'error':
+        return ChatEntryKind.error;
       default:
         throw ArgumentError(
-          'Value "$name" cannot be converted to "TaskEventKind"',
+          'Value "$name" cannot be converted to "ChatEntryKind"',
         );
     }
   }

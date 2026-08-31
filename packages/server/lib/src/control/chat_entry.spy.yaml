@@ -1,0 +1,15 @@
+class: ChatEntry
+fields:
+  conversationId: String
+  entryId: String
+  sequence: int
+  kind: ChatEntryKind
+  status: ChatEntryStatus
+  content: String
+  createdAt: DateTime
+  correlationId: String
+  source: ChatEntrySource
+  truncated: bool
+  runId: String?
+  toolCallId: String?
+  toolName: String?

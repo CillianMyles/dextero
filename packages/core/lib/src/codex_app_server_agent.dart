@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'chat_service.dart';
+import 'safe_metadata.dart';
 import 'tool.dart';
 
 typedef CodexTransportFactory = Future<CodexAppServerTransport> Function();
@@ -75,13 +77,44 @@ final class CodexAgentRun {
   const CodexAgentRun({
     required this.output,
     required this.threadId,
+    required this.turnId,
     required this.toolCalls,
   });
 
   final String output;
   final String threadId;
+  final String turnId;
   final int toolCalls;
 }
+
+enum CodexAgentActivityKind {
+  lifecycle,
+  assistantMessage,
+  toolCallStarted,
+  toolCallCompleted,
+  error,
+}
+
+final class CodexAgentActivity {
+  const CodexAgentActivity({
+    required this.kind,
+    required this.summary,
+    this.toolCallId,
+    this.toolName,
+    this.success,
+    this.retrying = false,
+  });
+
+  final CodexAgentActivityKind kind;
+  final SafeSummary summary;
+  final String? toolCallId;
+  final String? toolName;
+  final bool? success;
+  final bool retrying;
+}
+
+typedef CodexAgentActivitySink =
+    FutureOr<void> Function(CodexAgentActivity activity);
 
 /// Runs host-provided tools through Codex app-server's dynamic-tool protocol.
 ///
@@ -107,7 +140,11 @@ final class CodexAppServerAgent {
   final Duration messageTimeout;
   final CodexTransportFactory _transportFactory;
 
-  Future<CodexAgentRun> run(String prompt, {required List<Tool> tools}) async {
+  Future<CodexAgentRun> run(
+    String prompt, {
+    required List<Tool> tools,
+    CodexAgentActivitySink? onActivity,
+  }) async {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
     }
@@ -178,23 +215,72 @@ final class CodexAppServerAgent {
           ],
         },
       });
-      await _waitForResponse(messages, 2);
+      final turnResponse = await _waitForResponse(messages, 2);
+      final turn = turnResponse['turn'];
+      if (turn is! Map || turn['id'] is! String) {
+        throw const FormatException('turn/start response omitted turn.id');
+      }
+      final turnId = turn['id']! as String;
+      await onActivity?.call(
+        CodexAgentActivity(
+          kind: CodexAgentActivityKind.lifecycle,
+          summary: SafeMetadata.text('Codex is working'),
+        ),
+      );
 
       String? output;
       String? lastError;
       var toolCallCount = 0;
+      final startedToolCalls = <String>{};
+      final completedToolCalls = <String>{};
       while (await _moveNext(messages)) {
         final message = messages.current;
         final method = message['method'];
         final params = message['params'];
         if (method == 'item/tool/call' && message.containsKey('id')) {
           toolCallCount++;
-          await _handleToolCall(
+          final request = _toolRequest(message['id'], params);
+          if (startedToolCalls.add(request.callId)) {
+            await onActivity?.call(
+              CodexAgentActivity(
+                kind: CodexAgentActivityKind.toolCallStarted,
+                summary: SafeMetadata.toolCall(
+                  request.toolName,
+                  request.arguments,
+                ),
+                toolCallId: request.callId,
+                toolName: request.toolName,
+              ),
+            );
+          }
+          final execution = await _handleToolCall(
             transport,
             requestId: message['id'],
             params: params,
             tools: toolsByName,
           );
+          if (completedToolCalls.add(execution.callId)) {
+            await onActivity?.call(
+              CodexAgentActivity(
+                kind: CodexAgentActivityKind.toolCallCompleted,
+                summary: SafeMetadata.toolResult(
+                  execution.toolName,
+                  execution.content,
+                  success: execution.success,
+                ),
+                toolCallId: execution.callId,
+                toolName: execution.toolName,
+                success: execution.success,
+              ),
+            );
+          }
+          continue;
+        }
+        if (method == 'item/started' && params is Map) {
+          final activity = _toolItemActivity(params['item'], completed: false);
+          if (activity != null && startedToolCalls.add(activity.toolCallId!)) {
+            await onActivity?.call(activity);
+          }
           continue;
         }
         if (method == 'item/completed' && params is Map) {
@@ -203,6 +289,18 @@ final class CodexAppServerAgent {
               item['type'] == 'agentMessage' &&
               item['text'] is String) {
             output = item['text']! as String;
+            await onActivity?.call(
+              CodexAgentActivity(
+                kind: CodexAgentActivityKind.assistantMessage,
+                summary: SafeMetadata.message(output),
+              ),
+            );
+          } else {
+            final activity = _toolItemActivity(item, completed: true);
+            if (activity != null &&
+                completedToolCalls.add(activity.toolCallId!)) {
+              await onActivity?.call(activity);
+            }
           }
           continue;
         }
@@ -211,6 +309,19 @@ final class CodexAppServerAgent {
           lastError = error is Map
               ? error['message']?.toString()
               : error.toString();
+          final retrying = params['willRetry'] == true;
+          await onActivity?.call(
+            CodexAgentActivity(
+              kind: CodexAgentActivityKind.error,
+              summary: SafeMetadata.text(
+                retrying
+                    ? 'Codex reported a temporary error and will retry: '
+                          '${lastError ?? 'Unknown error'}'
+                    : lastError ?? 'Codex reported an error',
+              ),
+              retrying: retrying,
+            ),
+          );
           continue;
         }
         if (method == 'turn/completed' && params is Map) {
@@ -229,6 +340,7 @@ final class CodexAppServerAgent {
           return CodexAgentRun(
             output: output,
             threadId: threadId,
+            turnId: turnId,
             toolCalls: toolCallCount,
           );
         }
@@ -268,7 +380,7 @@ final class CodexAppServerAgent {
   Future<bool> _moveNext(StreamIterator<JsonMap> messages) =>
       messages.moveNext().timeout(messageTimeout);
 
-  Future<void> _handleToolCall(
+  Future<_ToolExecution> _handleToolCall(
     CodexAppServerTransport transport, {
     required Object? requestId,
     required Object? params,
@@ -276,10 +388,15 @@ final class CodexAppServerAgent {
   }) async {
     var success = false;
     Object? content;
+    var toolName = 'unknown_tool';
+    var callId = requestId.toString();
+    var arguments = <String, Object?>{};
     if (params is! Map || params['tool'] is! String) {
       content = 'Malformed dynamic tool request.';
     } else {
       final name = params['tool']! as String;
+      toolName = name;
+      if (params['callId'] is String) callId = params['callId']! as String;
       final tool = tools[name];
       final rawArguments = params['arguments'];
       if (tool == null) {
@@ -287,8 +404,9 @@ final class CodexAppServerAgent {
       } else if (rawArguments is! Map) {
         content = 'Tool arguments must be a JSON object.';
       } else {
+        arguments = rawArguments.cast<String, Object?>();
         try {
-          content = await tool.call(rawArguments.cast<String, Object?>());
+          content = await tool.call(arguments);
           success = true;
         } on Object catch (error) {
           content = error.toString();
@@ -305,6 +423,109 @@ final class CodexAppServerAgent {
         'success': success,
       },
     });
+    return _ToolExecution(
+      callId: callId,
+      toolName: toolName,
+      arguments: arguments,
+      content: content,
+      success: success,
+    );
+  }
+
+  _ToolRequest _toolRequest(Object? requestId, Object? params) {
+    if (params is! Map) {
+      return _ToolRequest(
+        callId: requestId.toString(),
+        toolName: 'unknown_tool',
+        arguments: const {},
+      );
+    }
+    return _ToolRequest(
+      callId: params['callId'] is String
+          ? params['callId']! as String
+          : requestId.toString(),
+      toolName: params['tool'] is String
+          ? params['tool']! as String
+          : 'unknown_tool',
+      arguments: params['arguments'] is Map
+          ? (params['arguments']! as Map).cast<String, Object?>()
+          : const {},
+    );
+  }
+
+  CodexAgentActivity? _toolItemActivity(
+    Object? rawItem, {
+    required bool completed,
+  }) {
+    if (rawItem is! Map || rawItem['id'] is! String) return null;
+    final id = rawItem['id']! as String;
+    final type = rawItem['type'];
+    final status = rawItem['status']?.toString();
+    final success = status == null
+        ? completed
+        : !{'failed', 'declined', 'error'}.contains(status);
+    final (toolName, summary) = switch (type) {
+      'dynamicToolCall' => (
+        rawItem['tool'] is String ? rawItem['tool']! as String : 'dynamic_tool',
+        completed
+            ? SafeMetadata.toolResult(
+                rawItem['tool'] is String
+                    ? rawItem['tool']! as String
+                    : 'dynamic_tool',
+                null,
+                success: success,
+              )
+            : SafeMetadata.toolCall(
+                rawItem['tool'] is String
+                    ? rawItem['tool']! as String
+                    : 'dynamic_tool',
+                rawItem['arguments'] is Map
+                    ? (rawItem['arguments']! as Map).cast<String, Object?>()
+                    : const {},
+              ),
+      ),
+      'commandExecution' => (
+        'command_execution',
+        SafeMetadata.text(
+          completed
+              ? 'Command execution ${success ? 'completed' : 'failed'}'
+              : 'Command execution started',
+        ),
+      ),
+      'fileChange' => (
+        'file_change',
+        SafeMetadata.text(
+          completed
+              ? 'File change ${success ? 'completed' : 'failed'}'
+              : 'File change started',
+        ),
+      ),
+      'mcpToolCall' => (
+        rawItem['tool'] is String ? rawItem['tool']! as String : 'mcp_tool',
+        SafeMetadata.text(
+          completed
+              ? 'MCP tool ${success ? 'completed' : 'failed'}'
+              : 'MCP tool started',
+        ),
+      ),
+      'webSearch' => (
+        'web_search',
+        SafeMetadata.text(
+          completed ? 'Web search completed' : 'Web search started',
+        ),
+      ),
+      _ => (null, null),
+    };
+    if (toolName == null || summary == null) return null;
+    return CodexAgentActivity(
+      kind: completed
+          ? CodexAgentActivityKind.toolCallCompleted
+          : CodexAgentActivityKind.toolCallStarted,
+      summary: summary,
+      toolCallId: id,
+      toolName: toolName,
+      success: completed ? success : null,
+    );
   }
 
   String _encodeToolContent(Object? content) {
@@ -314,4 +535,75 @@ final class CodexAppServerAgent {
       return content.toString();
     }
   }
+}
+
+final class CodexConversationAgent implements ConversationAgent {
+  CodexConversationAgent({
+    required CodexAppServerAgent agent,
+    required List<Tool> tools,
+  }) : _agent = agent,
+       _tools = List.unmodifiable(tools);
+
+  final CodexAppServerAgent _agent;
+  final List<Tool> _tools;
+
+  @override
+  Future<ConversationAgentResult> run(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+  }) async {
+    final result = await _agent.run(
+      prompt,
+      tools: _tools,
+      onActivity: (activity) => onEvent(
+        ConversationAgentEvent(
+          kind: switch (activity.kind) {
+            CodexAgentActivityKind.lifecycle =>
+              ConversationAgentEventKind.lifecycle,
+            CodexAgentActivityKind.assistantMessage =>
+              ConversationAgentEventKind.assistantMessage,
+            CodexAgentActivityKind.toolCallStarted =>
+              ConversationAgentEventKind.toolCallStarted,
+            CodexAgentActivityKind.toolCallCompleted =>
+              ConversationAgentEventKind.toolCallCompleted,
+            CodexAgentActivityKind.error => ConversationAgentEventKind.error,
+          },
+          summary: activity.summary,
+          toolCallId: activity.toolCallId,
+          toolName: activity.toolName,
+          success: activity.success,
+          retrying: activity.retrying,
+        ),
+      ),
+    );
+    return ConversationAgentResult(output: result.output);
+  }
+}
+
+final class _ToolExecution {
+  const _ToolExecution({
+    required this.callId,
+    required this.toolName,
+    required this.arguments,
+    required this.content,
+    required this.success,
+  });
+
+  final String callId;
+  final String toolName;
+  final JsonMap arguments;
+  final Object? content;
+  final bool success;
+}
+
+final class _ToolRequest {
+  const _ToolRequest({
+    required this.callId,
+    required this.toolName,
+    required this.arguments,
+  });
+
+  final String callId;
+  final String toolName;
+  final JsonMap arguments;
 }

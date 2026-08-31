@@ -1,8 +1,9 @@
-enum: TaskEventKind
+enum: ChatEntryStatus
 serialized: byName
 values:
+  - submitted
   - queued
   - running
-  - output
+  - warning
   - completed
   - failed

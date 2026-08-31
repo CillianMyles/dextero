@@ -17,6 +17,7 @@ void main() {
 
     expect(run.output, 'The tool said hello.');
     expect(run.threadId, 'thread-1');
+    expect(run.turnId, 'turn-1');
     expect(run.toolCalls, 1);
     expect(transport.closed, isTrue);
     final initialize = transport.sent[0];
@@ -52,6 +53,62 @@ void main() {
       ],
       'success': true,
     });
+  });
+
+  test('adapts real item and dynamic-tool activity without raw data', () async {
+    final transport = _ScriptedTransport(toolName: 'echo');
+    final activities = <CodexAgentActivity>[];
+
+    await CodexAppServerAgent(
+      transportFactory: () async => transport,
+    ).run('go', tools: [_EchoTool()], onActivity: activities.add);
+
+    expect(
+      activities.map((activity) => activity.kind),
+      containsAllInOrder([
+        CodexAgentActivityKind.lifecycle,
+        CodexAgentActivityKind.toolCallStarted,
+        CodexAgentActivityKind.toolCallCompleted,
+        CodexAgentActivityKind.assistantMessage,
+      ]),
+    );
+    expect(
+      activities
+          .where((activity) => activity.toolCallId == 'call-1')
+          .map((activity) => activity.kind),
+      [
+        CodexAgentActivityKind.toolCallStarted,
+        CodexAgentActivityKind.toolCallCompleted,
+      ],
+    );
+    final rendered = activities.map((activity) => activity.summary.text).join();
+    expect(rendered, isNot(contains('raw-secret-value')));
+    expect(rendered, isNot(contains('raw result')));
+    expect(rendered, isNot(contains(jsonEncode({'echo': 'hello'}))));
+  });
+
+  test('preserves multiline app-server assistant messages', () async {
+    final transport = _ScriptedTransport(
+      toolName: 'echo',
+      output: 'Summary\n\n```dart\nprint(1);\n```',
+    );
+    final activities = <CodexAgentActivity>[];
+
+    final run = await CodexAppServerAgent(
+      transportFactory: () async => transport,
+    ).run('go', tools: [_EchoTool()], onActivity: activities.add);
+
+    expect(run.output, 'Summary\n\n```dart\nprint(1);\n```');
+    expect(
+      activities
+          .singleWhere(
+            (activity) =>
+                activity.kind == CodexAgentActivityKind.assistantMessage,
+          )
+          .summary
+          .text,
+      'Summary\n\n```dart\nprint(1);\n```',
+    );
   });
 
   test('returns tool failures to app-server as unsuccessful results', () async {
@@ -187,9 +244,10 @@ base class _FakeTransport implements CodexAppServerTransport {
 }
 
 final class _ScriptedTransport extends _FakeTransport {
-  _ScriptedTransport({required this.toolName});
+  _ScriptedTransport({required this.toolName, this.output});
 
   final String toolName;
+  final String? output;
 
   @override
   void respond(JsonMap message) {
@@ -211,6 +269,21 @@ final class _ScriptedTransport extends _FakeTransport {
           },
         });
         emit({
+          'method': 'item/started',
+          'params': {
+            'threadId': 'thread-1',
+            'turnId': 'turn-1',
+            'startedAtMs': 1,
+            'item': {
+              'id': 'call-1',
+              'type': 'dynamicToolCall',
+              'tool': toolName,
+              'arguments': {'token': 'raw-secret-value'},
+              'status': 'inProgress',
+            },
+          },
+        });
+        emit({
           'id': 'tool-request-1',
           'method': 'item/tool/call',
           'params': {
@@ -226,11 +299,32 @@ final class _ScriptedTransport extends _FakeTransport {
         emit({
           'method': 'item/completed',
           'params': {
+            'threadId': 'thread-1',
+            'turnId': 'turn-1',
+            'completedAtMs': 2,
+            'item': {
+              'id': 'call-1',
+              'type': 'dynamicToolCall',
+              'tool': toolName,
+              'arguments': {'token': 'raw-secret-value'},
+              'status': 'completed',
+              'success': true,
+              'contentItems': [
+                {'type': 'inputText', 'text': 'raw result'},
+              ],
+            },
+          },
+        });
+        emit({
+          'method': 'item/completed',
+          'params': {
             'item': {
               'type': 'agentMessage',
-              'text': toolName == 'fail'
-                  ? 'The tool failed safely.'
-                  : 'The tool said hello.',
+              'text':
+                  output ??
+                  (toolName == 'fail'
+                      ? 'The tool failed safely.'
+                      : 'The tool said hello.'),
             },
           },
         });

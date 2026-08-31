@@ -14,8 +14,12 @@
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'dart:async' as _i2;
 import 'package:dextero_server/src/protocol/control/host_status.dart' as _i3;
-import 'package:dextero_server/src/protocol/control/task_event.dart' as _i4;
-import 'protocol.dart' as _i5;
+import 'package:dextero_server/src/protocol/control/chat_submission.dart'
+    as _i4;
+import 'package:dextero_server/src/protocol/control/chat_submit_request.dart'
+    as _i5;
+import 'package:dextero_server/src/protocol/control/chat_entry.dart' as _i6;
+import 'protocol.dart' as _i7;
 
 /// The first typed control-plane slice exposed to trusted controllers.
 /// {@category Endpoint}
@@ -29,12 +33,29 @@ class EndpointControl extends _i1.EndpointRef {
   _i2.Future<_i3.HostStatus> status() =>
       caller.callServerEndpoint<_i3.HostStatus>('control', 'status', {});
 
-  /// Starts work in the local core and streams its lifecycle and result.
-  _i2.Stream<_i4.TaskEvent> runTask(String prompt) => caller
-      .callStreamingServerEndpoint<_i2.Stream<_i4.TaskEvent>, _i4.TaskEvent>(
+  /// Canonically accepts a user message before starting assistant work.
+  _i2.Future<_i4.ChatSubmission> submitMessage(_i5.ChatSubmitRequest request) =>
+      caller.callServerEndpoint<_i4.ChatSubmission>(
         'control',
-        'runTask',
-        {'prompt': prompt},
+        'submitMessage',
+        {'request': request},
+      );
+
+  /// Returns the complete process-local history for one conversation.
+  _i2.Future<List<_i6.ChatEntry>> history(String conversationId) =>
+      caller.callServerEndpoint<List<_i6.ChatEntry>>('control', 'history', {
+        'conversationId': conversationId,
+      });
+
+  /// Replays entries after the cursor, then streams future appends.
+  _i2.Stream<_i6.ChatEntry> streamHistory(
+    String conversationId,
+    int afterSequence,
+  ) => caller
+      .callStreamingServerEndpoint<_i2.Stream<_i6.ChatEntry>, _i6.ChatEntry>(
+        'control',
+        'streamHistory',
+        {'conversationId': conversationId, 'afterSequence': afterSequence},
         {},
       );
 }
@@ -54,7 +75,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i5.Protocol(),
+         _i7.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,

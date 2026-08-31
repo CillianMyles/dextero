@@ -1,0 +1,5 @@
+class: ChatSubmitRequest
+fields:
+  conversationId: String
+  message: String
+  correlationId: String?

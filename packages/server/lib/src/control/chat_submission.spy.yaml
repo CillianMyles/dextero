@@ -1,0 +1,6 @@
+class: ChatSubmission
+fields:
+  conversationId: String
+  runId: String
+  correlationId: String
+  userEntry: ChatEntry

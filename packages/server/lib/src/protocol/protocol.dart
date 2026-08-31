@@ -12,12 +12,21 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'control/host_status.dart' as _i2;
-import 'control/task_event.dart' as _i3;
-import 'control/task_event_kind.dart' as _i4;
+import 'control/chat_entry.dart' as _i2;
+import 'control/chat_entry_kind.dart' as _i3;
+import 'control/chat_entry_source.dart' as _i4;
+import 'control/chat_entry_status.dart' as _i5;
+import 'control/chat_submission.dart' as _i6;
+import 'control/chat_submit_request.dart' as _i7;
+import 'control/host_status.dart' as _i8;
+import 'package:dextero_server/src/protocol/control/chat_entry.dart' as _i9;
+export 'control/chat_entry.dart';
+export 'control/chat_entry_kind.dart';
+export 'control/chat_entry_source.dart';
+export 'control/chat_entry_status.dart';
+export 'control/chat_submission.dart';
+export 'control/chat_submit_request.dart';
 export 'control/host_status.dart';
-export 'control/task_event.dart';
-export 'control/task_event_kind.dart';
 export 'client.dart';
 
 class Protocol extends _i1.SerializationManager {
@@ -51,32 +60,64 @@ class Protocol extends _i1.SerializationManager {
       }
     }
 
-    if (t == _i2.HostStatus) {
-      return _i2.HostStatus.fromJson(data) as T;
+    if (t == _i2.ChatEntry) {
+      return _i2.ChatEntry.fromJson(data) as T;
     }
-    if (t == _i3.TaskEvent) {
-      return _i3.TaskEvent.fromJson(data) as T;
+    if (t == _i3.ChatEntryKind) {
+      return _i3.ChatEntryKind.fromJson(data) as T;
     }
-    if (t == _i4.TaskEventKind) {
-      return _i4.TaskEventKind.fromJson(data) as T;
+    if (t == _i4.ChatEntrySource) {
+      return _i4.ChatEntrySource.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i2.HostStatus?>()) {
-      return (data != null ? _i2.HostStatus.fromJson(data) : null) as T;
+    if (t == _i5.ChatEntryStatus) {
+      return _i5.ChatEntryStatus.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i3.TaskEvent?>()) {
-      return (data != null ? _i3.TaskEvent.fromJson(data) : null) as T;
+    if (t == _i6.ChatSubmission) {
+      return _i6.ChatSubmission.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i4.TaskEventKind?>()) {
-      return (data != null ? _i4.TaskEventKind.fromJson(data) : null) as T;
+    if (t == _i7.ChatSubmitRequest) {
+      return _i7.ChatSubmitRequest.fromJson(data) as T;
+    }
+    if (t == _i8.HostStatus) {
+      return _i8.HostStatus.fromJson(data) as T;
+    }
+    if (t == _i1.getType<_i2.ChatEntry?>()) {
+      return (data != null ? _i2.ChatEntry.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i3.ChatEntryKind?>()) {
+      return (data != null ? _i3.ChatEntryKind.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i4.ChatEntrySource?>()) {
+      return (data != null ? _i4.ChatEntrySource.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i5.ChatEntryStatus?>()) {
+      return (data != null ? _i5.ChatEntryStatus.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i6.ChatSubmission?>()) {
+      return (data != null ? _i6.ChatSubmission.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i7.ChatSubmitRequest?>()) {
+      return (data != null ? _i7.ChatSubmitRequest.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i8.HostStatus?>()) {
+      return (data != null ? _i8.HostStatus.fromJson(data) : null) as T;
+    }
+    if (t == List<_i9.ChatEntry>) {
+      return (data as List).map((e) => deserialize<_i9.ChatEntry>(e)).toList()
+          as T;
     }
     return super.deserialize<T>(data, t);
   }
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i2.HostStatus => 'HostStatus',
-      _i3.TaskEvent => 'TaskEvent',
-      _i4.TaskEventKind => 'TaskEventKind',
+      _i2.ChatEntry => 'ChatEntry',
+      _i3.ChatEntryKind => 'ChatEntryKind',
+      _i4.ChatEntrySource => 'ChatEntrySource',
+      _i5.ChatEntryStatus => 'ChatEntryStatus',
+      _i6.ChatSubmission => 'ChatSubmission',
+      _i7.ChatSubmitRequest => 'ChatSubmitRequest',
+      _i8.HostStatus => 'HostStatus',
       _ => null,
     };
   }
@@ -91,12 +132,20 @@ class Protocol extends _i1.SerializationManager {
     }
 
     switch (data) {
-      case _i2.HostStatus():
+      case _i2.ChatEntry():
+        return 'ChatEntry';
+      case _i3.ChatEntryKind():
+        return 'ChatEntryKind';
+      case _i4.ChatEntrySource():
+        return 'ChatEntrySource';
+      case _i5.ChatEntryStatus():
+        return 'ChatEntryStatus';
+      case _i6.ChatSubmission():
+        return 'ChatSubmission';
+      case _i7.ChatSubmitRequest():
+        return 'ChatSubmitRequest';
+      case _i8.HostStatus():
         return 'HostStatus';
-      case _i3.TaskEvent():
-        return 'TaskEvent';
-      case _i4.TaskEventKind():
-        return 'TaskEventKind';
     }
     return null;
   }
@@ -107,14 +156,26 @@ class Protocol extends _i1.SerializationManager {
     if (dataClassName is! String) {
       return super.deserializeByClassName(data);
     }
+    if (dataClassName == 'ChatEntry') {
+      return deserialize<_i2.ChatEntry>(data['data']);
+    }
+    if (dataClassName == 'ChatEntryKind') {
+      return deserialize<_i3.ChatEntryKind>(data['data']);
+    }
+    if (dataClassName == 'ChatEntrySource') {
+      return deserialize<_i4.ChatEntrySource>(data['data']);
+    }
+    if (dataClassName == 'ChatEntryStatus') {
+      return deserialize<_i5.ChatEntryStatus>(data['data']);
+    }
+    if (dataClassName == 'ChatSubmission') {
+      return deserialize<_i6.ChatSubmission>(data['data']);
+    }
+    if (dataClassName == 'ChatSubmitRequest') {
+      return deserialize<_i7.ChatSubmitRequest>(data['data']);
+    }
     if (dataClassName == 'HostStatus') {
-      return deserialize<_i2.HostStatus>(data['data']);
-    }
-    if (dataClassName == 'TaskEvent') {
-      return deserialize<_i3.TaskEvent>(data['data']);
-    }
-    if (dataClassName == 'TaskEventKind') {
-      return deserialize<_i4.TaskEventKind>(data['data']);
+      return deserialize<_i8.HostStatus>(data['data']);
     }
     return super.deserializeByClassName(data);
   }

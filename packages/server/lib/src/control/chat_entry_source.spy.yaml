@@ -1,0 +1,6 @@
+enum: ChatEntrySource
+serialized: byName
+values:
+  - user
+  - dextero
+  - codex

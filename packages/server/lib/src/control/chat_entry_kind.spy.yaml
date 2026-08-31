@@ -1,0 +1,9 @@
+enum: ChatEntryKind
+serialized: byName
+values:
+  - userMessage
+  - assistantMessage
+  - toolCall
+  - toolResult
+  - lifecycle
+  - error

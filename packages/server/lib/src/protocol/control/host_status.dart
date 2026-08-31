@@ -19,6 +19,8 @@ abstract class HostStatus implements _i1.SerializableModel {
     required this.version,
     required this.startedAt,
     required this.persistence,
+    required this.conversationId,
+    required this.retentionNotice,
     required this.databaseRequired,
     required this.streamingAvailable,
   });
@@ -28,6 +30,8 @@ abstract class HostStatus implements _i1.SerializableModel {
     required String version,
     required DateTime startedAt,
     required String persistence,
+    required String conversationId,
+    required String retentionNotice,
     required bool databaseRequired,
     required bool streamingAvailable,
   }) = _HostStatusImpl;
@@ -40,6 +44,8 @@ abstract class HostStatus implements _i1.SerializableModel {
         jsonSerialization['startedAt'],
       ),
       persistence: jsonSerialization['persistence'] as String,
+      conversationId: jsonSerialization['conversationId'] as String,
+      retentionNotice: jsonSerialization['retentionNotice'] as String,
       databaseRequired: _i1.BoolJsonExtension.fromJson(
         jsonSerialization['databaseRequired'],
       ),
@@ -57,6 +63,10 @@ abstract class HostStatus implements _i1.SerializableModel {
 
   String persistence;
 
+  String conversationId;
+
+  String retentionNotice;
+
   bool databaseRequired;
 
   bool streamingAvailable;
@@ -69,6 +79,8 @@ abstract class HostStatus implements _i1.SerializableModel {
     String? version,
     DateTime? startedAt,
     String? persistence,
+    String? conversationId,
+    String? retentionNotice,
     bool? databaseRequired,
     bool? streamingAvailable,
   });
@@ -80,6 +92,8 @@ abstract class HostStatus implements _i1.SerializableModel {
       'version': version,
       'startedAt': startedAt.toJson(),
       'persistence': persistence,
+      'conversationId': conversationId,
+      'retentionNotice': retentionNotice,
       'databaseRequired': databaseRequired,
       'streamingAvailable': streamingAvailable,
     };
@@ -97,6 +111,8 @@ class _HostStatusImpl extends HostStatus {
     required String version,
     required DateTime startedAt,
     required String persistence,
+    required String conversationId,
+    required String retentionNotice,
     required bool databaseRequired,
     required bool streamingAvailable,
   }) : super._(
@@ -104,6 +120,8 @@ class _HostStatusImpl extends HostStatus {
          version: version,
          startedAt: startedAt,
          persistence: persistence,
+         conversationId: conversationId,
+         retentionNotice: retentionNotice,
          databaseRequired: databaseRequired,
          streamingAvailable: streamingAvailable,
        );
@@ -117,6 +135,8 @@ class _HostStatusImpl extends HostStatus {
     String? version,
     DateTime? startedAt,
     String? persistence,
+    String? conversationId,
+    String? retentionNotice,
     bool? databaseRequired,
     bool? streamingAvailable,
   }) {
@@ -125,6 +145,8 @@ class _HostStatusImpl extends HostStatus {
       version: version ?? this.version,
       startedAt: startedAt ?? this.startedAt,
       persistence: persistence ?? this.persistence,
+      conversationId: conversationId ?? this.conversationId,
+      retentionNotice: retentionNotice ?? this.retentionNotice,
       databaseRequired: databaseRequired ?? this.databaseRequired,
       streamingAvailable: streamingAvailable ?? this.streamingAvailable,
     );

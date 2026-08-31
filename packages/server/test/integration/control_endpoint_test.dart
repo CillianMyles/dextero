@@ -1,13 +1,27 @@
-import 'package:dextero_core/dextero_core.dart';
+import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:dextero_server/src/auth/dextero_token_authenticator.dart';
-import 'package:dextero_server/src/control/task_runtime.dart';
+import 'package:dextero_server/src/control/chat_runtime.dart';
 import 'package:dextero_server/src/generated/protocol.dart';
 import 'package:test/test.dart';
 
 import 'test_tools/serverpod_test_tools.dart';
 
 void main() {
-  TaskRuntime.runner = _FakeTaskRunner();
+  late core.InMemoryChatHistoryStore store;
+  late core.ChatService service;
+  late String conversationId;
+
+  setUp(() async {
+    store = core.InMemoryChatHistoryStore();
+    service = core.ChatService(store: store, agent: _FakeConversationAgent());
+    conversationId = (await service.createConversation()).id;
+    ChatRuntime.configure(
+      chatService: service,
+      defaultConversationId: conversationId,
+    );
+  });
+
+  tearDown(() => store.close());
 
   withServerpod('Control endpoint', (sessionBuilder, endpoints) {
     final authenticatedSession = sessionBuilder.copyWith(
@@ -36,56 +50,124 @@ void main() {
       await session.close();
     });
 
-    test('reports a database-free in-memory host', () async {
+    test('reports the default volatile conversation', () async {
       final status = await endpoints.control.status(authenticatedSession);
 
       expect(status.name, 'Dextero');
       expect(status.persistence, 'memory');
+      expect(status.conversationId, conversationId);
+      expect(status.retentionNotice, contains('server restarts'));
       expect(status.databaseRequired, isFalse);
       expect(status.streamingAvailable, isTrue);
       expect(status.startedAt.isUtc, isTrue);
     });
 
-    test('streams a complete ordered core task lifecycle', () async {
-      final events = await endpoints.control
-          .runTask(authenticatedSession, 'Inspect the workspace')
-          .toList();
+    test(
+      'submits, stores, and streams canonical ordered chat history',
+      () async {
+        final submission = await endpoints.control.submitMessage(
+          authenticatedSession,
+          ChatSubmitRequest(
+            conversationId: conversationId,
+            message: 'Inspect the workspace',
+            correlationId: 'client-1',
+          ),
+        );
+        await store
+            .watch(conversationId)
+            .firstWhere(
+              (entry) =>
+                  entry.runId == submission.runId &&
+                  entry.kind == core.ChatEntryKind.lifecycle &&
+                  {
+                    core.ChatEntryStatus.completed,
+                    core.ChatEntryStatus.failed,
+                  }.contains(entry.status),
+            );
 
-      expect(events, hasLength(4));
-      expect(events.map((event) => event.sequence), [0, 1, 2, 3]);
-      expect(events.first.kind, TaskEventKind.queued);
-      expect(events.last.kind, TaskEventKind.completed);
-      expect(events.last.terminal, isTrue);
-      expect(events.map((event) => event.taskId).toSet(), hasLength(1));
+        final history = await endpoints.control.history(
+          authenticatedSession,
+          conversationId,
+        );
+        final streamed = await endpoints.control
+            .streamHistory(authenticatedSession, conversationId, -1)
+            .take(history.length)
+            .toList();
+
+        expect(submission.userEntry.sequence, 0);
+        expect(submission.userEntry.entryId, isNotEmpty);
+        expect(history.map((entry) => entry.sequence), [0, 1, 2, 3, 4, 5, 6]);
+        expect(
+          streamed.map((entry) => entry.entryId),
+          history.map((entry) => entry.entryId),
+        );
+        expect(history.map((entry) => entry.runId).toSet(), {submission.runId});
+        expect(history.map((entry) => entry.correlationId).toSet(), {
+          'client-1',
+        });
+        expect(history.first.kind, ChatEntryKind.userMessage);
+        expect(history.last.status, ChatEntryStatus.completed);
+      },
+    );
+
+    test('rejects empty messages before appending history', () async {
+      await expectLater(
+        endpoints.control.submitMessage(
+          authenticatedSession,
+          ChatSubmitRequest(conversationId: conversationId, message: '   '),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        await endpoints.control.history(authenticatedSession, conversationId),
+        isEmpty,
+      );
     });
 
-    test('rejects empty task prompts', () async {
+    test('rejects unknown conversation identifiers', () async {
       await expectLater(
-        endpoints.control.runTask(authenticatedSession, '   '),
-        emitsError(isA<ArgumentError>()),
+        endpoints.control.history(authenticatedSession, 'missing'),
+        throwsStateError,
       );
     });
   });
 }
 
-final class _FakeTaskRunner implements TaskRunner {
+final class _FakeConversationAgent implements core.ConversationAgent {
   @override
-  Stream<CoreTaskEvent> run(String prompt) async* {
-    const kinds = [
-      CoreTaskEventKind.queued,
-      CoreTaskEventKind.running,
-      CoreTaskEventKind.output,
-      CoreTaskEventKind.completed,
-    ];
-    for (var sequence = 0; sequence < kinds.length; sequence++) {
-      yield CoreTaskEvent(
-        taskId: 'task-test',
-        sequence: sequence,
-        kind: kinds[sequence],
-        message: sequence == 2 ? 'Workspace inspected' : kinds[sequence].name,
-        timestamp: DateTime.utc(2026),
-        terminal: sequence == kinds.length - 1,
-      );
-    }
+  Future<core.ConversationAgentResult> run(
+    String prompt, {
+    required core.ConversationAgentEventSink onEvent,
+  }) async {
+    await onEvent(
+      core.ConversationAgentEvent(
+        kind: core.ConversationAgentEventKind.lifecycle,
+        summary: core.SafeMetadata.text('Codex is working'),
+      ),
+    );
+    await onEvent(
+      core.ConversationAgentEvent(
+        kind: core.ConversationAgentEventKind.toolCallStarted,
+        summary: core.SafeMetadata.text('list_files started'),
+        toolCallId: 'tool-call-1',
+        toolName: 'list_files',
+      ),
+    );
+    await onEvent(
+      core.ConversationAgentEvent(
+        kind: core.ConversationAgentEventKind.toolCallCompleted,
+        summary: core.SafeMetadata.text('list_files completed (4 entries)'),
+        toolCallId: 'tool-call-1',
+        toolName: 'list_files',
+        success: true,
+      ),
+    );
+    await onEvent(
+      core.ConversationAgentEvent(
+        kind: core.ConversationAgentEventKind.assistantMessage,
+        summary: core.SafeMetadata.text('Workspace inspected'),
+      ),
+    );
+    return const core.ConversationAgentResult(output: 'Workspace inspected');
   }
 }

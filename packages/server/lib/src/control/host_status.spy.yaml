@@ -4,5 +4,7 @@ fields:
   version: String
   startedAt: DateTime
   persistence: String
+  conversationId: String
+  retentionNotice: String
   databaseRequired: bool
   streamingAvailable: bool

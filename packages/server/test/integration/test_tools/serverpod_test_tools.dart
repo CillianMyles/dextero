@@ -15,7 +15,11 @@ import 'package:serverpod_test/serverpod_test.dart' as _i1;
 import 'package:serverpod/serverpod.dart' as _i2;
 import 'dart:async' as _i3;
 import 'package:dextero_server/src/generated/control/host_status.dart' as _i4;
-import 'package:dextero_server/src/generated/control/task_event.dart' as _i5;
+import 'package:dextero_server/src/generated/control/chat_submission.dart'
+    as _i5;
+import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
+    as _i6;
+import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i7;
 import 'package:dextero_server/src/generated/protocol.dart';
 import 'package:dextero_server/src/generated/endpoints.dart';
 export 'package:serverpod_test/serverpod_test_public_exports.dart';
@@ -158,23 +162,89 @@ class _ControlEndpoint {
     });
   }
 
-  _i3.Stream<_i5.TaskEvent> runTask(
+  _i3.Future<_i5.ChatSubmission> submitMessage(
     _i1.TestSessionBuilder sessionBuilder,
-    String prompt,
+    _i6.ChatSubmitRequest request,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'control',
+            method: 'submitMessage',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'control',
+          methodName: 'submitMessage',
+          parameters: _i1.testObjectToJson({'request': request}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i5.ChatSubmission>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<_i7.ChatEntry>> history(
+    _i1.TestSessionBuilder sessionBuilder,
+    String conversationId,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'control',
+            method: 'history',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'control',
+          methodName: 'history',
+          parameters: _i1.testObjectToJson({'conversationId': conversationId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<_i7.ChatEntry>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Stream<_i7.ChatEntry> streamHistory(
+    _i1.TestSessionBuilder sessionBuilder,
+    String conversationId,
+    int afterSequence,
   ) {
-    var _localTestStreamManager = _i1.TestStreamManager<_i5.TaskEvent>();
+    var _localTestStreamManager = _i1.TestStreamManager<_i7.ChatEntry>();
     _i1.callStreamFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
             endpoint: 'control',
-            method: 'runTask',
+            method: 'streamHistory',
           );
       var _localCallContext = await _endpointDispatch
           .getMethodStreamCallContext(
             createSessionCallback: (_) => _localUniqueSession,
             endpointPath: 'control',
-            methodName: 'runTask',
-            arguments: {'prompt': prompt},
+            methodName: 'streamHistory',
+            arguments: {
+              'conversationId': conversationId,
+              'afterSequence': afterSequence,
+            },
             requestedInputStreams: [],
             serializationManager: _serializationManager,
           );

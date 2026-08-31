@@ -13,12 +13,21 @@
 
 import 'package:serverpod/serverpod.dart' as _i1;
 import 'package:serverpod/protocol.dart' as _i2;
-import 'control/host_status.dart' as _i3;
-import 'control/task_event.dart' as _i4;
-import 'control/task_event_kind.dart' as _i5;
+import 'control/chat_entry.dart' as _i3;
+import 'control/chat_entry_kind.dart' as _i4;
+import 'control/chat_entry_source.dart' as _i5;
+import 'control/chat_entry_status.dart' as _i6;
+import 'control/chat_submission.dart' as _i7;
+import 'control/chat_submit_request.dart' as _i8;
+import 'control/host_status.dart' as _i9;
+import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i10;
+export 'control/chat_entry.dart';
+export 'control/chat_entry_kind.dart';
+export 'control/chat_entry_source.dart';
+export 'control/chat_entry_status.dart';
+export 'control/chat_submission.dart';
+export 'control/chat_submit_request.dart';
 export 'control/host_status.dart';
-export 'control/task_event.dart';
-export 'control/task_event_kind.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
   Protocol._();
@@ -55,23 +64,51 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
 
-    if (t == _i3.HostStatus) {
-      return _i3.HostStatus.fromJson(data) as T;
+    if (t == _i3.ChatEntry) {
+      return _i3.ChatEntry.fromJson(data) as T;
     }
-    if (t == _i4.TaskEvent) {
-      return _i4.TaskEvent.fromJson(data) as T;
+    if (t == _i4.ChatEntryKind) {
+      return _i4.ChatEntryKind.fromJson(data) as T;
     }
-    if (t == _i5.TaskEventKind) {
-      return _i5.TaskEventKind.fromJson(data) as T;
+    if (t == _i5.ChatEntrySource) {
+      return _i5.ChatEntrySource.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i3.HostStatus?>()) {
-      return (data != null ? _i3.HostStatus.fromJson(data) : null) as T;
+    if (t == _i6.ChatEntryStatus) {
+      return _i6.ChatEntryStatus.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i4.TaskEvent?>()) {
-      return (data != null ? _i4.TaskEvent.fromJson(data) : null) as T;
+    if (t == _i7.ChatSubmission) {
+      return _i7.ChatSubmission.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i5.TaskEventKind?>()) {
-      return (data != null ? _i5.TaskEventKind.fromJson(data) : null) as T;
+    if (t == _i8.ChatSubmitRequest) {
+      return _i8.ChatSubmitRequest.fromJson(data) as T;
+    }
+    if (t == _i9.HostStatus) {
+      return _i9.HostStatus.fromJson(data) as T;
+    }
+    if (t == _i1.getType<_i3.ChatEntry?>()) {
+      return (data != null ? _i3.ChatEntry.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i4.ChatEntryKind?>()) {
+      return (data != null ? _i4.ChatEntryKind.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i5.ChatEntrySource?>()) {
+      return (data != null ? _i5.ChatEntrySource.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i6.ChatEntryStatus?>()) {
+      return (data != null ? _i6.ChatEntryStatus.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i7.ChatSubmission?>()) {
+      return (data != null ? _i7.ChatSubmission.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i8.ChatSubmitRequest?>()) {
+      return (data != null ? _i8.ChatSubmitRequest.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i9.HostStatus?>()) {
+      return (data != null ? _i9.HostStatus.fromJson(data) : null) as T;
+    }
+    if (t == List<_i10.ChatEntry>) {
+      return (data as List).map((e) => deserialize<_i10.ChatEntry>(e)).toList()
+          as T;
     }
     try {
       return _i2.Protocol().deserialize<T>(data, t);
@@ -81,9 +118,13 @@ class Protocol extends _i1.SerializationManagerServer {
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i3.HostStatus => 'HostStatus',
-      _i4.TaskEvent => 'TaskEvent',
-      _i5.TaskEventKind => 'TaskEventKind',
+      _i3.ChatEntry => 'ChatEntry',
+      _i4.ChatEntryKind => 'ChatEntryKind',
+      _i5.ChatEntrySource => 'ChatEntrySource',
+      _i6.ChatEntryStatus => 'ChatEntryStatus',
+      _i7.ChatSubmission => 'ChatSubmission',
+      _i8.ChatSubmitRequest => 'ChatSubmitRequest',
+      _i9.HostStatus => 'HostStatus',
       _ => null,
     };
   }
@@ -98,12 +139,20 @@ class Protocol extends _i1.SerializationManagerServer {
     }
 
     switch (data) {
-      case _i3.HostStatus():
+      case _i3.ChatEntry():
+        return 'ChatEntry';
+      case _i4.ChatEntryKind():
+        return 'ChatEntryKind';
+      case _i5.ChatEntrySource():
+        return 'ChatEntrySource';
+      case _i6.ChatEntryStatus():
+        return 'ChatEntryStatus';
+      case _i7.ChatSubmission():
+        return 'ChatSubmission';
+      case _i8.ChatSubmitRequest():
+        return 'ChatSubmitRequest';
+      case _i9.HostStatus():
         return 'HostStatus';
-      case _i4.TaskEvent():
-        return 'TaskEvent';
-      case _i5.TaskEventKind():
-        return 'TaskEventKind';
     }
     className = _i2.Protocol().getClassNameForObject(data);
     if (className != null) {
@@ -118,14 +167,26 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName is! String) {
       return super.deserializeByClassName(data);
     }
+    if (dataClassName == 'ChatEntry') {
+      return deserialize<_i3.ChatEntry>(data['data']);
+    }
+    if (dataClassName == 'ChatEntryKind') {
+      return deserialize<_i4.ChatEntryKind>(data['data']);
+    }
+    if (dataClassName == 'ChatEntrySource') {
+      return deserialize<_i5.ChatEntrySource>(data['data']);
+    }
+    if (dataClassName == 'ChatEntryStatus') {
+      return deserialize<_i6.ChatEntryStatus>(data['data']);
+    }
+    if (dataClassName == 'ChatSubmission') {
+      return deserialize<_i7.ChatSubmission>(data['data']);
+    }
+    if (dataClassName == 'ChatSubmitRequest') {
+      return deserialize<_i8.ChatSubmitRequest>(data['data']);
+    }
     if (dataClassName == 'HostStatus') {
-      return deserialize<_i3.HostStatus>(data['data']);
-    }
-    if (dataClassName == 'TaskEvent') {
-      return deserialize<_i4.TaskEvent>(data['data']);
-    }
-    if (dataClassName == 'TaskEventKind') {
-      return deserialize<_i5.TaskEventKind>(data['data']);
+      return deserialize<_i9.HostStatus>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
