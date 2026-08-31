@@ -3,31 +3,12 @@
 **AI for the average person, running on a computer they own.**
 
 Dextero is an opinionated, local-first app for getting things done. You ask for
-an outcome in a polished product of its own—or message it from somewhere you
-already use—and Dextero works across the applications and services available
-on your computer to make it happen.
+an outcome and it works across the applications and services on a computer you
+own. The app is the primary experience; the agent machinery stays underneath.
 
-It should feel like an intuitive, useful, and fun app, not an agent harness or
-a remote shell. The Dart orchestration stack, specialist agents, Serverpod
-control plane, and permission system are implementation details beneath that
-experience.
-
-Dextero is designed to remain powerful enough for technical early adopters
-without requiring everyone to become one. Simple tasks should be simple;
-advanced control, inspection, and extension should appear through progressive
-disclosure rather than dominate the default experience.
-
-The product direction has four defining commitments:
-
-- **Your computer, your authority:** Dextero runs on a computer you own and,
-  with your permission, can use the same applications and services you can.
-- **One continuous relationship:** conversations, tasks, preferences, and
-  outcomes become durable, searchable memory instead of disappearing between
-  sessions.
-- **One product, many doors:** the Dextero app is the primary surface, while
-  trusted messaging channels can continue the same conversation and tasks.
-- **Works with your life:** built-in experiences such as calendar and tasks
-  complement—not replace—the services already synced to your phone.
+Dextero also acts as a user-owned gateway to AI: one durable memory and context
+across local models, cloud providers, and trusted messaging channels. Read the
+full product direction in [VISION.md](VISION.md).
 
 ## Repository layout
 

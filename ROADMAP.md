@@ -134,19 +134,29 @@ Add the highest-value typed tools behind the permission model.
 
 Git mutation, deletion, and general shell authority remain separately gated.
 
-## Milestone 7 — runtime ecosystem
+## Milestone 7 — AI gateway and runtime ecosystem
 
 - [ ] Add an MCP client and dynamic tool registry.
 - [ ] Define manifests, trust levels, lifecycle, health, and version negotiation
   for runtime adapters.
 - [ ] Add direct streaming model adapters while retaining provider-neutral
   kernel contracts.
+- [ ] Route tasks across local models, cloud providers, and specialists using
+  explicit capability, privacy, latency, availability, and cost policy.
+- [ ] Show which provider handled a task, why it was selected, what context was
+  shared, and its measured or estimated cost.
+- [ ] Keep provider credentials, consent, and routing preferences under the
+  user's control without copying the full memory store to every provider.
 - [ ] Support project instructions, skills, and configuration profiles.
+- [ ] Define separate household identities, memories, permissions, budgets,
+  age-appropriate controls, and transparent family usage summaries.
 - [ ] Add hooks and artifact storage without allowing extensions to bypass
   policy.
 
-**Exit condition:** useful capabilities can be installed or connected without
-recompiling Dextero or granting them ambient authority.
+**Exit condition:** Dextero can choose among permitted local and cloud models
+for a task without fragmenting the user's context, while useful capabilities
+can be installed or connected without recompiling Dextero or granting them
+ambient authority.
 
 ## Milestone 8 — browser and computer use
 

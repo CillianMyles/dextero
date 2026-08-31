@@ -58,6 +58,51 @@ already exist. Dextero should invoke and supervise Codex, Pi, or another coding
 agent when deep repository work is needed, while retaining lightweight local
 file and process tools for small or cross-domain tasks.
 
+## Your gateway to AI
+
+AI usage is increasingly fragmented across products, providers, subscriptions,
+and model-specific histories. Each new surface starts without the context the
+user already invested in teaching the last one.
+
+Dextero should sit above that fragmentation. It owns the user's durable memory,
+context, permissions, tools, and product experience, while models remain
+replaceable sources of intelligence. A task may run on a local model, use a
+cloud provider, or delegate to a specialist system without forcing the user to
+start a new relationship each time.
+
+Model selection should be an understandable policy decision. Dextero can route
+work according to:
+
+- capability and task fit;
+- privacy and data-residency requirements;
+- latency, availability, and offline operation;
+- cost and subscription access;
+- user or household preferences;
+- explicit model choice when the user wants control.
+
+The default should feel automatic, but never mysterious. A user should be able
+to see which model or provider handled a task, why it was chosen, what context
+was shared, and what it cost. Provider credentials and routing policy remain
+under the user's control, and choosing a cloud model must not silently move the
+entire memory store into that provider.
+
+This makes Dextero a stable personal AI layer rather than another model-shaped
+application. Models can improve, disappear, become expensive, or be replaced;
+the user's history, tools, preferences, and relationship remain theirs.
+
+### Families
+
+The same gateway can give families a coherent and safer way to use AI. A parent
+could manage which models, providers, tools, spending limits, and capabilities
+are available to a child, and view clear usage and safety summaries from one
+place instead of configuring every AI product separately.
+
+Family oversight must be explicit and age-appropriate, not covert surveillance.
+Each family member should have a distinct identity, memory, permissions, and
+clearly communicated privacy boundary. Parents need useful controls and
+visibility; children should understand what is monitored; providers should
+receive only the context needed for the task.
+
 ## One product, many doors
 
 The Dextero app should be where most people meet and use the product. It owns
@@ -127,7 +172,7 @@ The architecture remains deliberately hybrid:
                             │ shared models and event contracts
 ┌───────────────────────────▼─────────────────────────────────┐
 │ Dextero orchestration core                                  │
-│ sessions • policy • approvals • delegation • audit          │
+│ memory • model routing • policy • delegation • audit        │
 └─────────────┬──────────────────┬──────────────────┬─────────┘
               │                  │                  │
       Pure Dart tools       MCP/process        Native adapters
