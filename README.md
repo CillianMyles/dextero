@@ -1,10 +1,38 @@
 # Dextero
 
-Dextero is a local-first computer-agent stack written as one Dart monorepo. A
-single core runs work on the controlled computer; authenticated Flutter and
-terminal clients start tasks and watch the same typed event stream.
+**AI for the average person, running on a computer they own.**
+
+Dextero is an opinionated, local-first app for getting things done. You ask for
+an outcome in a polished product of its own—or message it from somewhere you
+already use—and Dextero works across the applications and services available
+on your computer to make it happen.
+
+It should feel like an intuitive, useful, and fun app, not an agent harness or
+a remote shell. The Dart orchestration stack, specialist agents, Serverpod
+control plane, and permission system are implementation details beneath that
+experience.
+
+Dextero is designed to remain powerful enough for technical early adopters
+without requiring everyone to become one. Simple tasks should be simple;
+advanced control, inspection, and extension should appear through progressive
+disclosure rather than dominate the default experience.
+
+The product direction has four defining commitments:
+
+- **Your computer, your authority:** Dextero runs on a computer you own and,
+  with your permission, can use the same applications and services you can.
+- **One continuous relationship:** conversations, tasks, preferences, and
+  outcomes become durable, searchable memory instead of disappearing between
+  sessions.
+- **One product, many doors:** the Dextero app is the primary surface, while
+  trusted messaging channels can continue the same conversation and tasks.
+- **Works with your life:** built-in experiences such as calendar and tasks
+  complement—not replace—the services already synced to your phone.
 
 ## Repository layout
+
+The repository is currently an early product and infrastructure stack in one
+Dart monorepo:
 
 ```text
 packages/
@@ -88,5 +116,5 @@ make generate
 make check
 ```
 
-The product direction and security milestones remain documented in
+The product philosophy and delivery milestones are documented in
 [VISION.md](VISION.md) and [ROADMAP.md](ROADMAP.md).

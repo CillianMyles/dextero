@@ -1,7 +1,9 @@
 # Roadmap
 
-Dextero is being built from the control plane outward. The priority is a safe,
-resumable orchestration system—not the fastest possible accumulation of tools.
+Dextero is being built as a consumer product backed by a safe, resumable local
+orchestration system—not as a harness that acquires a user interface at the
+end. Each technical milestone should leave the primary app more useful and
+coherent.
 
 This roadmap is directional. Milestones describe coherent product increments;
 they are not release-date promises.
@@ -18,6 +20,7 @@ they are not release-date promises.
 - [x] Codex app-server specialist adapter
 - [x] Deterministic demos and focused tool/protocol tests
 - [x] Native Dart AOT compilation spike
+- [x] Initial macOS Flutter app and terminal client on the shared task stream
 
 ## Milestone 1 — typed event backbone
 
@@ -45,8 +48,9 @@ Prove the product architecture with the smallest useful remote controller.
 - [ ] Expose endpoints to create, inspect, cancel, and approve tasks.
 - [x] Stream a deterministic task lifecycle to a generated Dart client over
   WebSocket.
-- [ ] Build a minimal Flutter controller showing task status, events, and one
-  approval interaction.
+- [x] Build a minimal Flutter app that can start a task and show its event
+  stream.
+- [ ] Add one understandable approval interaction to the app.
 - [x] Start with in-memory task state and document the restart limitation.
 - [ ] Add local-only development defaults and explicit network binding.
 
@@ -75,17 +79,27 @@ Turn current guardrails into enforceable product boundaries.
 **Exit condition:** every consequential action is denied, pre-authorized by a
 specific capability, or paused for an explicit approval with an audit record.
 
-## Milestone 4 — durable sessions
+## Milestone 4 — durable memory and sessions
 
 - [ ] Persist tasks, events, approvals, and checkpoints with SQLite/Drift.
+- [ ] Persist conversations, messages, artifacts, and their provenance as a
+  durable source record.
+- [ ] Add full-text search and semantic/vector search over messages and
+  artifacts.
+- [ ] Extract structured preferences, facts, relationships, and outcomes with
+  correction and provenance support.
+- [ ] Build retrieval and context-compaction policies that use relevant memory
+  without treating the entire archive as a prompt.
 - [ ] Resume or fail tasks predictably after a process restart.
 - [ ] Add context-window accounting, token budgets, and compaction.
 - [ ] Support queued steering messages and reconnecting event subscribers.
-- [ ] Define retention, export, and deletion controls for local data.
+- [ ] Add in-product memory browsing, search, correction, export, retention,
+  and deletion controls.
 - [ ] Add schema migrations and recovery tests.
 
 **Exit condition:** a host restart or controller disconnect does not erase task
-history, approvals, or the ability to understand what happened.
+history, approvals, conversation continuity, or the ability to find and
+understand what happened later.
 
 ## Milestone 5 — specialist delegation
 
@@ -144,6 +158,8 @@ recompiling Dextero or granting them ambient authority.
 - [ ] Add display, window, coordinate, and accessibility-node models.
 - [ ] Treat vision/pixel input as a fallback with explicit confidence and
   recovery paths.
+- [ ] Prove an end-to-end workflow that combines multiple ordinary desktop
+  applications rather than only developer tools.
 
 **Exit condition:** Dextero can complete a browser workflow safely and can
 exercise one native desktop workflow through a replaceable platform adapter.
@@ -164,6 +180,30 @@ exercise one native desktop workflow through a replaceable platform adapter.
 **Exit condition:** a paired controller can securely monitor, steer, approve,
 and take over a task without opening an unrestricted remote shell.
 
+## Milestone 10 — channels and personal-system sync
+
+Make Dextero one continuous product that can be reached from the places people
+already use.
+
+- [ ] Define a channel-neutral conversation and identity model shared by the
+  app and messaging adapters.
+- [ ] Add one trusted text-messaging adapter with pairing, sender verification,
+  approvals, and delivery-state handling.
+- [ ] Route channel messages into the same conversations, tasks, memory, and
+  policy engine as the app.
+- [ ] Build a first-class calendar view inside Dextero.
+- [ ] Add two-way sync with at least one widely used calendar provider so
+  Dextero-created events appear on the user's phone and external changes flow
+  back.
+- [ ] Define conflict resolution, idempotency, provenance, offline replay, and
+  deletion semantics for synchronized records.
+- [ ] Generalize the sync adapter contract for tasks, contacts, files, and
+  other personal systems without hiding third-party failures.
+
+**Exit condition:** a user can ask Dextero by text to create or change an
+event, see the same conversation and result in the Dextero app, and find the
+event in the calendar already used on their phone.
+
 ## Release engineering
 
 These concerns cut across all milestones:
@@ -180,6 +220,10 @@ These concerns cut across all milestones:
 
 - Bundling or requiring Postgres on each controlled computer
 - A central cloud account as a prerequisite for local use
+- Separate agent identities and fragmented histories for each messaging
+  channel
+- Treating Dextero's built-in calendar or task views as isolated replacements
+  for the user's existing services
 - Video or high-frequency input over Serverpod WebSockets
 - Unrestricted desktop control before permissions and auditability
 - Bespoke integrations for every service before MCP support
