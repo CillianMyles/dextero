@@ -32,8 +32,8 @@ Future<void> run(List<String> arguments) async {
         ListFilesTool(root: workspace),
         ReadFileTool(root: workspace),
         EditFileTool(root: workspace),
-        RunProcessTool(workingDirectory: workspace),
-        BashTool(workingDirectory: workspace),
+        RunCommandTool(workingDirectory: workspace),
+        RunShellTool(workingDirectory: workspace),
       ],
     ),
   );

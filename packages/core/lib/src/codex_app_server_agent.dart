@@ -188,7 +188,9 @@ final class CodexAppServerAgent {
             },
         ],
         'developerInstructions':
-            'Use the host-provided dynamic tools for file and shell operations. '
+            'Use the host-provided dynamic tools for file and command operations. '
+            'Use run_command for normal CLI execution. Use run_shell only when '
+            'shell syntax is required. '
             'Do not substitute built-in file or command tools for them.',
       };
       if (model != null) threadParams['model'] = model;

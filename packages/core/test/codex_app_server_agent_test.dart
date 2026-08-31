@@ -33,6 +33,13 @@ void main() {
     expect(params['ephemeral'], isTrue);
     expect(params['sandbox'], 'read-only');
     expect(params['approvalPolicy'], 'never');
+    expect(
+      params['developerInstructions'],
+      contains(
+        'Use run_command for normal CLI execution. Use run_shell only when '
+        'shell syntax is required.',
+      ),
+    );
     expect(params['dynamicTools'], [
       {
         'type': 'function',

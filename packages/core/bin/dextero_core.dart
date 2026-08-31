@@ -14,8 +14,8 @@ Future<void> main(List<String> arguments) async {
         ListFilesTool(root: root),
         ReadFileTool(root: root),
         EditFileTool(root: root),
-        RunProcessTool(workingDirectory: root),
-        BashTool(workingDirectory: root),
+        RunCommandTool(workingDirectory: root),
+        RunShellTool(workingDirectory: root),
       ],
     );
     stdout.writeln(run.output);

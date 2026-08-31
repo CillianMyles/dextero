@@ -46,8 +46,8 @@ abstract final class SafeMetadata {
     if ({'list_files', 'read_file', 'edit_file'}.contains(toolName)) {
       final path = _safePath(arguments['path']);
       if (path != null) detail = ' for $path';
-    } else if (toolName == 'run_process' && arguments['executable'] is String) {
-      detail = ' for ${_safeExecutable(arguments['executable']! as String)}';
+    } else if (toolName == 'run_command' && arguments['command'] is String) {
+      detail = ' for ${_safeExecutable(arguments['command']! as String)}';
     }
     return text('${_safeToolName(toolName)} started$detail');
   }
@@ -81,9 +81,9 @@ abstract final class SafeMetadata {
     } else if ({'read_file', 'edit_file'}.contains(toolName)) {
       final path = _safePath(map['path']);
       if (path != null) detail = ' for $path';
-    } else if ({'run_process', 'bash'}.contains(toolName) &&
-        map['exitCode'] is int) {
-      detail = ' (exit ${map['exitCode']})';
+    } else if ({'run_command', 'run_shell'}.contains(toolName) &&
+        map['exit_code'] is int) {
+      detail = ' (exit ${map['exit_code']})';
     }
     return text('${_safeToolName(toolName)} $outcome$detail');
   }

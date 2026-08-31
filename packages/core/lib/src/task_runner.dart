@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'codex_app_server_agent.dart';
 import 'tool.dart';
-import 'tools/bash_tool.dart';
 import 'tools/edit_file_tool.dart';
 import 'tools/list_files_tool.dart';
 import 'tools/read_file_tool.dart';
-import 'tools/run_process_tool.dart';
+import 'tools/run_command_tool.dart';
+import 'tools/run_shell_tool.dart';
 
 enum CoreTaskEventKind { queued, running, output, completed, failed }
 
@@ -93,7 +93,7 @@ final class CodexTaskRunner implements TaskRunner {
     ListFilesTool(root: workspace),
     ReadFileTool(root: workspace),
     EditFileTool(root: workspace),
-    RunProcessTool(workingDirectory: workspace),
-    BashTool(workingDirectory: workspace),
+    RunCommandTool(workingDirectory: workspace),
+    RunShellTool(workingDirectory: workspace),
   ];
 }

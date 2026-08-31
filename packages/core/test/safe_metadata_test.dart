@@ -16,12 +16,12 @@ void main() {
 
   test('never includes unstructured tool failure output', () {
     final summary = SafeMetadata.toolResult(
-      'run_process',
+      'run_command',
       'password=hunter2 and raw stderr',
       success: false,
     );
 
-    expect(summary.text, 'run_process failed');
+    expect(summary.text, 'run_command failed');
     expect(summary.text, isNot(contains('hunter2')));
     expect(summary.text, isNot(contains('stderr')));
   });
