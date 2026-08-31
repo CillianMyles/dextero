@@ -1,0 +1,6 @@
+type: server
+client_package_path: .
+server_test_tools_path: test/integration/test_tools
+
+features:
+  database: false

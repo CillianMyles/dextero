@@ -1,0 +1,20 @@
+name: dextero_server
+description: Local Serverpod control plane and generated client for Dextero.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+resolution: workspace
+
+dependencies:
+  dextero_core:
+    path: ../core
+  serverpod: 3.4.13
+  serverpod_client: 3.4.13
+
+dev_dependencies:
+  lints: ^6.0.0
+  serverpod_test: 3.4.13
+  test: ^1.31.0

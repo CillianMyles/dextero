@@ -1,6 +1,0 @@
-enum: TaskEventKind
-serialized: byName
-values:
-  - queued
-  - running
-  - completed

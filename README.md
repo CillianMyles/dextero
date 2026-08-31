@@ -1,192 +1,92 @@
 # Dextero
 
-**A local-first, opinionated computer agent built in Dart.**
+Dextero is a local-first computer-agent stack written as one Dart monorepo. A
+single core runs work on the controlled computer; authenticated Flutter and
+terminal clients start tasks and watch the same typed event stream.
 
-Dextero is an early-stage harness for agents that can work across a computer
-while remaining visible, controllable, and auditable. It is intended to become
-a general-purpose computer agent—not a coding agent with a few extra tools.
-
-Coding is an important capability, but not the product boundary. Dextero can
-use focused primitives directly and will delegate deeper repository work to
-specialist agents such as Codex or Pi. The same orchestration model can later
-support browser automation, research, communication, media, and native desktop
-adapters.
-
-> The intelligence can come from different models and specialists. Dextero's
-> job is to coordinate them safely on the user's computer.
-
-## Status
-
-Dextero is a working agent-kernel spike, not yet a complete computer agent.
-
-Implemented today:
-
-- typed tool definitions, calls, and results;
-- a provider-neutral, bounded model → tool → model loop;
-- workspace-confined file reading, listing, and exact single-match editing;
-- direct argv-based process execution;
-- an explicit, timeout-bounded shell tool with output caps;
-- a Codex app-server adapter that leaves subscription authentication and token
-  refresh with the Codex CLI;
-- deterministic demos and focused tests for tool and protocol failure modes;
-- a database-free Serverpod Mini control plane with bearer-token auth, a typed
-  status RPC, and a streamed demo-task lifecycle;
-- AOT compilation to a small, fast-starting native executable.
-
-The path from this kernel to the product is documented in [VISION.md](VISION.md)
-and [ROADMAP.md](ROADMAP.md).
-
-## Why Dart?
-
-Dart is a strong fit for the product as a whole:
-
-- a typed, fast-starting native host and CLI;
-- shared contracts between the harness, control plane, and clients;
-- Serverpod-generated endpoints, models, and streams;
-- Flutter controllers for mobile, desktop, and web;
-- straightforward process, HTTP, WebSocket, FFI, and MCP adapters.
-
-Dart does not need to be the best ecosystem for every capability. Dextero uses
-a hybrid adapter model: Dart owns orchestration, policy, state, and product
-surfaces while specialist tools, MCP servers, subprocesses, and native adapters
-provide capabilities where another ecosystem is stronger.
-
-## Architecture direction
+## Repository layout
 
 ```text
-Flutter controllers
-mobile • desktop • web
-          │ generated typed client
-          ▼
-Local Serverpod control plane
-pairing • commands • approvals • task streams
-          │ shared Dart models and events
-          ▼
-Dextero harness
-policy • sessions • tools • delegation • audit
-     │             │              │
-     ▼             ▼              ▼
-Pure Dart tools  MCP/process   Specialist agents
-files • HTTP     adapters      Codex • Pi • others
+packages/
+├── core/    provider-neutral harness, tools, and Codex app-server adapter
+├── server/  local Serverpod host, auth, HTTP/WebSocket API, generated client
+├── app/     Flutter desktop client
+└── cli/     interactive terminal client
 ```
 
-The controlled computer remains the authority. The local host is expected to
-use Serverpod Mini without requiring Postgres; lightweight persistence can be
-added with SQLite/Drift. Latency-sensitive screen, audio, and input traffic
-belongs on WebRTC rather than the Serverpod control stream.
+The dependency flow is deliberately one-way:
 
-## Try the current kernel
+```text
+app ─┐
+     ├── generated client surface ──> server ──> core ──> Codex
+cli ─┘                                  │
+                                       └── local workspace tools
+```
 
-Requirements:
+`packages/server/lib/dextero_client.dart` is the client-only Serverpod surface.
+The two frontends import it without importing or launching the server runtime.
 
-- Dart SDK 3.10 or newer;
-- Codex CLI only for the optional subscription-authenticated demo.
+## Get started
 
-Install dependencies and run the test suite:
+Requirements: Dart 3.10+, Flutter with macOS desktop support, Codex CLI, and
+OpenSSL. Authenticate Codex once with `codex login`, then:
 
 ```sh
-dart pub get
-dart test
-dart analyze
+make bootstrap
+make dev
 ```
 
-### Run the local control plane
+`make dev` creates a stable, git-ignored development token, starts the local
+Serverpod host, waits for it to accept connections, and launches the Flutter
+app. `Ctrl-C` stops both processes.
 
-The Serverpod Mini service requires no Postgres or Redis process. It keeps MVP
-state in memory and requires a bootstrap bearer token for every Dextero
-endpoint:
+For the terminal UI, use two terminals:
 
 ```sh
-export DEXTERO_CONTROL_TOKEN="$(openssl rand -hex 32)"
-dart run packages/dextero_server/bin/main.dart
+# terminal 1
+make server
+
+# terminal 2
+make cli
 ```
 
-Serverpod listens on port `8080` by default. Serverpod 3.4.13 binds its API
-listener to all IPv6 interfaces even though its default public host is
-`localhost`; do not treat the hostname as a network boundary. Keep the port
-firewalled from untrusted networks. The token is an MVP bootstrap mechanism,
-not a replacement for the planned cryptographic device-pairing flow.
-
-The generated Dart client lives in `packages/dextero_client`. After changing a
-`.spy.yaml` model or endpoint, regenerate both sides with:
+You can also pass a prompt without the interactive question:
 
 ```sh
-serverpod generate --directory packages/dextero_server
+make cli PROMPT="Inspect this workspace and summarize its architecture"
 ```
 
-With the server running, exercise the generated client and method stream from
-another terminal using the same token:
+Run `make help` for all commands. The usual pre-review quality gate is:
 
 ```sh
-dart run packages/dextero_client/bin/control_demo.dart
+make check
 ```
 
-Run the deterministic agent demo:
+## How a task runs
+
+1. The app or CLI calls the authenticated Serverpod `runTask` method stream.
+2. The server invokes `CodexTaskRunner` against `DEXTERO_WORKSPACE`.
+3. Core launches `codex app-server` and supplies workspace-scoped Dart tools.
+4. Queued, running, output, completed, and failed events stream back to the
+   initiating client over Serverpod's WebSocket transport.
+
+Server state and the bootstrap token model are intentionally MVP-grade. The
+token authenticates controllers, but it does not replace device pairing or an
+OS sandbox. Core currently exposes file editing and process execution inside
+the configured workspace, so run the host only where that authority is
+appropriate. Serverpod 3.4.13 may bind its API listener beyond loopback; keep
+port 8080 firewalled from untrusted networks.
+
+## Protocol changes
+
+Serverpod models live in `packages/server/lib/src/control`. Generated server,
+client, and test code is checked in. After changing an endpoint or `.spy.yaml`
+model, run:
 
 ```sh
-dart run bin/agent_demo.dart
+make generate
+make check
 ```
 
-Run the original structured process harness:
-
-```sh
-dart run bin/harness.dart --run 'printf dextero-ok'
-```
-
-Expected output on macOS:
-
-```json
-{"platform":"macos","exitCode":0,"stdout":"dextero-ok","stderr":""}
-```
-
-Build a native executable for the current machine:
-
-```sh
-mkdir -p build
-dart compile exe bin/harness.dart -o build/dextero
-./build/dextero --run 'printf dextero-ok'
-```
-
-### Codex app-server demo
-
-OpenAI subscription authentication stays behind the supported Codex boundary.
-Dextero launches `codex app-server` over JSONL stdio and never reads Codex's
-cached credentials directly.
-
-```sh
-codex login
-codex login status
-dart run bin/codex_oauth_demo.dart
-```
-
-The dynamic-tool protocol used by this adapter is experimental, so it remains
-isolated from the provider-neutral kernel.
-
-## Safety model
-
-Current path confinement, exact-match editing, timeouts, and output caps are
-guardrails—not an OS security boundary. Dextero does not yet have its planned
-permission engine, approval policy, sandbox adapters, secret filtering, or
-durable audit log. Run the spike only in environments where you understand and
-accept the authority granted to its tools.
-
-## Project principles
-
-- **Local authority:** the controlled computer owns execution and policy.
-- **Typed boundaries:** tools, events, approvals, and delegation use explicit
-  contracts.
-- **Least privilege:** capabilities are scoped; consequential actions require
-  clear approval.
-- **Specialists over imitation:** delegate deep domain work instead of
-  rebuilding every expert harness.
-- **Adapters over purity:** use MCP, processes, WebRTC, and native APIs when
-  they are the right boundary.
-- **Observable by default:** work should expose progress, decisions, results,
-  and failures.
-
-## Contributing
-
-Dextero is still defining its foundations. Issues and focused experiments that
-advance the milestones in [ROADMAP.md](ROADMAP.md) are welcome; large capability
-expansions should start with a design discussion so the permission and event
-contracts remain coherent.
+The product direction and security milestones remain documented in
+[VISION.md](VISION.md) and [ROADMAP.md](ROADMAP.md).
