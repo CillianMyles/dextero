@@ -1,19 +1,6 @@
 # Roadmap
 
-Dextero is being built as a consumer product backed by a safe, resumable local
-orchestration system—not as a harness that acquires a user interface at the
-end. Each technical milestone should leave the primary app more useful and
-coherent.
-
-This roadmap is directional. Milestones describe coherent product increments;
-they are not release-date promises.
-
-## Delivery invariant — tracer bullets
-
-Every capability ships as one thin vertical slice: **core → typed Serverpod
-API → Flutter app → CLI/TUI**. It is done only when each layer has focused
-tests and an end-to-end acceptance test proves the complete path. Milestones
-set direction; they do not permit stockpiling unfinished work in one layer.
+Milestones are directional, not release-date promises.
 
 ## Foundation — working today
 

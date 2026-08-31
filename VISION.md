@@ -1,306 +1,154 @@
 # Vision
 
-## AI for the average person
+Dextero is a local-first computer agent for people who do not want to learn
+agent terminology. It runs on a computer the user owns and, with permission,
+acts through the applications and services available there.
 
-Dextero is a general-purpose, opinionated computer agent expressed as an
-intuitive and fun consumer app. It runs on a computer the user owns and, with
-their permission, should eventually be able to do anything they can do on that
-computer: use applications, move information, communicate, create, organize,
-research, and coordinate work across connected services.
+The app is the main product surface. Technical details stay out of the way by
+default, while advanced users can inspect, configure, and extend the system.
 
-The app is the product. The harness, models, tools, specialists, and control
-plane should recede into the background. A person should not need to understand
-agent loops, MCP, context windows, or orchestration to get something useful
-done.
+## Product principles
 
-This does not mean sanding away the power that attracts technical early
-adopters. Dextero should use progressive disclosure: a calm default experience
-for anyone, with deeper visibility, control, configuration, and extension when
-someone wants it. Usability across every level of technical proficiency is a
-product constraint, not a later accessibility pass.
+- **Local authority:** the controlled computer owns execution and remains
+  useful without a cloud service.
+- **Durable memory:** conversations, tasks, preferences, artifacts, and
+  outcomes persist locally, remain searchable, and retain provenance.
+- **Safe autonomy:** permissions are scoped; consequential actions require
+  approval; work can be inspected, cancelled, and audited.
+- **One identity:** the app and trusted messaging channels share conversations,
+  tasks, policy, and memory.
+- **Interoperability:** built-in views synchronize with services people already
+  use rather than becoming isolated replacements.
+- **Progressive disclosure:** simple defaults do not remove advanced control.
 
-The differentiator is not a bigger bag of tools. It is the control system
-around them:
+## AI gateway
 
-- durable task and session state;
-- explicit permissions and risk-aware approvals;
-- observable progress and structured results;
-- scoped delegation to specialist agents;
-- recoverability, cancellation, and auditability;
-- useful defaults that keep authority local.
+Dextero owns the user's memory, context, permissions, and tools; models are
+replaceable. It can route work to local models, cloud providers, or specialist
+agents based on capability, privacy, latency, availability, cost, and user
+preference.
 
-Opinionated means Dextero makes coherent product choices on the user's behalf:
-one primary app, one continuous identity, durable memory, safe autonomy, and
-interoperability with the tools already present in their life. It does not mean
-forcing every user into one rigid workflow.
+Users should be able to see:
 
-## Product thesis
+- which model or provider handled a task;
+- why it was selected;
+- what context was shared;
+- what it cost.
 
-Most agent harnesses are shaped around a model or a domain. Coding agents are
-excellent at repositories; browser agents are optimized for web pages; desktop
-automation tools drive pixels and windows. A useful computer agent should not
-poorly reproduce all of them. It should understand the task, choose the right
-specialist, constrain its authority, supervise its work, and combine the
-result into one coherent user experience.
-
-Behind the product, Dextero has three roles:
-
-1. **Local control plane** — owns permissions, approvals, session state,
-   capability discovery, and the audit record.
-2. **Orchestrator** — decomposes work, invokes tools or specialists, streams
-   progress, handles failure, and incorporates results.
-3. **Product surface** — provides the primary app and lets trusted secondary
-   channels inspect work, approve actions, steer tasks, and continue the same
-   relationship.
-
-Coding is the first specialist delegation because mature coding harnesses
-already exist. Dextero should invoke and supervise Codex, Pi, or another coding
-agent when deep repository work is needed, while retaining lightweight local
-file and process tools for small or cross-domain tasks.
-
-## Your gateway to AI
-
-AI usage is increasingly fragmented across products, providers, subscriptions,
-and model-specific histories. Each new surface starts without the context the
-user already invested in teaching the last one.
-
-Dextero should sit above that fragmentation. It owns the user's durable memory,
-context, permissions, tools, and product experience, while models remain
-replaceable sources of intelligence. A task may run on a local model, use a
-cloud provider, or delegate to a specialist system without forcing the user to
-start a new relationship each time.
-
-Model selection should be an understandable policy decision. Dextero can route
-work according to:
-
-- capability and task fit;
-- privacy and data-residency requirements;
-- latency, availability, and offline operation;
-- cost and subscription access;
-- user or household preferences;
-- explicit model choice when the user wants control.
-
-The default should feel automatic, but never mysterious. A user should be able
-to see which model or provider handled a task, why it was chosen, what context
-was shared, and what it cost. Provider credentials and routing policy remain
-under the user's control, and choosing a cloud model must not silently move the
-entire memory store into that provider.
-
-This makes Dextero a stable personal AI layer rather than another model-shaped
-application. Models can improve, disappear, become expensive, or be replaced;
-the user's history, tools, preferences, and relationship remain theirs.
+Provider credentials and routing policy remain under user control. Selecting a
+cloud model must not copy the full memory store to that provider.
 
 ### Families
 
-The same gateway can give families a coherent and safer way to use AI. A parent
-could manage which models, providers, tools, spending limits, and capabilities
-are available to a child, and view clear usage and safety summaries from one
-place instead of configuring every AI product separately.
+Household profiles may provide separate identities, memories, permissions,
+budgets, and age-appropriate controls. Parents can see clear usage and safety
+summaries. Monitoring must be explicit to every family member, not covert.
 
-Family oversight must be explicit and age-appropriate, not covert surveillance.
-Each family member should have a distinct identity, memory, permissions, and
-clearly communicated privacy boundary. Parents need useful controls and
-visibility; children should understand what is monitored; providers should
-receive only the context needed for the task.
+## Product surfaces
 
-## One product, many doors
+The app owns conversation, tasks, approvals, artifacts, memory, settings, and
+native views such as calendar. Trusted messaging services provide another way
+into the same identity and task state; they are transports, not separate
+agents.
 
-The Dextero app should be where most people meet and use the product. It owns
-the complete experience: conversation, tasks, approvals, artifacts, memory,
-settings, and useful native views such as a calendar.
+Dextero should synchronize with personal systems already in use. For example,
+an event created in Dextero should appear in the calendar on the user's phone,
+and external changes should flow back.
 
-The app is not the only entrance. A user should also be able to text Dextero
-from a trusted messaging service, close the desktop app, reconnect from another
-device, and continue the same task and relationship. Channels are transports,
-not separate agents: they share identity, policy, conversation state, memory,
-and task history.
+## Memory
 
-Dextero should coexist with the products a person already relies on. If it
-creates an event in its own calendar experience, that event should also appear
-in the calendar they use on their phone. The same principle applies to tasks,
-contacts, files, messages, and other personal systems: provide a coherent
-Dextero surface while synchronizing through supported APIs and adapters rather
-than building an isolated replacement for everything.
-
-## Memory as a product promise
-
-Dextero should not casually forget. Messages, decisions, preferences, tasks,
-artifacts, outcomes, and the provenance connecting them should persist locally
-and remain searchable across time.
-
-That requires more than dumping chat transcripts into prompts:
+“Never forget” means continuity by default, with user-controlled correction,
+retention, export, and deletion. The implementation requires:
 
 - an append-only source record for conversations and task events;
 - structured facts, preferences, relationships, and task state;
 - full-text and semantic/vector search over messages and artifacts;
-- deliberate retrieval that supplies relevant context without flooding the
-  model;
-- provenance so remembered information can be inspected and corrected;
-- user-controlled export, retention, deletion, and private-data boundaries.
+- retrieval that supplies relevant context without loading the full archive;
+- provenance for inspection and correction;
+- explicit private-data boundaries.
 
-“Never forget” is the default continuity promise, not a claim that data can
-never be corrected or erased. The user remains the authority over what Dextero
-keeps, and durable memory must not become silent surveillance or mandatory
-cloud storage.
+## Architecture
 
-## Why Dart, Flutter, and Serverpod
+Dextero has three roles:
 
-The language decision is about the whole product, not just the agent loop.
+1. **Control plane:** permissions, approvals, task state, capabilities, and
+   audit records.
+2. **Orchestrator:** model and specialist selection, tool execution, progress,
+   failure handling, and result assembly.
+3. **Product surfaces:** app, CLI/TUI, and trusted channels.
 
-Dart provides a typed orchestration core, native CLI distribution, strong
-process and networking primitives, and a clean bridge to FFI or out-of-process
-adapters. Flutter turns the same ecosystem into polished controller apps for
-phones, tablets, desktops, and the web. Serverpod provides generated Dart
-models and clients, endpoint contracts, and streaming methods between those
-surfaces.
-
-Together they make contract changes visible at compile time across the host
-and controller instead of leaving the system connected by informal JSON.
-
-The architecture remains deliberately hybrid:
+Coding is a specialist capability. Dextero should supervise Codex, Pi, or
+another coding agent rather than reproduce a weaker coding harness.
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Dextero product surfaces                                    │
-│ conversation • tasks • memory • calendar • approvals        │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ generated typed client
-┌───────────────────────────▼─────────────────────────────────┐
-│ Local Serverpod control plane                               │
-│ pairing • authorization • commands • streams • signalling   │
-└───────────────────────────┬─────────────────────────────────┘
-                            │ shared models and event contracts
-┌───────────────────────────▼─────────────────────────────────┐
-│ Dextero orchestration core                                  │
-│ memory • model routing • policy • delegation • audit        │
-└─────────────┬──────────────────┬──────────────────┬─────────┘
-              │                  │                  │
-      Pure Dart tools       MCP/process        Native adapters
-      files • HTTP          specialists        AX • UIA • AT-SPI
-              │                  │                  │
-              └──────────────────┴──────────────────┘
-                    applications and services
-
-WebRTC: direct low-latency screen • audio • pointer • keyboard
+┌───────────────────────────────────────────────────────┐
+│ App • CLI/TUI • trusted channels                      │
+└──────────────────────────┬────────────────────────────┘
+                           │ generated typed client
+┌──────────────────────────▼────────────────────────────┐
+│ Local Serverpod control plane                         │
+│ pairing • authorization • commands • streams          │
+└──────────────────────────┬────────────────────────────┘
+                           │ shared contracts
+┌──────────────────────────▼────────────────────────────┐
+│ Orchestration core                                    │
+│ memory • model routing • policy • delegation • audit  │
+└────────────┬─────────────────┬─────────────────┬──────┘
+             │                 │                 │
+       Dart tools        MCP/process       native adapters
 ```
 
-Serverpod is the control plane, not the media plane. Ordinary commands,
-approvals, logs, presence, and task events fit typed endpoint calls and
-WebSocket streams. Screen video, audio, and high-frequency input require a
-purpose-built low-latency transport such as WebRTC; Serverpod can authenticate
-the peers and carry signalling.
+Serverpod carries commands, approvals, logs, presence, task events, and WebRTC
+signalling. WebRTC carries low-latency screen, audio, pointer, and keyboard
+traffic.
 
-## Local-first deployment
+## Deployment
 
-The controlled computer is the execution authority and should remain useful
-without a mandatory cloud service.
+The initial host uses:
 
-The default host shape is:
+- Serverpod Mini beside the core;
+- in-memory state for the current MVP;
+- SQLite/Drift when durable host state is added;
+- cryptographic device pairing and per-device authorization;
+- LAN, private-overlay, or direct WebRTC connectivity.
 
-- Serverpod Mini beside the harness;
-- no required Postgres installation;
-- in-memory state for the earliest vertical slice;
-- SQLite/Drift when durable host state is introduced;
-- custom cryptographic device pairing and per-device authorization;
-- direct LAN, private-overlay, or WebRTC connectivity.
+An optional managed service may later provide accounts, discovery,
+notifications, rendezvous, and relay fallback. It must not control local
+execution. Postgres may suit that service but is not required on user machines.
 
-An optional managed service may later provide accounts, device discovery,
-notifications, rendezvous, and relay fallback. It must not silently become the
-authority over local execution. A full Serverpod/Postgres deployment is a
-reasonable fit for that service, but an unreasonable prerequisite for every
-consumer computer.
+## Capabilities and extensions
 
-## Build with tracer bullets
+Every action is a capability with a resource, operation, scope, risk,
+approval policy, timeout, cancellation behaviour, events, and provenance. The
+same rules apply to Dart tools, MCP servers, native adapters, and specialist
+agents.
 
-Dextero should grow as a series of thin, working product slices rather than as
-separate layers built in isolation. Every new user-facing capability follows
-the same path:
+- Trusted Dart packages may ship at compile time.
+- Executable and MCP adapters use a small, versioned runtime protocol.
+- Platform automation sits behind stable macOS, Windows, and Linux interfaces.
+- Browser automation prefers DOM and CDP semantics over screenshot clicking.
+- Desktop coordinates are an adapter detail, not a core abstraction.
 
-1. implement the capability in the orchestration core;
-2. expose it through a typed Serverpod contract;
-3. make it usable in the primary Flutter app;
-4. make it usable in the CLI/TUI for technical users and automation.
+## User experience
 
-The slice is not complete until it is tested at every layer and end to end.
-Core behaviour needs focused tests, the server contract needs integration
-tests, each surface needs interaction tests, and one acceptance test must
-prove the real path across the system. This keeps architecture honest, makes
-each increment demonstrable, and prevents the app or TUI becoming a cosmetic
-shell over unfinished plumbing.
+1. The user states an outcome.
+2. Dextero works within existing authority or asks for a specific approval.
+3. Structured events show progress.
+4. The user can steer, cancel, inspect artifacts, or take over.
+5. Tasks survive reconnects and recover predictably from failure.
+6. Results state what changed, what failed, and what authority was used.
+7. Useful history remains searchable.
 
-## Capability model
-
-Dextero treats every action as a capability, not as ambient authority.
-
-A capability should declare:
-
-- what resource and operation it covers;
-- the scope granted to the current task or specialist;
-- its risk and approval requirements;
-- cancellation and timeout behaviour;
-- the events and artifacts it produces;
-- enough identity and provenance for an audit record.
-
-This model should apply equally to a Dart tool, an MCP server, a native desktop
-adapter, and a delegated coding agent. A specialist receives only the task,
-context, and capabilities it needs. The parent can monitor, steer, cancel, and
-incorporate the structured result.
-
-## Extension strategy
-
-Dextero is not an all-Dart purity project.
-
-- **Compile-time extensions** are trusted Dart packages shipped with a release.
-- **Runtime extensions** are executable or MCP adapters isolated behind a
-  small, versioned protocol.
-- **Native platform work** sits behind stable interfaces for macOS
-  accessibility, Windows UI Automation, and Linux accessibility APIs.
-- **Browser work** prefers DOM and Chrome DevTools Protocol semantics over
-  screenshot clicking.
-- **Desktop coordinates** are a last-mile adapter detail, never the core
-  abstraction.
-
-This gives Dextero access to mature Python, TypeScript, Rust, and native
-ecosystems without weakening the typed policy boundary.
-
-## Trust and user experience
-
-The ideal interaction is calm and legible:
-
-1. The user states an outcome in the app or a trusted messaging channel.
-2. Dextero proposes or begins a safe plan within already granted authority.
-3. Progress appears as structured events, not a wall of hidden reasoning.
-4. Consequential actions pause with a specific, understandable approval.
-5. The user can steer, cancel, inspect artifacts, or take over.
-6. The task can survive reconnects and recover from process failure.
-7. The final result includes what changed, what failed, and what authority was
-   exercised.
-8. The conversation, result, and useful lessons remain searchable later, and
-   changes to connected systems are reflected in the products the user already
-   uses.
-
-Remote control should strengthen this model, not bypass it. A phone controller
-is a secure window into the same approvals and task state—not a second,
+Remote controllers use the same permissions and task state; they are not an
 unrestricted command channel.
 
-## What Dextero is not
+## Non-goals
 
-- It is not a replacement for Codex, Pi, or every other specialist agent.
-- It is not an agent harness presented as a consumer product.
-- It is not an unrestricted shell with a chat interface.
-- It is not dependent on a cloud account to control the local computer.
-- It is not committed to screenshot-based automation when semantic interfaces
-  exist.
-- It is not promising one pure-Dart implementation for every operating-system
-  capability.
-- It is not production-safe until permissions, approvals, sandboxing, and
-  auditability exist as enforceable boundaries.
-
-## The destination
-
-Dextero succeeds when an ordinary person can ask it to get something done
-without learning agent terminology; when an expert can still inspect, extend,
-and control the machinery; when either can move between the app and messaging
-without losing continuity; and when Dextero remembers their shared history and
-works with the services already on their phone—all while the controlled
-computer and its authority remain theirs.
+- Replacing specialist agents.
+- Exposing an agent harness as the product.
+- An unrestricted shell behind chat.
+- Requiring a cloud account for local use.
+- Using screenshot automation where semantic interfaces exist.
+- Implementing every platform capability in pure Dart.
+- Claiming production safety before permissions, approvals, sandboxing, and
+  audit are enforceable.
