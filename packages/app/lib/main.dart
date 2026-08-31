@@ -53,13 +53,14 @@ class DexteroHomePage extends StatefulWidget {
 }
 
 class _DexteroHomePageState extends State<DexteroHomePage> {
-  final _promptController = TextEditingController();
+  final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_refresh);
-    _promptController.addListener(_refresh);
+    _messageController.addListener(_refresh);
     widget.controller.initialize();
   }
 
@@ -67,78 +68,71 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
   void dispose() {
     widget.controller.removeListener(_refresh);
     widget.controller.dispose();
-    _promptController
+    _messageController
       ..removeListener(_refresh)
       ..dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  Future<void> _send() async {
+    final sent = await widget.controller.submitMessage(_messageController.text);
+    if (sent) _messageController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final canRun =
-        controller.configured &&
+    final canSend =
         controller.hostStatus != null &&
         !controller.busy &&
-        _promptController.text.trim().isNotEmpty;
+        _messageController.text.trim().isNotEmpty;
 
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 920),
+            constraints: const BoxConstraints(maxWidth: 960),
             child: Padding(
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _Header(controller: controller),
-                  const SizedBox(height: 28),
-                  TextField(
-                    key: const Key('task-prompt'),
-                    controller: _promptController,
-                    enabled: !controller.busy,
-                    minLines: 3,
-                    maxLines: 7,
-                    decoration: const InputDecoration(
-                      filled: true,
-                      labelText: 'What should Dextero do?',
-                      hintText:
-                          'Inspect this workspace and summarize its architecture.',
-                      alignLabelWithHint: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: canRun
-                        ? (_) => controller.runTask(_promptController.text)
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      key: const Key('run-task'),
-                      onPressed: canRun
-                          ? () => controller.runTask(_promptController.text)
-                          : null,
-                      icon: controller.busy
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.play_arrow_rounded),
-                      label: Text(controller.busy ? 'Working…' : 'Run task'),
-                    ),
-                  ),
+                  const SizedBox(height: 18),
                   if (controller.error case final error?) ...[
-                    const SizedBox(height: 16),
                     _ErrorBanner(message: error),
+                    const SizedBox(height: 12),
                   ],
-                  const SizedBox(height: 20),
-                  Expanded(child: _EventTimeline(events: controller.events)),
+                  Expanded(
+                    child: _ConversationView(
+                      state: controller.loadState,
+                      entries: controller.entries,
+                      scrollController: _scrollController,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _Composer(
+                    messageController: _messageController,
+                    enabled: controller.hostStatus != null && !controller.busy,
+                    canSend: canSend,
+                    submitting: controller.submitting,
+                    working: controller.busy && !controller.submitting,
+                    onSend: _send,
+                  ),
                 ],
               ),
             ),
@@ -180,10 +174,19 @@ class _Header extends StatelessWidget {
                 'Dextero',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
               ),
-              Text('Local agent workspace'),
+              Text('One local conversation'),
             ],
           ),
         ),
+        if (status != null)
+          Tooltip(
+            message: status.retentionNotice,
+            child: const Chip(
+              avatar: Icon(Icons.memory, size: 16),
+              label: Text('Until restart'),
+            ),
+          ),
+        const SizedBox(width: 8),
         Chip(
           avatar: Icon(
             status == null ? Icons.cloud_off_outlined : Icons.circle,
@@ -201,6 +204,240 @@ class _Header extends StatelessWidget {
   }
 }
 
+class _ConversationView extends StatelessWidget {
+  const _ConversationView({
+    required this.state,
+    required this.entries,
+    required this.scrollController,
+  });
+
+  final ChatLoadState state;
+  final List<ChatEntry> entries;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state == ChatLoadState.loading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(key: Key('history-loading')),
+            SizedBox(height: 12),
+            Text('Loading conversation…'),
+          ],
+        ),
+      );
+    }
+    if (state == ChatLoadState.empty || entries.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.chat_bubble_outline, size: 38),
+            SizedBox(height: 12),
+            Text(
+              'Start a conversation with Dextero.',
+              key: Key('empty-history'),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 4),
+            Text('Messages and safe activity summaries will appear here.'),
+          ],
+        ),
+      );
+    }
+    return ListView.separated(
+      key: const Key('chat-history'),
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: entries.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) => _ChatEntryCard(entry: entries[index]),
+    );
+  }
+}
+
+class _ChatEntryCard extends StatelessWidget {
+  const _ChatEntryCard({required this.entry});
+
+  final ChatEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (entry.kind) {
+      ChatEntryKind.userMessage => _MessageBubble(entry: entry, user: true),
+      ChatEntryKind.assistantMessage => _MessageBubble(
+        entry: entry,
+        user: false,
+      ),
+      _ => _ActivityRow(entry: entry),
+    };
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.entry, required this.user});
+
+  final ChatEntry entry;
+  final bool user;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Align(
+      alignment: user ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 700),
+        child: Material(
+          color: user ? scheme.primaryContainer : scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user ? 'You' : 'Dextero',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+                const SizedBox(height: 4),
+                SelectableText(
+                  entry.content,
+                  key: Key('entry-${entry.entryId}'),
+                  style: const TextStyle(fontSize: 16, height: 1.4),
+                ),
+                if (entry.truncated) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    'Summary truncated',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.entry});
+
+  final ChatEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final isError = entry.kind == ChatEntryKind.error;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        key: Key('entry-${entry.entryId}'),
+        constraints: const BoxConstraints(maxWidth: 700),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: isError
+              ? Theme.of(context).colorScheme.errorContainer
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(_activityIcon(entry), size: 17),
+            const SizedBox(width: 8),
+            Flexible(child: Text(entry.content)),
+            const SizedBox(width: 8),
+            Text(
+              entry.status.name,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _activityIcon(ChatEntry entry) => switch (entry.kind) {
+    ChatEntryKind.toolCall => Icons.build_outlined,
+    ChatEntryKind.toolResult =>
+      entry.status == ChatEntryStatus.failed
+          ? Icons.error_outline
+          : Icons.check_circle_outline,
+    ChatEntryKind.error => Icons.error_outline,
+    _ => switch (entry.status) {
+      ChatEntryStatus.queued => Icons.schedule,
+      ChatEntryStatus.running => Icons.sync,
+      ChatEntryStatus.completed => Icons.check_circle_outline,
+      ChatEntryStatus.failed => Icons.error_outline,
+      _ => Icons.info_outline,
+    },
+  };
+}
+
+class _Composer extends StatelessWidget {
+  const _Composer({
+    required this.messageController,
+    required this.enabled,
+    required this.canSend,
+    required this.submitting,
+    required this.working,
+    required this.onSend,
+  });
+
+  final TextEditingController messageController;
+  final bool enabled;
+  final bool canSend;
+  final bool submitting;
+  final bool working;
+  final Future<void> Function() onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 1,
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: TextField(
+                key: const Key('chat-message'),
+                controller: messageController,
+                enabled: enabled,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.newline,
+                decoration: InputDecoration(
+                  hintText: working ? 'Dextero is working…' : 'Message Dextero',
+                  border: InputBorder.none,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              key: const Key('send-message'),
+              tooltip: 'Send message',
+              onPressed: canSend ? onSend : null,
+              icon: submitting
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_upward_rounded),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ErrorBanner extends StatelessWidget {
   const _ErrorBanner({required this.message});
 
@@ -208,6 +445,7 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
+    key: const Key('error-banner'),
     color: Theme.of(context).colorScheme.errorContainer,
     borderRadius: BorderRadius.circular(12),
     child: Padding(
@@ -222,66 +460,4 @@ class _ErrorBanner extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _EventTimeline extends StatelessWidget {
-  const _EventTimeline({required this.events});
-
-  final List<TaskEvent> events;
-
-  @override
-  Widget build(BuildContext context) {
-    if (events.isEmpty) {
-      return const Center(
-        child: Text('Task progress and results will appear here.'),
-      );
-    }
-    return ListView.separated(
-      itemCount: events.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final event = events[index];
-        final isOutput = event.kind == TaskEventKind.output;
-        return Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(_eventIcon(event.kind), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.kind.name.toUpperCase(),
-                        style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      SelectableText(
-                        event.message,
-                        style: isOutput
-                            ? const TextStyle(fontSize: 16, height: 1.45)
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  IconData _eventIcon(TaskEventKind kind) => switch (kind) {
-    TaskEventKind.queued => Icons.schedule,
-    TaskEventKind.running => Icons.sync,
-    TaskEventKind.output => Icons.notes,
-    TaskEventKind.completed => Icons.check_circle_outline,
-    TaskEventKind.failed => Icons.error_outline,
-  };
 }

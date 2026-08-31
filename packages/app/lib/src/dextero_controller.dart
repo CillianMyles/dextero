@@ -1,78 +1,266 @@
+import 'dart:async';
+
 import 'package:dextero_server/dextero_client.dart';
 import 'package:flutter/foundation.dart';
 
+enum ChatLoadState { loading, empty, ready, error }
+
+abstract interface class ChatApi {
+  Future<HostStatus> status();
+
+  Future<List<ChatEntry>> history(String conversationId);
+
+  Future<ChatSubmission> submit(ChatSubmitRequest request);
+
+  Stream<ChatEntry> streamHistory(String conversationId, int afterSequence);
+
+  Future<void> close();
+}
+
+final class ServerpodChatApi implements ChatApi {
+  ServerpodChatApi({required String serverUrl, required String token}) {
+    final normalizedUrl = serverUrl.endsWith('/') ? serverUrl : '$serverUrl/';
+    _client = Client(normalizedUrl)
+      ..authKeyProvider = DexteroTokenAuthProvider(token);
+  }
+
+  late final Client _client;
+
+  @override
+  Future<HostStatus> status() => _client.control.status();
+
+  @override
+  Future<List<ChatEntry>> history(String conversationId) =>
+      _client.control.history(conversationId);
+
+  @override
+  Future<ChatSubmission> submit(ChatSubmitRequest request) =>
+      _client.control.submitMessage(request);
+
+  @override
+  Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
+      _client.control.streamHistory(conversationId, afterSequence);
+
+  @override
+  Future<void> close() async => _client.close();
+}
+
 final class DexteroController extends ChangeNotifier {
-  DexteroController({required this.token, required this.serverUrl});
+  DexteroController({
+    required ChatApi api,
+    this.configured = true,
+    String Function()? correlationIdFactory,
+  }) : _api = api,
+       _correlationIdFactory =
+           correlationIdFactory ??
+           (() =>
+               'app-${DateTime.now().toUtc().microsecondsSinceEpoch.toString()}');
 
   factory DexteroController.fromEnvironment(Map<String, String> environment) {
+    final token = environment['DEXTERO_CONTROL_TOKEN'];
+    final configured = token != null && token.length >= 32;
     return DexteroController(
-      token: environment['DEXTERO_CONTROL_TOKEN'],
-      serverUrl: environment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/',
+      configured: configured,
+      api: configured
+          ? ServerpodChatApi(
+              serverUrl:
+                  environment['DEXTERO_CONTROL_URL'] ??
+                  'http://localhost:8080/',
+              token: token,
+            )
+          : const _UnavailableChatApi(),
     );
   }
 
-  final String? token;
-  final String serverUrl;
-
-  Client? _client;
+  final ChatApi _api;
+  final String Function() _correlationIdFactory;
+  final bool configured;
+  final List<ChatEntry> _entries = [];
+  final Set<String> _terminalRunIds = {};
+  StreamSubscription<ChatEntry>? _historySubscription;
   HostStatus? _hostStatus;
+  ChatLoadState _loadState = ChatLoadState.loading;
   String? _error;
-  bool _busy = false;
-  final List<TaskEvent> _events = [];
+  bool _submitting = false;
+  String? _activeRunId;
+  bool _initialized = false;
 
   HostStatus? get hostStatus => _hostStatus;
+  ChatLoadState get loadState => _loadState;
   String? get error => _error;
-  bool get busy => _busy;
-  bool get configured => token != null && token!.length >= 32;
-  List<TaskEvent> get events => List.unmodifiable(_events);
+  bool get submitting => _submitting;
+  bool get busy => _submitting || _activeRunId != null;
+  List<ChatEntry> get entries => List.unmodifiable(_entries);
 
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+    _loadState = ChatLoadState.loading;
+    notifyListeners();
     if (!configured) {
-      _error =
-          'DEXTERO_CONTROL_TOKEN is missing. Start the app with '
-          '`make app-web` or `make app-macos`.';
-      notifyListeners();
+      _setError(
+        'DEXTERO_CONTROL_TOKEN is missing. Start the app with '
+        '`make app-web` or `make app-macos`.',
+      );
       return;
     }
 
-    final normalizedUrl = serverUrl.endsWith('/') ? serverUrl : '$serverUrl/';
-    _client = Client(normalizedUrl)
-      ..authKeyProvider = DexteroTokenAuthProvider(token!);
     try {
-      _hostStatus = await _client!.control.status();
+      _hostStatus = await _api.status();
+      _entries
+        ..clear()
+        ..addAll(await _api.history(_hostStatus!.conversationId));
+      _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
+      _restoreRunState();
+      _loadState = _entries.isEmpty ? ChatLoadState.empty : ChatLoadState.ready;
       _error = null;
+      notifyListeners();
+      _subscribeToHistory();
     } on Object catch (error) {
-      _error = 'Cannot reach the Dextero server: $error';
+      _setError('Cannot reach the Dextero server: $error');
     }
-    notifyListeners();
   }
 
-  Future<void> runTask(String prompt) async {
-    final client = _client;
-    final normalizedPrompt = prompt.trim();
-    if (client == null || normalizedPrompt.isEmpty || _busy) return;
+  Future<bool> submitMessage(String message) async {
+    final status = _hostStatus;
+    final normalized = message.trim();
+    if (status == null || normalized.isEmpty || busy) return false;
 
-    _busy = true;
+    _submitting = true;
     _error = null;
-    _events.clear();
     notifyListeners();
     try {
-      await for (final event in client.control.runTask(normalizedPrompt)) {
-        _events.add(event);
-        if (event.kind == TaskEventKind.failed) _error = event.message;
-        notifyListeners();
-      }
+      final submission = await _api.submit(
+        ChatSubmitRequest(
+          conversationId: status.conversationId,
+          message: normalized,
+          correlationId: _correlationIdFactory(),
+        ),
+      );
+      _addEntry(submission.userEntry);
+      _activeRunId = submission.runId;
+      if (_terminalRunIds.contains(submission.runId)) _activeRunId = null;
+      _loadState = ChatLoadState.ready;
+      return true;
     } on Object catch (error) {
-      _error = 'Task stream failed: $error';
+      _error = 'Message submission failed: $error';
+      return false;
     } finally {
-      _busy = false;
+      _submitting = false;
       notifyListeners();
     }
+  }
+
+  void _subscribeToHistory() {
+    final status = _hostStatus;
+    if (status == null) return;
+    final afterSequence = _entries.isEmpty ? -1 : _entries.last.sequence;
+    _historySubscription = _api
+        .streamHistory(status.conversationId, afterSequence)
+        .listen(
+          (entry) {
+            _addEntry(entry);
+            if (entry.runId case final runId?
+                when entry.kind == ChatEntryKind.lifecycle &&
+                    {
+                      ChatEntryStatus.completed,
+                      ChatEntryStatus.failed,
+                    }.contains(entry.status)) {
+              _terminalRunIds.add(runId);
+            }
+            if (entry.runId == _activeRunId &&
+                entry.kind == ChatEntryKind.lifecycle &&
+                {
+                  ChatEntryStatus.completed,
+                  ChatEntryStatus.failed,
+                }.contains(entry.status)) {
+              _activeRunId = null;
+            }
+            if (entry.kind == ChatEntryKind.error &&
+                entry.status == ChatEntryStatus.failed) {
+              _error = entry.content;
+            }
+            notifyListeners();
+          },
+          onError: (Object error) {
+            _error = 'Chat history stream failed: $error';
+            _activeRunId = null;
+            _hostStatus = null;
+            notifyListeners();
+          },
+          onDone: () {
+            _error = 'Chat history stream disconnected.';
+            _activeRunId = null;
+            _hostStatus = null;
+            notifyListeners();
+          },
+        );
+  }
+
+  void _restoreRunState() {
+    _terminalRunIds.clear();
+    final latestSequenceByRun = <String, int>{};
+    for (final entry in _entries) {
+      final runId = entry.runId;
+      if (runId == null) continue;
+      latestSequenceByRun[runId] = entry.sequence;
+      if (entry.kind == ChatEntryKind.lifecycle &&
+          {
+            ChatEntryStatus.completed,
+            ChatEntryStatus.failed,
+          }.contains(entry.status)) {
+        _terminalRunIds.add(runId);
+      }
+    }
+    final activeRuns =
+        latestSequenceByRun.entries
+            .where((run) => !_terminalRunIds.contains(run.key))
+            .toList()
+          ..sort((left, right) => left.value.compareTo(right.value));
+    _activeRunId = activeRuns.isEmpty ? null : activeRuns.last.key;
+  }
+
+  void _addEntry(ChatEntry entry) {
+    if (_entries.any((existing) => existing.entryId == entry.entryId)) return;
+    _entries.add(entry);
+    _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
+    _loadState = ChatLoadState.ready;
+  }
+
+  void _setError(String message) {
+    _error = message;
+    _loadState = ChatLoadState.error;
+    notifyListeners();
   }
 
   @override
   void dispose() {
-    _client?.close();
+    unawaited(_historySubscription?.cancel());
+    unawaited(_api.close());
     super.dispose();
   }
+}
+
+final class _UnavailableChatApi implements ChatApi {
+  const _UnavailableChatApi();
+
+  Never _unavailable() => throw StateError('Dextero is not configured.');
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  Future<List<ChatEntry>> history(String conversationId) async =>
+      _unavailable();
+
+  @override
+  Future<HostStatus> status() async => _unavailable();
+
+  @override
+  Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
+      Stream.error(_unavailable());
+
+  @override
+  Future<ChatSubmission> submit(ChatSubmitRequest request) async =>
+      _unavailable();
 }

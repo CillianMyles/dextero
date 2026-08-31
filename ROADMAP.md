@@ -14,20 +14,30 @@ Milestones are directional, not release-date promises.
 - [x] Codex app-server specialist adapter
 - [x] Deterministic demos and focused tool/protocol tests
 - [x] Native Dart AOT compilation spike
-- [x] Initial macOS Flutter app and terminal client on the shared task stream
+- [x] Initial macOS Flutter app and terminal-client control-plane spike
 
-## Milestone 1 — typed event backbone
+## Milestone 1 — chat and typed control backbone
 
 Make every task observable and controllable before adding more authority.
 
+- [x] Establish append-only user, assistant, tool, lifecycle, and error history
+  with stable conversation, entry, run, tool-call, and correlation IDs.
+- [x] Adapt real Codex activity into bounded safe summaries without retaining
+  raw tool arguments or results.
+- [x] Expose typed submit, history, and cursor-stream operations through the
+  Flutter and terminal chats.
+- [x] Test the path at every layer, including a terminal-to-server network
+  acceptance test.
 - [ ] Define versioned events for task, model, tool, approval, artifact, usage,
   warning, and error lifecycles.
-- [ ] Add stable task, run, tool-call, and correlation identifiers.
 - [ ] Support streaming model output and incremental tool output.
 - [ ] Add cancellation propagation and reliable child-process-tree cleanup.
 - [ ] Add timeouts, output limits, environment filtering, and bounded background
   execution to all process tools.
 - [ ] Provide a stable JSONL interface for automation and tests.
+
+History is currently in memory behind a persistence interface and is lost when
+the server restarts.
 
 **Exit condition:** a task can be watched and cancelled through one typed event
 contract without relying on terminal scraping.
@@ -36,14 +46,10 @@ contract without relying on terminal scraping.
 
 Prove the product architecture with the smallest useful remote controller.
 
-- [x] Add a Serverpod Mini service beside the harness without a Postgres
-  requirement.
-- [ ] Generate shared task, event, approval, and command models.
-- [ ] Expose endpoints to create, inspect, cancel, and approve tasks.
-- [x] Stream a deterministic task lifecycle to a generated Dart client over
-  WebSocket.
-- [x] Build a minimal Flutter app that can start a task and show its event
-  stream.
+- [x] Add a database-free Serverpod Mini service with a generated conversation
+  contract for submitting, inspecting, and streaming history.
+- [ ] Expose endpoints to cancel and approve work.
+- [x] Use that contract from the Flutter and terminal chats.
 - [ ] Add one understandable approval interaction to the app.
 - [x] Start with in-memory task state and document the restart limitation.
 - [ ] Add local-only development defaults and explicit network binding.
@@ -52,9 +58,9 @@ Current security boundary: control endpoints require a bootstrap bearer token.
 Serverpod 3.4.13 still binds its listener to all IPv6 interfaces, so the port
 must remain firewalled until explicit binding or device pairing is available.
 
-**Exit condition:** a Flutter client can start the deterministic demo, observe
-its typed events, approve a gated action, cancel it, and receive the result from
-a local Dextero host.
+**Exit condition:** a Flutter client can continue the local conversation,
+observe typed activity, approve a gated action, cancel it, and receive the
+result from a local Dextero host.
 
 ## Milestone 3 — permissions, approvals, and audit
 

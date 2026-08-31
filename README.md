@@ -1,8 +1,8 @@
 # Dextero
 
 Dextero is an experimental local computer agent built with Dart, Flutter, and
-Serverpod. The current MVP runs Codex tasks against a configured workspace and
-streams task events to a desktop app and terminal client.
+Serverpod. The current MVP provides one chat conversation backed by Codex and
+shows the same ordered history in the Flutter app and terminal client.
 
 See [VISION.md](VISION.md) for product direction and [ROADMAP.md](ROADMAP.md)
 for planned work.
@@ -26,7 +26,8 @@ cli ─┘
 ```
 
 The app and CLI use the generated client without importing or launching the
-server runtime.
+server runtime. User messages are stored before assistant work begins; replies,
+safe tool activity, lifecycle, and errors append to the same ordered history.
 
 ## Run
 
@@ -56,14 +57,15 @@ start only the corresponding client. The local bearer token and control URL are
 passed to Flutter as compile-time defines so the same entrypoint works on web
 and macOS.
 
-Start the CLI in a second terminal while the server is running:
+Start an interactive terminal chat in a second terminal while the server is
+running. Use `/exit` to leave:
 
 ```sh
 make server
 make cli
 ```
 
-Pass a prompt directly:
+Send one message non-interactively:
 
 ```sh
 make cli PROMPT="Inspect this workspace and summarize its architecture"
@@ -84,10 +86,16 @@ or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. Serverpod 3.4.13 may bind beyond loopback, so keep port
 8080 firewalled from untrusted networks.
 
+Chat history stores bounded, redacted tool summaries instead of raw arguments
+or results. The current in-memory implementation loses its single conversation
+when the server restarts; no Postgres service is required.
+
 ## Serverpod changes
 
-Models live in `packages/server/lib/src/control`. Generated server, client, and
-test code is committed. After changing an endpoint or `.spy.yaml` model, run:
+Models live in `packages/server/lib/src/control`. The control endpoint exposes
+typed `submitMessage`, `history`, and `streamHistory` operations. Generated
+server, client, and test code is committed. After changing an endpoint or
+`.spy.yaml` model, run:
 
 ```sh
 make generate
