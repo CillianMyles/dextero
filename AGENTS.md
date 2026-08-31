@@ -1,5 +1,18 @@
 # Repository instructions
 
+## Delivery loop
+
+For every change:
+
+1. do the work;
+2. run linting and tests;
+3. validate the changed behaviour by running it;
+4. commit with a Conventional Commit message;
+5. push the current branch.
+
+Do not report the work complete before the commit and push succeed unless the
+user explicitly asks to stop earlier.
+
 ## Delivery
 
 Build user-facing capabilities as tracer bullets through every layer:

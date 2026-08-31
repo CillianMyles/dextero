@@ -13,7 +13,7 @@ for planned work.
 packages/
 ├── core/    agent loop, tools, and Codex adapter
 ├── server/  Serverpod host, API, and generated client
-├── app/     Flutter desktop app
+├── app/     Flutter web and macOS app
 └── cli/     terminal client
 ```
 
@@ -33,16 +33,28 @@ server runtime.
 Requirements:
 
 - Dart 3.10+
-- Flutter with macOS desktop support
+- Flutter with web support and Chrome
+- Full Xcode installation for optional macOS native runs
 - Codex CLI, authenticated with `codex login`
 - OpenSSL
 
-Start the server and app:
+Start the server and web app:
 
 ```sh
 make bootstrap
 make dev
 ```
+
+Use the native macOS app for local development or platform checks:
+
+```sh
+make dev-macos
+```
+
+When the server is already running, use `make app-web` or `make app-macos` to
+start only the corresponding client. The local bearer token and control URL are
+passed to Flutter as compile-time defines so the same entrypoint works on web
+and macOS.
 
 Start the CLI in a second terminal while the server is running:
 

@@ -29,7 +29,8 @@ final class DexteroController extends ChangeNotifier {
   Future<void> initialize() async {
     if (!configured) {
       _error =
-          'DEXTERO_CONTROL_TOKEN is missing. Start the app with `make app`.';
+          'DEXTERO_CONTROL_TOKEN is missing. Start the app with '
+          '`make app-web` or `make app-macos`.';
       notifyListeners();
       return;
     }

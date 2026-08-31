@@ -61,7 +61,10 @@ void main() {
             })
             as JsonMap;
 
-    expect(result['stdout'], root.path);
+    expect(
+      FileSystemEntity.identicalSync(result['stdout']! as String, root.path),
+      isTrue,
+    );
   });
 
   test('captures stderr and a non-zero exit code', () async {

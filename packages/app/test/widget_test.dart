@@ -15,7 +15,7 @@ void main() {
 
     expect(find.text('Dextero'), findsOneWidget);
     expect(find.text('Disconnected'), findsOneWidget);
-    expect(find.textContaining('make app'), findsOneWidget);
+    expect(find.textContaining('make app-web'), findsOneWidget);
     expect(tester.widget(find.byKey(const Key('run-task'))), isNotNull);
   });
 }

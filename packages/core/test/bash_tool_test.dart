@@ -49,7 +49,8 @@ void main() {
         await tool.call({'command': Platform.isWindows ? 'cd' : 'pwd'})
             as JsonMap;
 
-    expect((result['stdout']! as String).trim(), root.path);
+    final processDirectory = (result['stdout']! as String).trim();
+    expect(FileSystemEntity.identicalSync(processDirectory, root.path), isTrue);
   });
 
   test('captures stderr and non-zero exit status', () async {

@@ -1,14 +1,21 @@
-import 'dart:io';
-
 import 'package:dextero_server/dextero_client.dart';
 import 'package:flutter/material.dart';
 
 import 'src/dextero_controller.dart';
 
+const _controlToken = String.fromEnvironment('DEXTERO_CONTROL_TOKEN');
+const _controlUrl = String.fromEnvironment(
+  'DEXTERO_CONTROL_URL',
+  defaultValue: 'http://localhost:8080/',
+);
+
 void main() {
   runApp(
     DexteroApp(
-      controller: DexteroController.fromEnvironment(Platform.environment),
+      controller: DexteroController.fromEnvironment({
+        if (_controlToken.isNotEmpty) 'DEXTERO_CONTROL_TOKEN': _controlToken,
+        'DEXTERO_CONTROL_URL': _controlUrl,
+      }),
     ),
   );
 }

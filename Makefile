@@ -6,10 +6,12 @@ FLUTTER ?= flutter
 SERVERPOD ?= serverpod
 CONTROL_URL ?= http://localhost:8080/
 WORKSPACE ?= $(CURDIR)
+APP_DEVICE ?= chrome
 DEV_TOKEN_FILE := .dart_tool/dev-token
 
 .PHONY: help doctor bootstrap tools token generate format format-check analyze \
-	test test-core test-server test-app test-cli check server app cli core dev
+	test test-core test-server test-app test-app-web test-cli check server app \
+	app-web app-macos cli core dev dev-web dev-macos
 
 help: ## Show the available developer commands.
 	@printf "Dextero development\n\n"
@@ -62,13 +64,17 @@ test-core: ## Run core unit tests.
 test-server: ## Run Serverpod endpoint integration tests.
 	@cd packages/server && $(DART) test
 
-test-app: ## Run Flutter widget tests.
+test-app: ## Run Flutter widget tests on the local and web test devices.
 	@cd packages/app && $(FLUTTER) test
+	@cd packages/app && $(FLUTTER) test --platform chrome
+
+test-app-web: ## Run Flutter widget tests in Chrome.
+	@cd packages/app && $(FLUTTER) test --platform chrome
 
 test-cli: ## Run CLI unit tests.
 	@cd packages/cli && $(DART) test
 
-test: ## Run every package test suite.
+test: ## Run every package test suite, including the Flutter web tests.
 	@$(MAKE) --no-print-directory -j 4 test-core test-server test-app test-cli
 
 check: format-check analyze test ## Run the same quality gate expected before review.
@@ -78,12 +84,18 @@ server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and Codex-backed core.
 	 DEXTERO_WORKSPACE="$(WORKSPACE)" \
 	 $(DART) run packages/server/bin/server.dart
 
-app: $(DEV_TOKEN_FILE) ## Run the Flutter macOS client (start the server separately).
+app: $(DEV_TOKEN_FILE) ## Run the Flutter client (Chrome by default; set APP_DEVICE).
 	@token="$$(cat $(DEV_TOKEN_FILE))"; \
 	 cd packages/app && \
-	 DEXTERO_CONTROL_TOKEN="$$token" \
-	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
-	 $(FLUTTER) run -d macos
+	 $(FLUTTER) run -d "$(APP_DEVICE)" \
+	   --dart-define="DEXTERO_CONTROL_TOKEN=$$token" \
+	   --dart-define="DEXTERO_CONTROL_URL=$(CONTROL_URL)"
+
+app-web: ## Run the Flutter web client in Chrome (start the server separately).
+	@$(MAKE) --no-print-directory app APP_DEVICE=chrome
+
+app-macos: ## Run the Flutter macOS client (start the server separately).
+	@$(MAKE) --no-print-directory app APP_DEVICE=macos
 
 cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
@@ -93,7 +105,7 @@ cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 core: ## Run the core directly through Codex without Serverpod.
 	@$(DART) run packages/core/bin/dextero_core.dart $(if $(PROMPT),"$(PROMPT)",)
 
-dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter app together; Ctrl-C stops both.
+dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default).
 	@set -e; \
 	 token="$$(cat $(DEV_TOKEN_FILE))"; \
 	 cleanup() { kill $$server_pid 2>/dev/null || true; }; \
@@ -105,5 +117,12 @@ dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter app together; Ctrl-C stop
 	   sleep 0.25; \
 	 done; \
 	 cd packages/app && \
-	 DEXTERO_CONTROL_TOKEN="$$token" DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
-	   $(FLUTTER) run -d macos
+	 $(FLUTTER) run -d "$(APP_DEVICE)" \
+	   --dart-define="DEXTERO_CONTROL_TOKEN=$$token" \
+	   --dart-define="DEXTERO_CONTROL_URL=$(CONTROL_URL)"
+
+dev-web: ## Start the server and Flutter web client together.
+	@$(MAKE) --no-print-directory dev APP_DEVICE=chrome
+
+dev-macos: ## Start the server and Flutter macOS client together.
+	@$(MAKE) --no-print-directory dev APP_DEVICE=macos
