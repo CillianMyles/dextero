@@ -8,6 +8,13 @@ coherent.
 This roadmap is directional. Milestones describe coherent product increments;
 they are not release-date promises.
 
+## Delivery invariant — tracer bullets
+
+Every capability ships as one thin vertical slice: **core → typed Serverpod
+API → Flutter app → CLI/TUI**. It is done only when each layer has focused
+tests and an end-to-end acceptance test proves the complete path. Milestones
+set direction; they do not permit stockpiling unfinished work in one layer.
+
 ## Foundation — working today
 
 - [x] JSON-shaped tool definitions, calls, and results

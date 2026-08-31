@@ -210,6 +210,24 @@ authority over local execution. A full Serverpod/Postgres deployment is a
 reasonable fit for that service, but an unreasonable prerequisite for every
 consumer computer.
 
+## Build with tracer bullets
+
+Dextero should grow as a series of thin, working product slices rather than as
+separate layers built in isolation. Every new user-facing capability follows
+the same path:
+
+1. implement the capability in the orchestration core;
+2. expose it through a typed Serverpod contract;
+3. make it usable in the primary Flutter app;
+4. make it usable in the CLI/TUI for technical users and automation.
+
+The slice is not complete until it is tested at every layer and end to end.
+Core behaviour needs focused tests, the server contract needs integration
+tests, each surface needs interaction tests, and one acceptance test must
+prove the real path across the system. This keeps architecture honest, makes
+each increment demonstrable, and prevents the app or TUI becoming a cosmetic
+shell over unfinished plumbing.
+
 ## Capability model
 
 Dextero treats every action as a capability, not as ambient authority.
