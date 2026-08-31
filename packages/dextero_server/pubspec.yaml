@@ -1,0 +1,17 @@
+name: dextero_server
+description: Local Serverpod Mini control plane for Dextero.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+resolution: workspace
+
+dependencies:
+  serverpod: 3.4.13
+
+dev_dependencies:
+  lints: ">=3.0.0 <7.0.0"
+  serverpod_test: 3.4.13
+  test: ">=1.26.0 <1.31.0"

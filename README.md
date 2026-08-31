@@ -29,6 +29,8 @@ Implemented today:
 - a Codex app-server adapter that leaves subscription authentication and token
   refresh with the Codex CLI;
 - deterministic demos and focused tests for tool and protocol failure modes;
+- a database-free Serverpod Mini control plane with bearer-token auth, a typed
+  status RPC, and a streamed demo-task lifecycle;
 - AOT compilation to a small, fast-starting native executable.
 
 The path from this kernel to the product is documented in [VISION.md](VISION.md)
@@ -86,6 +88,37 @@ Install dependencies and run the test suite:
 dart pub get
 dart test
 dart analyze
+```
+
+### Run the local control plane
+
+The Serverpod Mini service requires no Postgres or Redis process. It keeps MVP
+state in memory and requires a bootstrap bearer token for every Dextero
+endpoint:
+
+```sh
+export DEXTERO_CONTROL_TOKEN="$(openssl rand -hex 32)"
+dart run packages/dextero_server/bin/main.dart
+```
+
+Serverpod listens on port `8080` by default. Serverpod 3.4.13 binds its API
+listener to all IPv6 interfaces even though its default public host is
+`localhost`; do not treat the hostname as a network boundary. Keep the port
+firewalled from untrusted networks. The token is an MVP bootstrap mechanism,
+not a replacement for the planned cryptographic device-pairing flow.
+
+The generated Dart client lives in `packages/dextero_client`. After changing a
+`.spy.yaml` model or endpoint, regenerate both sides with:
+
+```sh
+serverpod generate --directory packages/dextero_server
+```
+
+With the server running, exercise the generated client and method stream from
+another terminal using the same token:
+
+```sh
+dart run packages/dextero_client/bin/control_demo.dart
 ```
 
 Run the deterministic agent demo:

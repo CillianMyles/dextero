@@ -1,0 +1,8 @@
+class: TaskEvent
+fields:
+  taskId: String
+  sequence: int
+  kind: TaskEventKind
+  message: String
+  timestamp: DateTime
+  terminal: bool

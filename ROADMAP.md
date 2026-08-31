@@ -39,15 +39,20 @@ contract without relying on terminal scraping.
 
 Prove the product architecture with the smallest useful remote controller.
 
-- [ ] Add a Serverpod Mini service beside the harness without a Postgres
+- [x] Add a Serverpod Mini service beside the harness without a Postgres
   requirement.
 - [ ] Generate shared task, event, approval, and command models.
 - [ ] Expose endpoints to create, inspect, cancel, and approve tasks.
-- [ ] Stream task events to a generated Dart client over WebSocket.
+- [x] Stream a deterministic task lifecycle to a generated Dart client over
+  WebSocket.
 - [ ] Build a minimal Flutter controller showing task status, events, and one
   approval interaction.
-- [ ] Start with in-memory task state and document the restart limitation.
+- [x] Start with in-memory task state and document the restart limitation.
 - [ ] Add local-only development defaults and explicit network binding.
+
+Current security boundary: control endpoints require a bootstrap bearer token.
+Serverpod 3.4.13 still binds its listener to all IPv6 interfaces, so the port
+must remain firewalled until explicit binding or device pairing is available.
 
 **Exit condition:** a Flutter client can start the deterministic demo, observe
 its typed events, approve a gated action, cancel it, and receive the result from

@@ -1,0 +1,12 @@
+name: dextero_client
+description: Generated Dart client for the local Dextero control plane.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+resolution: workspace
+
+dependencies:
+  serverpod_client: 3.4.13

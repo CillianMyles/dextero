@@ -1,0 +1,8 @@
+class: HostStatus
+fields:
+  name: String
+  version: String
+  startedAt: DateTime
+  persistence: String
+  databaseRequired: bool
+  streamingAvailable: bool
