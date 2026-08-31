@@ -27,6 +27,30 @@ void main() {
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
   });
 
+  testWidgets('keeps the connected chat controls usable at phone width', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final controller = DexteroController(
+      api: _FakeChatApi(status: Future.value(_status())),
+    );
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('chat-message')), 'Hello');
+    await tester.pump();
+
+    expect(find.byKey(const Key('compact-header')), findsOneWidget);
+    expect(find.text('Dextero 0.0.1'), findsOneWidget);
+    expect(find.byKey(const Key('send-message')), findsOneWidget);
+    expect(
+      tester.getCenter(find.byKey(const Key('send-message'))).dx,
+      lessThan(390),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders canonical submission and streamed chat activity', (
     tester,
   ) async {

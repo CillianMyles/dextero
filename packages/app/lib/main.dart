@@ -151,57 +151,83 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = controller.hostStatus;
-    return Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            Icons.auto_awesome,
-            color: Theme.of(context).colorScheme.onPrimary,
+    final badges = <Widget>[
+      if (status != null)
+        Tooltip(
+          message: status.retentionNotice,
+          child: const Chip(
+            avatar: Icon(Icons.memory, size: 16),
+            label: Text('Until restart'),
           ),
         ),
-        const SizedBox(width: 14),
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      Chip(
+        avatar: Icon(
+          status == null ? Icons.cloud_off_outlined : Icons.circle,
+          size: 14,
+          color: status == null ? null : Colors.green.shade700,
+        ),
+        label: Text(
+          status == null ? 'Disconnected' : '${status.name} ${status.version}',
+        ),
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 620) {
+          return Column(
+            key: const Key('compact-header'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Dextero',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-              ),
-              Text('One local conversation'),
+              const _Brand(),
+              const SizedBox(height: 10),
+              Wrap(spacing: 8, runSpacing: 8, children: badges),
             ],
-          ),
-        ),
-        if (status != null)
-          Tooltip(
-            message: status.retentionNotice,
-            child: const Chip(
-              avatar: Icon(Icons.memory, size: 16),
-              label: Text('Until restart'),
-            ),
-          ),
-        const SizedBox(width: 8),
-        Chip(
-          avatar: Icon(
-            status == null ? Icons.cloud_off_outlined : Icons.circle,
-            size: 14,
-            color: status == null ? null : Colors.green.shade700,
-          ),
-          label: Text(
-            status == null
-                ? 'Disconnected'
-                : '${status.name} ${status.version}',
-          ),
-        ),
-      ],
+          );
+        }
+        return Row(
+          children: [
+            const Expanded(child: _Brand()),
+            ...badges.expand((badge) => [const SizedBox(width: 8), badge]),
+          ],
+        );
+      },
     );
   }
+}
+
+class _Brand extends StatelessWidget {
+  const _Brand();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          Icons.auto_awesome,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
+      ),
+      const SizedBox(width: 14),
+      const Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Dextero',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+            ),
+            Text('One local conversation'),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 class _ConversationView extends StatelessWidget {
