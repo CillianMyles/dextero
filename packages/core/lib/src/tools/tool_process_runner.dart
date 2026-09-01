@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../cancellation.dart';
+import '../process_environment.dart';
 import '../tool.dart';
 
 /// Runs a process with bounded, separate stdout and stderr capture.
@@ -32,34 +34,71 @@ final class ToolProcessRunner {
   final Duration timeout;
   final int maxOutputBytes;
 
-  Future<JsonMap> run(String command, List<String> arguments) async {
+  Future<JsonMap> run(
+    String command,
+    List<String> arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
+    cancellationToken?.throwIfCancellationRequested();
     final process = await Process.start(
       command,
       arguments,
       workingDirectory: workingDirectory,
       runInShell: false,
+      includeParentEnvironment: false,
+      environment: filteredProcessEnvironment(),
     );
-    final stdoutFuture = _capture(process.stdout);
-    final stderrFuture = _capture(process.stderr);
-    final timer = Timer(timeout, process.kill);
+    final stdoutFuture = _capture(process.stdout, 'stdout', onOutput);
+    final stderrFuture = _capture(process.stderr, 'stderr', onOutput);
+    final termination = Completer<_TerminationReason>();
+    final timer = Timer(
+      timeout,
+      () => termination.complete(_TerminationReason.timeout),
+    );
+    if (cancellationToken != null) {
+      unawaited(
+        cancellationToken.whenCancelled.then((_) {
+          if (!termination.isCompleted) {
+            termination.complete(_TerminationReason.cancelled);
+          }
+        }),
+      );
+    }
 
+    final naturalExit = process.exitCode.then((_) => _TerminationReason.exit);
+    final reason = await Future.any([naturalExit, termination.future]);
+    if (reason != _TerminationReason.exit) {
+      await terminateProcessTree(process);
+    }
     final exitCode = await process.exitCode;
     timer.cancel();
     final stdout = await stdoutFuture;
     final stderr = await stderrFuture;
+    if (reason == _TerminationReason.cancelled) {
+      throw const RunCancelledException();
+    }
     return {
       'exit_code': exitCode,
       'stdout': stdout.text,
       'stderr': stderr.text,
       'truncated': stdout.truncated || stderr.truncated,
+      if (reason == _TerminationReason.timeout) 'timed_out': true,
     };
   }
 
-  Future<_CapturedOutput> _capture(Stream<List<int>> stream) async {
+  Future<_CapturedOutput> _capture(
+    Stream<List<int>> stream,
+    String streamName,
+    ToolOutputSink? onOutput,
+  ) async {
     final bytes = BytesBuilder(copy: false);
     var remaining = maxOutputBytes;
     var truncated = false;
     await for (final chunk in stream) {
+      await onOutput?.call(
+        ToolOutputUpdate(stream: streamName, byteCount: chunk.length),
+      );
       if (chunk.length <= remaining) {
         bytes.add(chunk);
         remaining -= chunk.length;
@@ -75,6 +114,8 @@ final class ToolProcessRunner {
     );
   }
 }
+
+enum _TerminationReason { exit, timeout, cancelled }
 
 final class _CapturedOutput {
   const _CapturedOutput(this.text, this.truncated);

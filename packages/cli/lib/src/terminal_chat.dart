@@ -1,18 +1,24 @@
 import 'package:dextero_server/dextero_client.dart';
 
 import 'chat_client.dart';
+import 'jsonl_renderer.dart';
 import 'terminal_io.dart';
 import 'terminal_renderer.dart';
+
+enum TerminalOutputMode { human, jsonl }
 
 final class TerminalChat {
   TerminalChat({
     required TerminalChatClient client,
     required TerminalIo io,
     TerminalRenderer renderer = const TerminalRenderer(),
+    JsonlRenderer jsonlRenderer = const JsonlRenderer(),
+    this.outputMode = TerminalOutputMode.human,
     String Function()? correlationIdFactory,
   }) : _client = client,
        _io = io,
        _renderer = renderer,
+       _jsonlRenderer = jsonlRenderer,
        _correlationIdFactory =
            correlationIdFactory ??
            (() =>
@@ -21,16 +27,30 @@ final class TerminalChat {
   final TerminalChatClient _client;
   final TerminalIo _io;
   final TerminalRenderer _renderer;
+  final JsonlRenderer _jsonlRenderer;
+  final TerminalOutputMode outputMode;
   final String Function() _correlationIdFactory;
   final List<ChatEntry> _entries = [];
   final Set<String> _plainRenderedEntryIds = {};
   var _plainEmptyRendered = false;
   late HostStatus _status;
 
-  Future<int> run({String? initialMessage}) async {
+  Future<int> run({String? initialMessage, String? cancelRunId}) async {
     var failed = false;
     try {
       _status = await _client.status();
+      if (cancelRunId != null) {
+        final cancelled = await _client.cancelRun(
+          _status.conversationId,
+          cancelRunId,
+        );
+        _io.writeln(
+          cancelled
+              ? 'Cancellation requested for $cancelRunId.'
+              : 'Run $cancelRunId is not active.',
+        );
+        return cancelled ? 0 : 1;
+      }
       _entries.addAll(await _client.history(_status.conversationId));
       _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
       _render(notice: initialMessage == null ? 'Type /exit to leave.' : null);
@@ -48,7 +68,11 @@ final class TerminalChat {
       }
       return failed ? 1 : 0;
     } on Object catch (error) {
-      _io.error('Dextero request failed: $error');
+      if (outputMode == TerminalOutputMode.jsonl) {
+        _io.writeln(_jsonlRenderer.error(error));
+      } else {
+        _io.error('Dextero request failed: $error');
+      }
       return 1;
     } finally {
       await _client.close();
@@ -87,6 +111,7 @@ final class TerminalChat {
           {
             ChatEntryStatus.completed,
             ChatEntryStatus.failed,
+            ChatEntryStatus.cancelled,
           }.contains(entry.status);
       _render(notice: terminal ? null : 'Dextero is working…');
       if (terminal) {
@@ -109,6 +134,13 @@ final class TerminalChat {
   }
 
   void _render({String? notice}) {
+    if (outputMode == TerminalOutputMode.jsonl) {
+      for (final entry in _entries) {
+        if (!_plainRenderedEntryIds.add(entry.entryId)) continue;
+        _io.writeln(_jsonlRenderer.entry(entry));
+      }
+      return;
+    }
     if (_io.hasTerminal) {
       _io.write(
         _renderer.frame(status: _status, entries: _entries, notice: notice),

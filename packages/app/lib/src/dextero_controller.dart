@@ -12,6 +12,8 @@ abstract interface class ChatApi {
 
   Future<ChatSubmission> submit(ChatSubmitRequest request);
 
+  Future<bool> cancelRun(String conversationId, String runId);
+
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence);
 
   Future<void> close();
@@ -36,6 +38,10 @@ final class ServerpodChatApi implements ChatApi {
   @override
   Future<ChatSubmission> submit(ChatSubmitRequest request) =>
       _client.control.submitMessage(request);
+
+  @override
+  Future<bool> cancelRun(String conversationId, String runId) =>
+      _client.control.cancelRun(conversationId, runId);
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
@@ -82,6 +88,7 @@ final class DexteroController extends ChangeNotifier {
   ChatLoadState _loadState = ChatLoadState.loading;
   String? _error;
   bool _submitting = false;
+  bool _cancelling = false;
   String? _activeRunId;
   bool _initialized = false;
 
@@ -89,7 +96,9 @@ final class DexteroController extends ChangeNotifier {
   ChatLoadState get loadState => _loadState;
   String? get error => _error;
   bool get submitting => _submitting;
+  bool get cancelling => _cancelling;
   bool get busy => _submitting || _activeRunId != null;
+  bool get canCancel => _activeRunId != null && !_cancelling;
   List<ChatEntry> get entries => List.unmodifiable(_entries);
 
   Future<void> initialize() async {
@@ -118,6 +127,29 @@ final class DexteroController extends ChangeNotifier {
       _subscribeToHistory();
     } on Object catch (error) {
       _setError('Cannot reach the Dextero server: $error');
+    }
+  }
+
+  Future<bool> cancelActiveRun() async {
+    final status = _hostStatus;
+    final runId = _activeRunId;
+    if (status == null || runId == null || _cancelling) return false;
+
+    _cancelling = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final accepted = await _api.cancelRun(status.conversationId, runId);
+      if (!accepted) {
+        _error = 'The run had already finished before cancellation.';
+      }
+      return accepted;
+    } on Object catch (error) {
+      _error = 'Run cancellation failed: $error';
+      return false;
+    } finally {
+      _cancelling = false;
+      notifyListeners();
     }
   }
 
@@ -165,6 +197,7 @@ final class DexteroController extends ChangeNotifier {
                     {
                       ChatEntryStatus.completed,
                       ChatEntryStatus.failed,
+                      ChatEntryStatus.cancelled,
                     }.contains(entry.status)) {
               _terminalRunIds.add(runId);
             }
@@ -173,6 +206,7 @@ final class DexteroController extends ChangeNotifier {
                 {
                   ChatEntryStatus.completed,
                   ChatEntryStatus.failed,
+                  ChatEntryStatus.cancelled,
                 }.contains(entry.status)) {
               _activeRunId = null;
             }
@@ -208,6 +242,7 @@ final class DexteroController extends ChangeNotifier {
           {
             ChatEntryStatus.completed,
             ChatEntryStatus.failed,
+            ChatEntryStatus.cancelled,
           }.contains(entry.status)) {
         _terminalRunIds.add(runId);
       }
@@ -251,6 +286,10 @@ final class _UnavailableChatApi implements ChatApi {
 
   @override
   Future<List<ChatEntry>> history(String conversationId) async =>
+      _unavailable();
+
+  @override
+  Future<bool> cancelRun(String conversationId, String runId) async =>
       _unavailable();
 
   @override

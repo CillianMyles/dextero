@@ -63,6 +63,7 @@ final class _AcceptanceAgent implements ConversationAgent {
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
   }) async {
     await onEvent(
       ConversationAgentEvent(

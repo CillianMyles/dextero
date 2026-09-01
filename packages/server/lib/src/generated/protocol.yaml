@@ -1,5 +1,6 @@
 control:
   - status:
   - submitMessage:
+  - cancelRun:
   - history:
   - streamHistory:

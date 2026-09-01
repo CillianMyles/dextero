@@ -102,6 +102,51 @@ void main() {
   });
 
   test(
+    'cancels the active run and records a clean terminal lifecycle',
+    () async {
+      final agent = _CancellableAgent();
+      final store = InMemoryChatHistoryStore();
+      addTearDown(store.close);
+      final service = ChatService(store: store, agent: agent);
+      final conversation = await service.createConversation();
+      final submission = await service.submit(
+        conversationId: conversation.id,
+        message: 'keep working',
+      );
+      await agent.started.future;
+
+      expect(
+        await service.cancel(
+          conversationId: conversation.id,
+          runId: submission.runId,
+        ),
+        isTrue,
+      );
+      final terminal = await _waitForTerminal(
+        store,
+        conversation.id,
+        submission.runId,
+      );
+
+      expect(terminal.status, ChatEntryStatus.cancelled);
+      expect(terminal.content, 'Response cancelled');
+      expect(
+        (await store.history(
+          conversation.id,
+        )).where((entry) => entry.kind == ChatEntryKind.error),
+        isEmpty,
+      );
+      expect(
+        await service.cancel(
+          conversationId: conversation.id,
+          runId: submission.runId,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
     'preserves multiline assistant messages and strips terminal controls',
     () async {
       final store = InMemoryChatHistoryStore();
@@ -133,6 +178,7 @@ final class _ControlledAgent implements ConversationAgent {
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
   }) async {
     started.complete();
     await release.future;
@@ -174,8 +220,25 @@ final class _FailingAgent implements ConversationAgent {
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
   }) async {
     throw StateError('token=super-secret ${'x' * 600}');
+  }
+}
+
+final class _CancellableAgent implements ConversationAgent {
+  final started = Completer<void>();
+
+  @override
+  Future<ConversationAgentResult> run(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+  }) async {
+    started.complete();
+    await cancellationToken.whenCancelled;
+    cancellationToken.throwIfCancellationRequested();
+    throw StateError('unreachable');
   }
 }
 
@@ -184,6 +247,7 @@ final class _MultilineAgent implements ConversationAgent {
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
   }) async => const ConversationAgentResult(
     output: 'First paragraph\n\n```dart\nprint(1);\n```\x1b[2J',
   );
@@ -209,5 +273,6 @@ Future<ChatHistoryEntry> _waitForTerminal(
           {
             ChatEntryStatus.completed,
             ChatEntryStatus.failed,
+            ChatEntryStatus.cancelled,
           }.contains(entry.status),
     );

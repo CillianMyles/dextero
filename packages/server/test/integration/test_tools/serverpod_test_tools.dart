@@ -193,6 +193,41 @@ class _ControlEndpoint {
     });
   }
 
+  _i3.Future<bool> cancelRun(
+    _i1.TestSessionBuilder sessionBuilder,
+    String conversationId,
+    String runId,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'control',
+            method: 'cancelRun',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'control',
+          methodName: 'cancelRun',
+          parameters: _i1.testObjectToJson({
+            'conversationId': conversationId,
+            'runId': runId,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<bool>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
   _i3.Future<List<_i7.ChatEntry>> history(
     _i1.TestSessionBuilder sessionBuilder,
     String conversationId,

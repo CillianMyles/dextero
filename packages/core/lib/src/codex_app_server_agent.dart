@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'cancellation.dart';
 import 'chat_service.dart';
+import 'process_environment.dart';
 import 'safe_metadata.dart';
 import 'tool.dart';
 
@@ -39,6 +41,8 @@ final class ProcessCodexAppServerTransport implements CodexAppServerTransport {
       ['app-server'],
       workingDirectory: workingDirectory,
       runInShell: false,
+      includeParentEnvironment: false,
+      environment: codexProcessEnvironment(),
     );
     return ProcessCodexAppServerTransport._(process);
   }
@@ -59,8 +63,12 @@ final class ProcessCodexAppServerTransport implements CodexAppServerTransport {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    await _process.stdin.close();
-    _process.kill();
+    try {
+      await _process.stdin.close().timeout(const Duration(seconds: 1));
+    } on TimeoutException {
+      // The process tree is terminated below.
+    }
+    await terminateProcessTree(_process);
     await _process.exitCode;
   }
 
@@ -90,7 +98,9 @@ final class CodexAgentRun {
 enum CodexAgentActivityKind {
   lifecycle,
   assistantMessage,
+  assistantDelta,
   toolCallStarted,
+  toolOutput,
   toolCallCompleted,
   error,
 }
@@ -144,6 +154,7 @@ final class CodexAppServerAgent {
     String prompt, {
     required List<Tool> tools,
     CodexAgentActivitySink? onActivity,
+    CancellationToken? cancellationToken,
   }) async {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
@@ -156,6 +167,7 @@ final class CodexAppServerAgent {
     final transport = await _transportFactory();
     final messages = StreamIterator(transport.messages);
     try {
+      cancellationToken?.throwIfCancellationRequested();
       await transport.send({
         'method': 'initialize',
         'id': 0,
@@ -168,7 +180,7 @@ final class CodexAppServerAgent {
           'capabilities': {'experimentalApi': true},
         },
       });
-      await _waitForResponse(messages, 0);
+      await _waitForResponse(messages, 0, cancellationToken);
       await transport.send({
         'method': 'initialized',
         'params': <String, Object?>{},
@@ -200,7 +212,11 @@ final class CodexAppServerAgent {
         'id': 1,
         'params': threadParams,
       });
-      final threadResponse = await _waitForResponse(messages, 1);
+      final threadResponse = await _waitForResponse(
+        messages,
+        1,
+        cancellationToken,
+      );
       final thread = threadResponse['thread'];
       if (thread is! Map || thread['id'] is! String) {
         throw const FormatException('thread/start response omitted thread.id');
@@ -217,7 +233,11 @@ final class CodexAppServerAgent {
           ],
         },
       });
-      final turnResponse = await _waitForResponse(messages, 2);
+      final turnResponse = await _waitForResponse(
+        messages,
+        2,
+        cancellationToken,
+      );
       final turn = turnResponse['turn'];
       if (turn is! Map || turn['id'] is! String) {
         throw const FormatException('turn/start response omitted turn.id');
@@ -235,7 +255,7 @@ final class CodexAppServerAgent {
       var toolCallCount = 0;
       final startedToolCalls = <String>{};
       final completedToolCalls = <String>{};
-      while (await _moveNext(messages)) {
+      while (await _moveNext(messages, cancellationToken)) {
         final message = messages.current;
         final method = message['method'];
         final params = message['params'];
@@ -260,6 +280,8 @@ final class CodexAppServerAgent {
             requestId: message['id'],
             params: params,
             tools: toolsByName,
+            cancellationToken: cancellationToken,
+            onActivity: onActivity,
           );
           if (completedToolCalls.add(execution.callId)) {
             await onActivity?.call(
@@ -282,6 +304,35 @@ final class CodexAppServerAgent {
           final activity = _toolItemActivity(params['item'], completed: false);
           if (activity != null && startedToolCalls.add(activity.toolCallId!)) {
             await onActivity?.call(activity);
+          }
+          continue;
+        }
+        if (method == 'item/agentMessage/delta' && params is Map) {
+          final delta = params['delta'];
+          if (delta is String && delta.isNotEmpty) {
+            await onActivity?.call(
+              CodexAgentActivity(
+                kind: CodexAgentActivityKind.assistantDelta,
+                summary: SafeMetadata.message(delta),
+              ),
+            );
+          }
+          continue;
+        }
+        if (method == 'item/commandExecution/outputDelta' && params is Map) {
+          final delta = params['delta'];
+          final itemId = params['itemId']?.toString();
+          if (delta is String && delta.isNotEmpty) {
+            await onActivity?.call(
+              CodexAgentActivity(
+                kind: CodexAgentActivityKind.toolOutput,
+                summary: SafeMetadata.text(
+                  'Command produced ${delta.length} characters of output',
+                ),
+                toolCallId: itemId,
+                toolName: 'command_execution',
+              ),
+            );
           }
           continue;
         }
@@ -357,8 +408,9 @@ final class CodexAppServerAgent {
   Future<JsonMap> _waitForResponse(
     StreamIterator<JsonMap> messages,
     Object requestId,
+    CancellationToken? cancellationToken,
   ) async {
-    while (await _moveNext(messages)) {
+    while (await _moveNext(messages, cancellationToken)) {
       final message = messages.current;
       if (message['id'] != requestId) continue;
       if (message['error'] case final Map error) {
@@ -379,14 +431,28 @@ final class CodexAppServerAgent {
     );
   }
 
-  Future<bool> _moveNext(StreamIterator<JsonMap> messages) =>
-      messages.moveNext().timeout(messageTimeout);
+  Future<bool> _moveNext(
+    StreamIterator<JsonMap> messages,
+    CancellationToken? cancellationToken,
+  ) async {
+    cancellationToken?.throwIfCancellationRequested();
+    final moveNext = messages.moveNext().timeout(messageTimeout);
+    if (cancellationToken == null) return moveNext;
+    return Future.any<bool>([
+      moveNext,
+      cancellationToken.whenCancelled.then<bool>(
+        (_) => throw const RunCancelledException(),
+      ),
+    ]);
+  }
 
   Future<_ToolExecution> _handleToolCall(
     CodexAppServerTransport transport, {
     required Object? requestId,
     required Object? params,
     required Map<String, Tool> tools,
+    CancellationToken? cancellationToken,
+    CodexAgentActivitySink? onActivity,
   }) async {
     var success = false;
     Object? content;
@@ -408,7 +474,21 @@ final class CodexAppServerAgent {
       } else {
         arguments = rawArguments.cast<String, Object?>();
         try {
-          content = await tool.call(arguments);
+          content = await tool.call(
+            arguments,
+            cancellationToken: cancellationToken,
+            onOutput: (update) => onActivity?.call(
+              CodexAgentActivity(
+                kind: CodexAgentActivityKind.toolOutput,
+                summary: SafeMetadata.text(
+                  '$toolName ${update.stream}: ${update.byteCount} bytes',
+                ),
+                toolCallId: callId,
+                toolName: toolName,
+              ),
+            ),
+          );
+          cancellationToken?.throwIfCancellationRequested();
           success = true;
         } on Object catch (error) {
           content = error.toString();
@@ -553,10 +633,12 @@ final class CodexConversationAgent implements ConversationAgent {
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
   }) async {
     final result = await _agent.run(
       prompt,
       tools: _tools,
+      cancellationToken: cancellationToken,
       onActivity: (activity) => onEvent(
         ConversationAgentEvent(
           kind: switch (activity.kind) {
@@ -564,8 +646,12 @@ final class CodexConversationAgent implements ConversationAgent {
               ConversationAgentEventKind.lifecycle,
             CodexAgentActivityKind.assistantMessage =>
               ConversationAgentEventKind.assistantMessage,
+            CodexAgentActivityKind.assistantDelta =>
+              ConversationAgentEventKind.assistantDelta,
             CodexAgentActivityKind.toolCallStarted =>
               ConversationAgentEventKind.toolCallStarted,
+            CodexAgentActivityKind.toolOutput =>
+              ConversationAgentEventKind.toolOutput,
             CodexAgentActivityKind.toolCallCompleted =>
               ConversationAgentEventKind.toolCallCompleted,
             CodexAgentActivityKind.error => ConversationAgentEventKind.error,

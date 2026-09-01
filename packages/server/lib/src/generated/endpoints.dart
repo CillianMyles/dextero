@@ -47,6 +47,27 @@ class Endpoints extends _i1.EndpointDispatch {
                 params['request'],
               ),
         ),
+        'cancelRun': _i1.MethodConnector(
+          name: 'cancelRun',
+          params: {
+            'conversationId': _i1.ParameterDescription(
+              name: 'conversationId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'runId': _i1.ParameterDescription(
+              name: 'runId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['control'] as _i2.ControlEndpoint).cancelRun(
+                session,
+                params['conversationId'],
+                params['runId'],
+              ),
+        ),
         'history': _i1.MethodConnector(
           name: 'history',
           params: {

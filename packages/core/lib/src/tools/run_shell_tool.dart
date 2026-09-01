@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../cancellation.dart';
 import '../tool.dart';
 import 'tool_process_runner.dart';
 
@@ -33,7 +34,11 @@ final class RunShellTool implements Tool {
   );
 
   @override
-  Future<Object?> call(JsonMap arguments) async {
+  Future<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
     final command = arguments['command'];
     if (command is! String || command.trim().isEmpty) {
       throw const FormatException('command must be a non-empty string');
@@ -43,6 +48,11 @@ final class RunShellTool implements Tool {
     final shellArguments = Platform.isWindows
         ? ['/d', '/s', '/c', command]
         : ['-c', command];
-    return _runner.run(shell, shellArguments);
+    return _runner.run(
+      shell,
+      shellArguments,
+      cancellationToken: cancellationToken,
+      onOutput: onOutput,
+    );
   }
 }

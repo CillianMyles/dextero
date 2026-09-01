@@ -16,7 +16,9 @@ import 'package:serverpod/serverpod.dart' as _i1;
 enum ChatEntryKind implements _i1.SerializableModel {
   userMessage,
   assistantMessage,
+  assistantDelta,
   toolCall,
+  toolOutput,
   toolResult,
   lifecycle,
   error;
@@ -27,8 +29,12 @@ enum ChatEntryKind implements _i1.SerializableModel {
         return ChatEntryKind.userMessage;
       case 'assistantMessage':
         return ChatEntryKind.assistantMessage;
+      case 'assistantDelta':
+        return ChatEntryKind.assistantDelta;
       case 'toolCall':
         return ChatEntryKind.toolCall;
+      case 'toolOutput':
+        return ChatEntryKind.toolOutput;
       case 'toolResult':
         return ChatEntryKind.toolResult;
       case 'lifecycle':

@@ -1,6 +1,16 @@
 import 'dart:async';
 
+import 'cancellation.dart';
+
 typedef JsonMap = Map<String, Object?>;
+typedef ToolOutputSink = FutureOr<void> Function(ToolOutputUpdate update);
+
+final class ToolOutputUpdate {
+  const ToolOutputUpdate({required this.stream, required this.byteCount});
+
+  final String stream;
+  final int byteCount;
+}
 
 final class ToolDefinition {
   const ToolDefinition({
@@ -55,5 +65,9 @@ final class ToolResult {
 abstract interface class Tool {
   ToolDefinition get definition;
 
-  FutureOr<Object?> call(JsonMap arguments);
+  FutureOr<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  });
 }

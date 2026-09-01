@@ -7,6 +7,8 @@ abstract interface class TerminalChatClient {
 
   Future<ChatSubmission> submit(ChatSubmitRequest request);
 
+  Future<bool> cancelRun(String conversationId, String runId);
+
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence);
 
   Future<void> close();
@@ -34,6 +36,10 @@ final class ServerpodTerminalChatClient implements TerminalChatClient {
   @override
   Future<ChatSubmission> submit(ChatSubmitRequest request) =>
       _client.control.submitMessage(request);
+
+  @override
+  Future<bool> cancelRun(String conversationId, String runId) =>
+      _client.control.cancelRun(conversationId, runId);
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>

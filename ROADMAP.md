@@ -28,13 +28,13 @@ Make every task observable and controllable before adding more authority.
   Flutter and terminal chats.
 - [x] Test the path at every layer, including a terminal-to-server network
   acceptance test.
-- [ ] Define versioned events for task, model, tool, approval, artifact, usage,
+- [x] Define versioned events for task, model, tool, approval, artifact, usage,
   warning, and error lifecycles.
-- [ ] Support streaming model output and incremental tool output.
-- [ ] Add cancellation propagation and reliable child-process-tree cleanup.
-- [ ] Add timeouts, output limits, environment filtering, and bounded background
+- [x] Support streaming model output and incremental tool output.
+- [x] Add cancellation propagation and reliable child-process-tree cleanup.
+- [x] Add timeouts, output limits, environment filtering, and bounded background
   execution to all process tools.
-- [ ] Provide a stable JSONL interface for automation and tests.
+- [x] Provide a stable JSONL interface for automation and tests.
 
 History is currently in memory behind a persistence interface and is lost when
 the server restarts.
@@ -48,7 +48,8 @@ Prove the product architecture with the smallest useful remote controller.
 
 - [x] Add a database-free Serverpod Mini service with a generated conversation
   contract for submitting, inspecting, and streaming history.
-- [ ] Expose endpoints to cancel and approve work.
+- [x] Expose an endpoint to cancel work.
+- [ ] Expose endpoints to approve work.
 - [x] Use that contract from the Flutter and terminal chats.
 - [ ] Add one understandable approval interaction to the app.
 - [x] Start with in-memory task state and document the restart limitation.

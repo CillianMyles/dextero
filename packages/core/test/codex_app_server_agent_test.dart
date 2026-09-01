@@ -76,6 +76,8 @@ void main() {
         CodexAgentActivityKind.lifecycle,
         CodexAgentActivityKind.toolCallStarted,
         CodexAgentActivityKind.toolCallCompleted,
+        CodexAgentActivityKind.toolOutput,
+        CodexAgentActivityKind.assistantDelta,
         CodexAgentActivityKind.assistantMessage,
       ]),
     );
@@ -86,6 +88,7 @@ void main() {
       [
         CodexAgentActivityKind.toolCallStarted,
         CodexAgentActivityKind.toolCallCompleted,
+        CodexAgentActivityKind.toolOutput,
       ],
     );
     final rendered = activities.map((activity) => activity.summary.text).join();
@@ -210,7 +213,11 @@ final class _EchoTool implements Tool {
   );
 
   @override
-  Object? call(JsonMap arguments) => {'echo': arguments['value']};
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) => {'echo': arguments['value']};
 }
 
 final class _FailingTool implements Tool {
@@ -222,7 +229,11 @@ final class _FailingTool implements Tool {
   );
 
   @override
-  Object? call(JsonMap arguments) => throw StateError('tool exploded');
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) => throw StateError('tool exploded');
 }
 
 base class _FakeTransport implements CodexAppServerTransport {
@@ -304,6 +315,10 @@ final class _ScriptedTransport extends _FakeTransport {
       case null:
         if (message['id'] != 'tool-request-1') return;
         emit({
+          'method': 'item/commandExecution/outputDelta',
+          'params': {'itemId': 'call-1', 'delta': 'raw incremental output'},
+        });
+        emit({
           'method': 'item/completed',
           'params': {
             'threadId': 'thread-1',
@@ -321,6 +336,10 @@ final class _ScriptedTransport extends _FakeTransport {
               ],
             },
           },
+        });
+        emit({
+          'method': 'item/agentMessage/delta',
+          'params': {'delta': 'The tool said '},
         });
         emit({
           'method': 'item/completed',

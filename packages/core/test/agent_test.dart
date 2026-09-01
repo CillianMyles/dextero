@@ -150,7 +150,11 @@ final class _EchoTool implements Tool {
   );
 
   @override
-  Object? call(JsonMap arguments) => {'echo': arguments['value']};
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) => {'echo': arguments['value']};
 }
 
 final class _FailingTool implements Tool {
@@ -162,7 +166,11 @@ final class _FailingTool implements Tool {
   );
 
   @override
-  Object? call(JsonMap arguments) => throw StateError('exploded');
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) => throw StateError('exploded');
 }
 
 final class _QueueModel implements AgentModel {

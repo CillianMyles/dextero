@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../cancellation.dart';
 import '../tool.dart';
 import 'workspace_path.dart';
 
@@ -28,7 +29,12 @@ final class ListFilesTool implements Tool {
   );
 
   @override
-  Future<Object?> call(JsonMap arguments) async {
+  Future<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
+    cancellationToken?.throwIfCancellationRequested();
     final path = arguments['path'] ?? '.';
     final recursive = arguments['recursive'] ?? false;
     if (path is! String || path.isEmpty) {

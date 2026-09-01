@@ -1,3 +1,4 @@
+import '../cancellation.dart';
 import '../tool.dart';
 import 'tool_process_runner.dart';
 
@@ -36,7 +37,11 @@ final class RunCommandTool implements Tool {
   );
 
   @override
-  Future<Object?> call(JsonMap arguments) async {
+  Future<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
     final command = arguments['command'];
     final rawArguments = arguments['arguments'] ?? const <Object?>[];
     if (command is! String || command.trim().isEmpty) {
@@ -47,6 +52,11 @@ final class RunCommandTool implements Tool {
       throw const FormatException('arguments must be an array of strings');
     }
 
-    return _runner.run(command, rawArguments.cast<String>());
+    return _runner.run(
+      command,
+      rawArguments.cast<String>(),
+      cancellationToken: cancellationToken,
+      onOutput: onOutput,
+    );
   }
 }

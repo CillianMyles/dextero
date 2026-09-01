@@ -1,5 +1,7 @@
 class: ChatEntry
 fields:
+  eventVersion: int, default=1
+  family: ChatEventFamily, default=task
   conversationId: String
   entryId: String
   sequence: int

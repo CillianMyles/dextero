@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../cancellation.dart';
 import '../tool.dart';
 import 'workspace_path.dart';
 
@@ -26,7 +27,12 @@ final class ReadFileTool implements Tool {
   );
 
   @override
-  Future<Object?> call(JsonMap arguments) async {
+  Future<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
+    cancellationToken?.throwIfCancellationRequested();
     final path = arguments['path'];
     if (path is! String || path.isEmpty) {
       throw const FormatException('path must be a non-empty string');

@@ -65,10 +65,19 @@ make server
 make cli
 ```
 
+Cancel a known run from another terminal with
+`dart run packages/cli/bin/dextero.dart --cancel <run-id>`.
+
 Send one message non-interactively:
 
 ```sh
 make cli PROMPT="Inspect this workspace and summarize its architecture"
+```
+
+Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
+
+```sh
+dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"
 ```
 
 Run all checks:

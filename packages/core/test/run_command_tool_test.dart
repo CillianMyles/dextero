@@ -100,6 +100,28 @@ void main() {
     );
   });
 
+  test(
+    'reports bounded incremental output metadata without its content',
+    () async {
+      final updates = <ToolOutputUpdate>[];
+      final script = await _script(
+        root,
+        "stdout.write('secret output'); stderr.write('secret error');",
+      );
+
+      await tool.call({
+        'command': Platform.resolvedExecutable,
+        'arguments': [script.path],
+      }, onOutput: updates.add);
+
+      expect(updates.map((update) => update.stream).toSet(), {
+        'stdout',
+        'stderr',
+      });
+      expect(updates.every((update) => update.byteCount > 0), isTrue);
+    },
+  );
+
   test('always reports when either output stream is truncated', () async {
     tool = RunCommandTool(workingDirectory: root.path, maxOutputBytes: 5);
     final script = await _script(

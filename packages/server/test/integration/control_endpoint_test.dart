@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:dextero_server/src/auth/dextero_token_authenticator.dart';
 import 'package:dextero_server/src/control/chat_runtime.dart';
@@ -130,7 +132,56 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('cancels an active run through the typed endpoint', () async {
+      final cancellable = _CancellableConversationAgent();
+      service = core.ChatService(store: store, agent: cancellable);
+      conversationId = (await service.createConversation()).id;
+      ChatRuntime.configure(
+        chatService: service,
+        defaultConversationId: conversationId,
+      );
+      final submission = await endpoints.control.submitMessage(
+        authenticatedSession,
+        ChatSubmitRequest(conversationId: conversationId, message: 'Long task'),
+      );
+      await cancellable.started.future;
+
+      expect(
+        await endpoints.control.cancelRun(
+          authenticatedSession,
+          conversationId,
+          submission.runId,
+        ),
+        isTrue,
+      );
+      final terminal = await store
+          .watch(conversationId)
+          .firstWhere(
+            (entry) =>
+                entry.runId == submission.runId &&
+                entry.kind == core.ChatEntryKind.lifecycle &&
+                entry.status == core.ChatEntryStatus.cancelled,
+          );
+      expect(terminal.content, 'Response cancelled');
+    });
   });
+}
+
+final class _CancellableConversationAgent implements core.ConversationAgent {
+  final started = Completer<void>();
+
+  @override
+  Future<core.ConversationAgentResult> run(
+    String prompt, {
+    required core.ConversationAgentEventSink onEvent,
+    required core.CancellationToken cancellationToken,
+  }) async {
+    started.complete();
+    await cancellationToken.whenCancelled;
+    cancellationToken.throwIfCancellationRequested();
+    throw StateError('unreachable');
+  }
 }
 
 final class _FakeConversationAgent implements core.ConversationAgent {
@@ -138,6 +189,7 @@ final class _FakeConversationAgent implements core.ConversationAgent {
   Future<core.ConversationAgentResult> run(
     String prompt, {
     required core.ConversationAgentEventSink onEvent,
+    required core.CancellationToken cancellationToken,
   }) async {
     await onEvent(
       core.ConversationAgentEvent(

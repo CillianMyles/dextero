@@ -1,8 +1,10 @@
 export 'src/agent.dart';
+export 'src/cancellation.dart';
 export 'src/chat_history.dart';
 export 'src/chat_service.dart';
 export 'src/codex_app_server_agent.dart';
 export 'src/model.dart';
+export 'src/process_environment.dart';
 export 'src/safe_metadata.dart';
 export 'src/task_runner.dart';
 export 'src/tool.dart';

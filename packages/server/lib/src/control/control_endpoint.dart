@@ -43,6 +43,13 @@ final class ControlEndpoint extends Endpoint {
     );
   }
 
+  /// Requests cancellation of the matching active run.
+  Future<bool> cancelRun(
+    Session session,
+    String conversationId,
+    String runId,
+  ) => ChatRuntime.service.cancel(conversationId: conversationId, runId: runId);
+
   /// Returns the complete process-local history for one conversation.
   Future<List<ChatEntry>> history(
     Session session,
@@ -61,6 +68,8 @@ final class ControlEndpoint extends Endpoint {
       .map(_toProtocolEntry);
 
   ChatEntry _toProtocolEntry(core.ChatHistoryEntry entry) => ChatEntry(
+    eventVersion: entry.eventVersion,
+    family: ChatEventFamily.values.byName(entry.family.name),
     conversationId: entry.conversationId,
     entryId: entry.entryId,
     sequence: entry.sequence,

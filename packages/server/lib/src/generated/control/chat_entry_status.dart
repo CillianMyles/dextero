@@ -19,7 +19,8 @@ enum ChatEntryStatus implements _i1.SerializableModel {
   running,
   warning,
   completed,
-  failed;
+  failed,
+  cancelled;
 
   static ChatEntryStatus fromJson(String name) {
     switch (name) {
@@ -35,6 +36,8 @@ enum ChatEntryStatus implements _i1.SerializableModel {
         return ChatEntryStatus.completed;
       case 'failed':
         return ChatEntryStatus.failed;
+      case 'cancelled':
+        return ChatEntryStatus.cancelled;
       default:
         throw ArgumentError(
           'Value "$name" cannot be converted to "ChatEntryStatus"',

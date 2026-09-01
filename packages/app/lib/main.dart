@@ -93,6 +93,8 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
     if (sent) _messageController.clear();
   }
 
+  Future<void> _cancel() => widget.controller.cancelActiveRun();
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -130,8 +132,10 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                     enabled: controller.hostStatus != null && !controller.busy,
                     canSend: canSend,
                     submitting: controller.submitting,
+                    cancelling: controller.cancelling,
                     working: controller.busy && !controller.submitting,
                     onSend: _send,
+                    onCancel: _cancel,
                   ),
                 ],
               ),
@@ -356,38 +360,151 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isError = entry.kind == ChatEntryKind.error;
+    final scheme = Theme.of(context).colorScheme;
+    final isError =
+        entry.kind == ChatEntryKind.error ||
+        entry.status == ChatEntryStatus.failed;
+    final isWarning = entry.status == ChatEntryStatus.warning;
+    final background = isError
+        ? scheme.errorContainer
+        : isWarning
+        ? const Color(0xffffefd1)
+        : scheme.surfaceContainerHighest;
+    final foreground = isError
+        ? scheme.onErrorContainer
+        : isWarning
+        ? const Color(0xff694c00)
+        : scheme.onSurface;
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
+      child: Material(
         key: Key('entry-${entry.entryId}'),
-        constraints: const BoxConstraints(maxWidth: 700),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: isError
-              ? Theme.of(context).colorScheme.errorContainer
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(_activityIcon(entry), size: 17),
-            const SizedBox(width: 8),
-            Flexible(child: Text(entry.content)),
-            const SizedBox(width: 8),
-            Text(
-              entry.status.name,
-              style: Theme.of(context).textTheme.labelSmall,
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 700),
+          child: ExpansionTile(
+            key: Key('activity-details-${entry.entryId}'),
+            tilePadding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            iconColor: foreground,
+            collapsedIconColor: foreground,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Icon(_activityIcon(entry), size: 18, color: foreground),
+                    Text(
+                      _activityLabel(entry),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    _ActivityBadge(
+                      label: _displayName(entry.status.name),
+                      foreground: foreground,
+                    ),
+                    if (entry.truncated)
+                      _ActivityBadge(
+                        key: Key('activity-truncated-${entry.entryId}'),
+                        label: 'Truncated',
+                        foreground: foreground,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  entry.content,
+                  key: Key('activity-summary-${entry.entryId}'),
+                  style: TextStyle(color: foreground, height: 1.35),
+                ),
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    Text(
+                      _timestamp(entry.createdAt),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: foreground),
+                    ),
+                    Text(
+                      '• ${_displayName(entry.source.name)}',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelSmall?.copyWith(color: foreground),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
+            children: [
+              Divider(color: foreground.withValues(alpha: 0.25)),
+              _TechnicalDetail(
+                label: 'Event',
+                value:
+                    'v${entry.eventVersion} · ${_displayName(entry.family.name)}',
+              ),
+              _TechnicalDetail(label: 'Sequence', value: '${entry.sequence}'),
+              if (entry.runId case final runId?)
+                _TechnicalDetail(label: 'Run', value: runId),
+              _TechnicalDetail(
+                label: 'Correlation',
+                value: entry.correlationId,
+              ),
+              if (entry.toolCallId case final toolCallId?)
+                _TechnicalDetail(label: 'Tool call', value: toolCallId),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  String _activityLabel(ChatEntry entry) => switch (entry.kind) {
+    ChatEntryKind.assistantDelta => 'Model output',
+    ChatEntryKind.toolCall => '${_toolLabel(entry.toolName)} started',
+    ChatEntryKind.toolOutput => '${_toolLabel(entry.toolName)} output',
+    ChatEntryKind.toolResult => '${_toolLabel(entry.toolName)} result',
+    ChatEntryKind.error => 'Agent error',
+    ChatEntryKind.lifecycle => switch (entry.status) {
+      ChatEntryStatus.queued => 'Queued',
+      ChatEntryStatus.running => 'Agent activity',
+      ChatEntryStatus.completed => 'Run completed',
+      ChatEntryStatus.failed => 'Run failed',
+      ChatEntryStatus.cancelled => 'Run cancelled',
+      _ => 'Run update',
+    },
+    _ => _displayName(entry.kind.name),
+  };
+
+  String _toolLabel(String? toolName) => toolName == null
+      ? 'Tool'
+      : _displayName(toolName.replaceAll(RegExp(r'[._-]+'), ' '));
+
+  String _timestamp(DateTime value) {
+    final utc = value.toUtc();
+    String two(int part) => part.toString().padLeft(2, '0');
+    return '${utc.year}-${two(utc.month)}-${two(utc.day)} '
+        '${two(utc.hour)}:${two(utc.minute)}:${two(utc.second)} UTC';
+  }
+
+  String _displayName(String value) =>
+      value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
+
   IconData _activityIcon(ChatEntry entry) => switch (entry.kind) {
+    ChatEntryKind.assistantDelta => Icons.notes_outlined,
     ChatEntryKind.toolCall => Icons.build_outlined,
+    ChatEntryKind.toolOutput => Icons.terminal_outlined,
     ChatEntryKind.toolResult =>
       entry.status == ChatEntryStatus.failed
           ? Icons.error_outline
@@ -398,9 +515,63 @@ class _ActivityRow extends StatelessWidget {
       ChatEntryStatus.running => Icons.sync,
       ChatEntryStatus.completed => Icons.check_circle_outline,
       ChatEntryStatus.failed => Icons.error_outline,
+      ChatEntryStatus.cancelled => Icons.cancel_outlined,
       _ => Icons.info_outline,
     },
   };
+}
+
+class _ActivityBadge extends StatelessWidget {
+  const _ActivityBadge({
+    required this.label,
+    required this.foreground,
+    super.key,
+  });
+
+  final String label;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      border: Border.all(color: foreground.withValues(alpha: 0.35)),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      label,
+      style: Theme.of(
+        context,
+      ).textTheme.labelSmall?.copyWith(color: foreground),
+    ),
+  );
+}
+
+class _TechnicalDetail extends StatelessWidget {
+  const _TechnicalDetail({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 88,
+          child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+        ),
+        Expanded(
+          child: SelectableText(
+            value,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _Composer extends StatelessWidget {
@@ -409,16 +580,20 @@ class _Composer extends StatelessWidget {
     required this.enabled,
     required this.canSend,
     required this.submitting,
+    required this.cancelling,
     required this.working,
     required this.onSend,
+    required this.onCancel,
   });
 
   final TextEditingController messageController;
   final bool enabled;
   final bool canSend;
   final bool submitting;
+  final bool cancelling;
   final bool working;
   final Future<void> Function() onSend;
+  final Future<void> Function() onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -446,17 +621,30 @@ class _Composer extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            IconButton.filled(
-              key: const Key('send-message'),
-              tooltip: 'Send message',
-              onPressed: canSend ? onSend : null,
-              icon: submitting
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.arrow_upward_rounded),
-            ),
+            if (working)
+              IconButton.filledTonal(
+                key: const Key('cancel-run'),
+                tooltip: 'Cancel run',
+                onPressed: cancelling ? null : onCancel,
+                icon: cancelling
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.stop_rounded),
+              )
+            else
+              IconButton.filled(
+                key: const Key('send-message'),
+                tooltip: 'Send message',
+                onPressed: canSend ? onSend : null,
+                icon: submitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.arrow_upward_rounded),
+              ),
           ],
         ),
       ),

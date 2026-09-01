@@ -1,0 +1,12 @@
+enum: ChatEventFamily
+serialized: byName
+values:
+  - message
+  - task
+  - model
+  - tool
+  - approval
+  - artifact
+  - usage
+  - warning
+  - error

@@ -5,13 +5,35 @@ import 'dart:math';
 enum ChatEntryKind {
   userMessage,
   assistantMessage,
+  assistantDelta,
   toolCall,
+  toolOutput,
   toolResult,
   lifecycle,
   error,
 }
 
-enum ChatEntryStatus { submitted, queued, running, warning, completed, failed }
+enum ChatEventFamily {
+  message,
+  task,
+  model,
+  tool,
+  approval,
+  artifact,
+  usage,
+  warning,
+  error,
+}
+
+enum ChatEntryStatus {
+  submitted,
+  queued,
+  running,
+  warning,
+  completed,
+  failed,
+  cancelled,
+}
 
 enum ChatEntrySource { user, dextero, codex }
 
@@ -25,6 +47,8 @@ final class ChatConversation {
 /// One immutable, display-safe record in a conversation.
 final class ChatHistoryEntry {
   const ChatHistoryEntry({
+    this.eventVersion = 1,
+    ChatEventFamily? family,
     required this.conversationId,
     required this.entryId,
     required this.sequence,
@@ -38,7 +62,11 @@ final class ChatHistoryEntry {
     this.runId,
     this.toolCallId,
     this.toolName,
-  });
+  }) : _family = family;
+
+  final int eventVersion;
+  final ChatEventFamily? _family;
+  ChatEventFamily get family => _family ?? eventFamilyFor(kind, status);
 
   final String conversationId;
   final String entryId;
@@ -66,6 +94,7 @@ final class PendingChatEntry {
     this.runId,
     this.toolCallId,
     this.toolName,
+    this.family,
   });
 
   final ChatEntryKind kind;
@@ -77,6 +106,22 @@ final class PendingChatEntry {
   final String? runId;
   final String? toolCallId;
   final String? toolName;
+  final ChatEventFamily? family;
+}
+
+ChatEventFamily eventFamilyFor(ChatEntryKind kind, ChatEntryStatus status) {
+  if (status == ChatEntryStatus.warning) return ChatEventFamily.warning;
+  if (status == ChatEntryStatus.failed) return ChatEventFamily.error;
+  return switch (kind) {
+    ChatEntryKind.userMessage => ChatEventFamily.message,
+    ChatEntryKind.assistantMessage ||
+    ChatEntryKind.assistantDelta => ChatEventFamily.model,
+    ChatEntryKind.toolCall ||
+    ChatEntryKind.toolOutput ||
+    ChatEntryKind.toolResult => ChatEventFamily.tool,
+    ChatEntryKind.lifecycle => ChatEventFamily.task,
+    ChatEntryKind.error => ChatEventFamily.error,
+  };
 }
 
 abstract interface class IdentifierGenerator {
@@ -157,6 +202,8 @@ final class InMemoryChatHistoryStore implements ChatHistoryStore {
     _ensureOpen();
     final state = _state(conversationId);
     final canonical = ChatHistoryEntry(
+      eventVersion: 1,
+      family: entry.family,
       conversationId: conversationId,
       entryId: _identifiers.next('entry'),
       sequence: state.entries.length,

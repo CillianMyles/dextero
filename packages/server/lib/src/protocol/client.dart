@@ -41,6 +41,13 @@ class EndpointControl extends _i1.EndpointRef {
         {'request': request},
       );
 
+  /// Requests cancellation of the matching active run.
+  _i2.Future<bool> cancelRun(String conversationId, String runId) =>
+      caller.callServerEndpoint<bool>('control', 'cancelRun', {
+        'conversationId': conversationId,
+        'runId': runId,
+      });
+
   /// Returns the complete process-local history for one conversation.
   _i2.Future<List<_i6.ChatEntry>> history(String conversationId) =>
       caller.callServerEndpoint<List<_i6.ChatEntry>>('control', 'history', {

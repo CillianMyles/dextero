@@ -1,6 +1,7 @@
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_server/dextero_client.dart';
 import 'package:test/test.dart';
+import 'dart:convert';
 
 void main() {
   test(
@@ -69,6 +70,41 @@ void main() {
     expect(result, 1);
     expect(io.errors.single, contains('before the response completed'));
   });
+
+  test('cancels a run by id without submitting a message', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: client,
+      io: io,
+    ).run(cancelRunId: 'run-42');
+
+    expect(result, 0);
+    expect(client.cancellations, [('conversation-1', 'run-42')]);
+    expect(client.requests, isEmpty);
+    expect(io.output.join(), contains('Cancellation requested'));
+  });
+
+  test('emits only stable JSONL events in automation mode', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: client,
+      io: io,
+      outputMode: TerminalOutputMode.jsonl,
+    ).run(initialMessage: 'Inspect the repo');
+
+    expect(result, 0);
+    final records = io.output
+        .map((line) => jsonDecode(line) as Map<String, Object?>)
+        .toList();
+    expect(records, isNotEmpty);
+    expect(records.every((record) => record['schema_version'] == 1), isTrue);
+    expect(records.every((record) => record['type'] == 'chat_event'), isTrue);
+    expect(io.output.join(), isNot(contains('Dextero is working')));
+  });
 }
 
 final class _FakeClient implements TerminalChatClient {
@@ -84,10 +120,17 @@ final class _FakeClient implements TerminalChatClient {
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
   bool closed = false;
+  final cancellations = <(String, String)>[];
 
   @override
   Future<void> close() async {
     closed = true;
+  }
+
+  @override
+  Future<bool> cancelRun(String conversationId, String runId) async {
+    cancellations.add((conversationId, runId));
+    return true;
   }
 
   @override

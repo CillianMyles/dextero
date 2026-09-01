@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../cancellation.dart';
 import '../tool.dart';
 import 'workspace_path.dart';
 
@@ -30,7 +31,12 @@ final class EditFileTool implements Tool {
   );
 
   @override
-  Future<Object?> call(JsonMap arguments) async {
+  Future<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
+    cancellationToken?.throwIfCancellationRequested();
     final path = arguments['path'];
     final oldText = arguments['oldText'];
     final newText = arguments['newText'];

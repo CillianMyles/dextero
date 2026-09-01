@@ -12,13 +12,16 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod/serverpod.dart' as _i1;
-import '../control/chat_entry_kind.dart' as _i2;
-import '../control/chat_entry_status.dart' as _i3;
-import '../control/chat_entry_source.dart' as _i4;
+import '../control/chat_event_family.dart' as _i2;
+import '../control/chat_entry_kind.dart' as _i3;
+import '../control/chat_entry_status.dart' as _i4;
+import '../control/chat_entry_source.dart' as _i5;
 
 abstract class ChatEntry
     implements _i1.SerializableModel, _i1.ProtocolSerialization {
   ChatEntry._({
+    int? eventVersion,
+    _i2.ChatEventFamily? family,
     required this.conversationId,
     required this.entryId,
     required this.sequence,
@@ -32,18 +35,21 @@ abstract class ChatEntry
     this.runId,
     this.toolCallId,
     this.toolName,
-  });
+  }) : eventVersion = eventVersion ?? 1,
+       family = family ?? _i2.ChatEventFamily.task;
 
   factory ChatEntry({
+    int? eventVersion,
+    _i2.ChatEventFamily? family,
     required String conversationId,
     required String entryId,
     required int sequence,
-    required _i2.ChatEntryKind kind,
-    required _i3.ChatEntryStatus status,
+    required _i3.ChatEntryKind kind,
+    required _i4.ChatEntryStatus status,
     required String content,
     required DateTime createdAt,
     required String correlationId,
-    required _i4.ChatEntrySource source,
+    required _i5.ChatEntrySource source,
     required bool truncated,
     String? runId,
     String? toolCallId,
@@ -52,11 +58,17 @@ abstract class ChatEntry
 
   factory ChatEntry.fromJson(Map<String, dynamic> jsonSerialization) {
     return ChatEntry(
+      eventVersion: jsonSerialization['eventVersion'] as int?,
+      family: jsonSerialization['family'] == null
+          ? null
+          : _i2.ChatEventFamily.fromJson(
+              (jsonSerialization['family'] as String),
+            ),
       conversationId: jsonSerialization['conversationId'] as String,
       entryId: jsonSerialization['entryId'] as String,
       sequence: jsonSerialization['sequence'] as int,
-      kind: _i2.ChatEntryKind.fromJson((jsonSerialization['kind'] as String)),
-      status: _i3.ChatEntryStatus.fromJson(
+      kind: _i3.ChatEntryKind.fromJson((jsonSerialization['kind'] as String)),
+      status: _i4.ChatEntryStatus.fromJson(
         (jsonSerialization['status'] as String),
       ),
       content: jsonSerialization['content'] as String,
@@ -64,7 +76,7 @@ abstract class ChatEntry
         jsonSerialization['createdAt'],
       ),
       correlationId: jsonSerialization['correlationId'] as String,
-      source: _i4.ChatEntrySource.fromJson(
+      source: _i5.ChatEntrySource.fromJson(
         (jsonSerialization['source'] as String),
       ),
       truncated: _i1.BoolJsonExtension.fromJson(jsonSerialization['truncated']),
@@ -74,15 +86,19 @@ abstract class ChatEntry
     );
   }
 
+  int eventVersion;
+
+  _i2.ChatEventFamily family;
+
   String conversationId;
 
   String entryId;
 
   int sequence;
 
-  _i2.ChatEntryKind kind;
+  _i3.ChatEntryKind kind;
 
-  _i3.ChatEntryStatus status;
+  _i4.ChatEntryStatus status;
 
   String content;
 
@@ -90,7 +106,7 @@ abstract class ChatEntry
 
   String correlationId;
 
-  _i4.ChatEntrySource source;
+  _i5.ChatEntrySource source;
 
   bool truncated;
 
@@ -104,15 +120,17 @@ abstract class ChatEntry
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
   ChatEntry copyWith({
+    int? eventVersion,
+    _i2.ChatEventFamily? family,
     String? conversationId,
     String? entryId,
     int? sequence,
-    _i2.ChatEntryKind? kind,
-    _i3.ChatEntryStatus? status,
+    _i3.ChatEntryKind? kind,
+    _i4.ChatEntryStatus? status,
     String? content,
     DateTime? createdAt,
     String? correlationId,
-    _i4.ChatEntrySource? source,
+    _i5.ChatEntrySource? source,
     bool? truncated,
     String? runId,
     String? toolCallId,
@@ -122,6 +140,8 @@ abstract class ChatEntry
   Map<String, dynamic> toJson() {
     return {
       '__className__': 'ChatEntry',
+      'eventVersion': eventVersion,
+      'family': family.toJson(),
       'conversationId': conversationId,
       'entryId': entryId,
       'sequence': sequence,
@@ -142,6 +162,8 @@ abstract class ChatEntry
   Map<String, dynamic> toJsonForProtocol() {
     return {
       '__className__': 'ChatEntry',
+      'eventVersion': eventVersion,
+      'family': family.toJson(),
       'conversationId': conversationId,
       'entryId': entryId,
       'sequence': sequence,
@@ -168,20 +190,24 @@ class _Undefined {}
 
 class _ChatEntryImpl extends ChatEntry {
   _ChatEntryImpl({
+    int? eventVersion,
+    _i2.ChatEventFamily? family,
     required String conversationId,
     required String entryId,
     required int sequence,
-    required _i2.ChatEntryKind kind,
-    required _i3.ChatEntryStatus status,
+    required _i3.ChatEntryKind kind,
+    required _i4.ChatEntryStatus status,
     required String content,
     required DateTime createdAt,
     required String correlationId,
-    required _i4.ChatEntrySource source,
+    required _i5.ChatEntrySource source,
     required bool truncated,
     String? runId,
     String? toolCallId,
     String? toolName,
   }) : super._(
+         eventVersion: eventVersion,
+         family: family,
          conversationId: conversationId,
          entryId: entryId,
          sequence: sequence,
@@ -202,21 +228,25 @@ class _ChatEntryImpl extends ChatEntry {
   @_i1.useResult
   @override
   ChatEntry copyWith({
+    int? eventVersion,
+    _i2.ChatEventFamily? family,
     String? conversationId,
     String? entryId,
     int? sequence,
-    _i2.ChatEntryKind? kind,
-    _i3.ChatEntryStatus? status,
+    _i3.ChatEntryKind? kind,
+    _i4.ChatEntryStatus? status,
     String? content,
     DateTime? createdAt,
     String? correlationId,
-    _i4.ChatEntrySource? source,
+    _i5.ChatEntrySource? source,
     bool? truncated,
     Object? runId = _Undefined,
     Object? toolCallId = _Undefined,
     Object? toolName = _Undefined,
   }) {
     return ChatEntry(
+      eventVersion: eventVersion ?? this.eventVersion,
+      family: family ?? this.family,
       conversationId: conversationId ?? this.conversationId,
       entryId: entryId ?? this.entryId,
       sequence: sequence ?? this.sequence,

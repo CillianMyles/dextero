@@ -13,34 +13,40 @@
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 
-enum ChatEntryStatus implements _i1.SerializableModel {
-  submitted,
-  queued,
-  running,
+enum ChatEventFamily implements _i1.SerializableModel {
+  message,
+  task,
+  model,
+  tool,
+  approval,
+  artifact,
+  usage,
   warning,
-  completed,
-  failed,
-  cancelled;
+  error;
 
-  static ChatEntryStatus fromJson(String name) {
+  static ChatEventFamily fromJson(String name) {
     switch (name) {
-      case 'submitted':
-        return ChatEntryStatus.submitted;
-      case 'queued':
-        return ChatEntryStatus.queued;
-      case 'running':
-        return ChatEntryStatus.running;
+      case 'message':
+        return ChatEventFamily.message;
+      case 'task':
+        return ChatEventFamily.task;
+      case 'model':
+        return ChatEventFamily.model;
+      case 'tool':
+        return ChatEventFamily.tool;
+      case 'approval':
+        return ChatEventFamily.approval;
+      case 'artifact':
+        return ChatEventFamily.artifact;
+      case 'usage':
+        return ChatEventFamily.usage;
       case 'warning':
-        return ChatEntryStatus.warning;
-      case 'completed':
-        return ChatEntryStatus.completed;
-      case 'failed':
-        return ChatEntryStatus.failed;
-      case 'cancelled':
-        return ChatEntryStatus.cancelled;
+        return ChatEventFamily.warning;
+      case 'error':
+        return ChatEventFamily.error;
       default:
         throw ArgumentError(
-          'Value "$name" cannot be converted to "ChatEntryStatus"',
+          'Value "$name" cannot be converted to "ChatEventFamily"',
         );
     }
   }

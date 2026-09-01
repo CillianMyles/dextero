@@ -36,7 +36,10 @@ void main() {
       );
 
       expect(first.sequence, 0);
+      expect(first.eventVersion, 1);
+      expect(first.family, ChatEventFamily.message);
       expect(second.sequence, 1);
+      expect(second.family, ChatEventFamily.task);
       expect(first.entryId, isNot(second.entryId));
       expect(
         await store.history(conversation.id),

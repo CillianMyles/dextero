@@ -121,6 +121,100 @@ void main() {
     expect(controller.busy, isFalse);
   });
 
+  testWidgets(
+    'renders rich safe activity metadata and expandable identifiers',
+    (tester) async {
+      final api = _FakeChatApi(
+        status: Future.value(_status()),
+        initialHistory: [
+          _entry(
+            sequence: 7,
+            entryId: 'entry-rich-tool',
+            kind: ChatEntryKind.toolCall,
+            status: ChatEntryStatus.warning,
+            content: 'read_file started for lib/main.dart',
+            toolCallId: 'call-7',
+            toolName: 'read_file',
+            correlationId: 'correlation-7',
+            runId: 'run-7',
+            truncated: true,
+            family: ChatEventFamily.warning,
+            createdAt: DateTime.utc(2026, 9, 1, 19, 57, 21),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        DexteroApp(controller: DexteroController(api: api)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Read file started'), findsOneWidget);
+      expect(find.text('read_file started for lib/main.dart'), findsOneWidget);
+      expect(find.text('Warning'), findsOneWidget);
+      expect(find.text('Truncated'), findsOneWidget);
+      expect(find.text('2026-09-01 19:57:21 UTC'), findsOneWidget);
+      expect(find.text('• Codex'), findsOneWidget);
+      expect(find.text('run-7'), findsNothing);
+      expect(find.text('call-7'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const Key('activity-details-entry-rich-tool')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sequence'), findsOneWidget);
+      expect(find.text('Event'), findsOneWidget);
+      expect(find.text('v1 · Warning'), findsOneWidget);
+      expect(find.text('7'), findsOneWidget);
+      expect(find.text('Run'), findsOneWidget);
+      expect(find.text('run-7'), findsOneWidget);
+      expect(find.text('Correlation'), findsOneWidget);
+      expect(find.text('correlation-7'), findsOneWidget);
+      expect(find.text('Tool call'), findsOneWidget);
+      expect(find.text('call-7'), findsOneWidget);
+    },
+  );
+
+  testWidgets('keeps expanded failed activity responsive at compact width', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 1,
+          entryId: 'entry-compact-error',
+          kind: ChatEntryKind.error,
+          status: ChatEntryStatus.failed,
+          content: 'Codex could not complete the requested operation safely.',
+          correlationId: 'compact-correlation-with-a-long-identifier',
+          runId: 'compact-run-with-a-long-identifier',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Agent error'), findsOneWidget);
+    expect(find.text('Failed'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('activity-details-entry-compact-error')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('compact-correlation-with-a-long-identifier'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps a visible submitting state until acceptance', (
     tester,
   ) async {
@@ -199,6 +293,51 @@ void main() {
     );
   });
 
+  testWidgets('cancels the active run from the composer', (tester) async {
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-cancel-user',
+          kind: ChatEntryKind.userMessage,
+          status: ChatEntryStatus.submitted,
+          content: 'Keep working',
+        ),
+        _entry(
+          sequence: 1,
+          entryId: 'entry-cancel-running',
+          kind: ChatEntryKind.lifecycle,
+          status: ChatEntryStatus.running,
+          content: 'Codex is working',
+        ),
+      ],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('cancel-run')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('cancel-run')));
+    await tester.pumpAndSettle();
+
+    expect(api.cancellations, [('conversation-1', 'run-1')]);
+    api.emit(
+      _entry(
+        sequence: 2,
+        entryId: 'entry-cancelled',
+        kind: ChatEntryKind.lifecycle,
+        status: ChatEntryStatus.cancelled,
+        content: 'Response cancelled',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.busy, isFalse);
+    expect(find.byKey(const Key('send-message')), findsOneWidget);
+  });
+
   testWidgets('explains configuration and server failures', (tester) async {
     final unconfigured = DexteroController.fromEnvironment(const {});
     await tester.pumpWidget(DexteroApp(controller: unconfigured));
@@ -235,12 +374,19 @@ final class _FakeChatApi implements ChatApi {
   final Future<ChatSubmission> Function(ChatSubmitRequest request)? submitter;
   final List<ChatEntry> initialHistory;
   final submissions = <ChatSubmitRequest>[];
+  final cancellations = <(String, String)>[];
   final _stream = StreamController<ChatEntry>.broadcast();
 
   void emit(ChatEntry entry) => _stream.add(entry);
 
   @override
   Future<void> close() async {}
+
+  @override
+  Future<bool> cancelRun(String conversationId, String runId) async {
+    cancellations.add((conversationId, runId));
+    return true;
+  }
 
   @override
   Future<List<ChatEntry>> history(String conversationId) async =>
@@ -293,20 +439,26 @@ ChatEntry _entry({
   required String content,
   String? toolCallId,
   String? toolName,
+  String correlationId = 'app-test-1',
+  String? runId = 'run-1',
+  bool truncated = false,
+  DateTime? createdAt,
+  ChatEventFamily family = ChatEventFamily.task,
 }) => ChatEntry(
+  family: family,
   conversationId: 'conversation-1',
   entryId: entryId,
   sequence: sequence,
   kind: kind,
   status: status,
   content: content,
-  createdAt: DateTime.utc(2026),
-  correlationId: 'app-test-1',
+  createdAt: createdAt ?? DateTime.utc(2026),
+  correlationId: correlationId,
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
       : ChatEntrySource.codex,
-  truncated: false,
-  runId: 'run-1',
+  truncated: truncated,
+  runId: runId,
   toolCallId: toolCallId,
   toolName: toolName,
 );

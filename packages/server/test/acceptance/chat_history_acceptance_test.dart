@@ -58,6 +58,10 @@ void main() {
           ChatEntryKind.lifecycle,
         ]);
         expect(received.map((entry) => entry.sequence), [0, 1, 2, 3, 4]);
+        expect(received.map((entry) => entry.eventVersion).toSet(), {1});
+        expect(received.first.family, ChatEventFamily.message);
+        expect(received[1].family, ChatEventFamily.task);
+        expect(received[3].family, ChatEventFamily.model);
         expect(received.map((entry) => entry.correlationId).toSet(), {
           'acceptance-1',
         });
@@ -80,6 +84,7 @@ final class _AcceptanceAgent implements core.ConversationAgent {
   Future<core.ConversationAgentResult> run(
     String prompt, {
     required core.ConversationAgentEventSink onEvent,
+    required core.CancellationToken cancellationToken,
   }) async {
     await onEvent(
       core.ConversationAgentEvent(

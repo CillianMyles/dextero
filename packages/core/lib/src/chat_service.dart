@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'cancellation.dart';
 import 'chat_history.dart';
 import 'safe_metadata.dart';
 
 enum ConversationAgentEventKind {
   lifecycle,
   assistantMessage,
+  assistantDelta,
   toolCallStarted,
+  toolOutput,
   toolCallCompleted,
   error,
 }
@@ -42,6 +45,7 @@ abstract interface class ConversationAgent {
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
   });
 }
 
@@ -72,7 +76,7 @@ final class ChatService {
   final ChatHistoryStore _store;
   final ConversationAgent _agent;
   final IdentifierGenerator _identifiers;
-  final Set<String> _activeConversations = {};
+  final Map<String, _ActiveRun> _activeRuns = {};
   Future<void> _submissionLock = Future.value();
 
   ChatHistoryStore get store => _store;
@@ -97,7 +101,7 @@ final class ChatService {
       if (await _store.conversation(conversationId) == null) {
         throw StateError('Unknown conversation: $conversationId');
       }
-      if (_activeConversations.contains(conversationId)) {
+      if (_activeRuns.containsKey(conversationId)) {
         throw StateError(
           'A response is already running for this conversation.',
         );
@@ -116,12 +120,17 @@ final class ChatService {
           runId: runId,
         ),
       );
-      _activeConversations.add(conversationId);
+      final cancellation = CancellationController();
+      _activeRuns[conversationId] = _ActiveRun(
+        runId: runId,
+        cancellation: cancellation,
+      );
       final completion = _process(
         conversationId: conversationId,
         runId: runId,
         correlationId: effectiveCorrelationId,
         prompt: normalized,
+        cancellationToken: cancellation.token,
       );
       unawaited(completion);
       return ChatSubmission(
@@ -133,11 +142,24 @@ final class ChatService {
     });
   }
 
+  Future<bool> cancel({
+    required String conversationId,
+    required String runId,
+  }) => _withSubmissionLock(() async {
+    if (await _store.conversation(conversationId) == null) {
+      throw StateError('Unknown conversation: $conversationId');
+    }
+    final active = _activeRuns[conversationId];
+    if (active == null || active.runId != runId) return false;
+    return active.cancellation.cancel();
+  });
+
   Future<void> _process({
     required String conversationId,
     required String runId,
     required String correlationId,
     required String prompt,
+    required CancellationToken cancellationToken,
   }) async {
     var assistantRecorded = false;
     var terminalAgentErrorRecorded = false;
@@ -151,9 +173,12 @@ final class ChatService {
         content: 'Message queued',
         source: ChatEntrySource.dextero,
       );
+      cancellationToken.throwIfCancellationRequested();
       final result = await _agent.run(
         prompt,
+        cancellationToken: cancellationToken,
         onEvent: (event) async {
+          cancellationToken.throwIfCancellationRequested();
           if (event.kind == ConversationAgentEventKind.assistantMessage) {
             assistantRecorded = true;
           }
@@ -164,6 +189,7 @@ final class ChatService {
           await _recordAgentEvent(conversationId, runId, correlationId, event);
         },
       );
+      cancellationToken.throwIfCancellationRequested();
       if (!assistantRecorded) {
         final output = SafeMetadata.message(result.output);
         await _append(
@@ -184,6 +210,16 @@ final class ChatService {
         kind: ChatEntryKind.lifecycle,
         status: ChatEntryStatus.completed,
         content: 'Response completed',
+        source: ChatEntrySource.dextero,
+      );
+    } on RunCancelledException {
+      await _append(
+        conversationId,
+        runId,
+        correlationId,
+        kind: ChatEntryKind.lifecycle,
+        status: ChatEntryStatus.cancelled,
+        content: 'Response cancelled',
         source: ChatEntrySource.dextero,
       );
     } on Object catch (error) {
@@ -211,7 +247,8 @@ final class ChatService {
       );
     } finally {
       await _withSubmissionLock(() async {
-        _activeConversations.remove(conversationId);
+        final active = _activeRuns[conversationId];
+        if (active?.runId == runId) _activeRuns.remove(conversationId);
       });
     }
   }
@@ -231,8 +268,16 @@ final class ChatService {
         ChatEntryKind.assistantMessage,
         ChatEntryStatus.completed,
       ),
+      ConversationAgentEventKind.assistantDelta => (
+        ChatEntryKind.assistantDelta,
+        ChatEntryStatus.running,
+      ),
       ConversationAgentEventKind.toolCallStarted => (
         ChatEntryKind.toolCall,
+        ChatEntryStatus.running,
+      ),
+      ConversationAgentEventKind.toolOutput => (
+        ChatEntryKind.toolOutput,
         ChatEntryStatus.running,
       ),
       ConversationAgentEventKind.toolCallCompleted => (
@@ -317,4 +362,11 @@ final class ChatService {
       completer.complete();
     }
   }
+}
+
+final class _ActiveRun {
+  const _ActiveRun({required this.runId, required this.cancellation});
+
+  final String runId;
+  final CancellationController cancellation;
 }

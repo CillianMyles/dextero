@@ -33,7 +33,9 @@ final class TerminalRenderer {
     final (symbol, color, label) = switch (entry.kind) {
       ChatEntryKind.userMessage => ('YOU', '35', 'you'),
       ChatEntryKind.assistantMessage => ('DEX', '36', 'dextero'),
+      ChatEntryKind.assistantDelta => ('…', '36', 'model output'),
       ChatEntryKind.toolCall => ('›', '34', entry.toolName ?? 'tool'),
+      ChatEntryKind.toolOutput => ('│', '34', entry.toolName ?? 'tool output'),
       ChatEntryKind.toolResult => (
         entry.status == ChatEntryStatus.failed ? '×' : '✓',
         entry.status == ChatEntryStatus.failed ? '31' : '32',
@@ -52,7 +54,9 @@ final class TerminalRenderer {
     final label = switch (entry.kind) {
       ChatEntryKind.userMessage => 'you',
       ChatEntryKind.assistantMessage => 'dextero',
+      ChatEntryKind.assistantDelta => 'model output',
       ChatEntryKind.toolCall ||
+      ChatEntryKind.toolOutput ||
       ChatEntryKind.toolResult => entry.toolName ?? entry.kind.name,
       ChatEntryKind.lifecycle => entry.status.name,
       ChatEntryKind.error => 'error',

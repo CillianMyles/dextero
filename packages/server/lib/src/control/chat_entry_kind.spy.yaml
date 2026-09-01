@@ -3,7 +3,9 @@ serialized: byName
 values:
   - userMessage
   - assistantMessage
+  - assistantDelta
   - toolCall
+  - toolOutput
   - toolResult
   - lifecycle
   - error

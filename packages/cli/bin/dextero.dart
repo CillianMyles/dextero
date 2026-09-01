@@ -18,11 +18,23 @@ Future<int> run(List<String> arguments) async {
 
   final rawUrl =
       Platform.environment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/';
+  final jsonl = arguments.isNotEmpty && arguments.first == '--jsonl';
+  final effectiveArguments = jsonl ? arguments.skip(1).toList() : arguments;
   final chat = TerminalChat(
     client: ServerpodTerminalChatClient(serverUrl: rawUrl, token: token),
     io: io,
+    outputMode: jsonl ? TerminalOutputMode.jsonl : TerminalOutputMode.human,
   );
+  if (effectiveArguments case ['--cancel', final runId]) {
+    return chat.run(cancelRunId: runId);
+  }
+  if (effectiveArguments.isNotEmpty && effectiveArguments.first == '--cancel') {
+    io.error('Usage: dextero --cancel <run-id>');
+    return 64;
+  }
   return chat.run(
-    initialMessage: arguments.isEmpty ? null : arguments.join(' '),
+    initialMessage: effectiveArguments.isEmpty
+        ? null
+        : effectiveArguments.join(' '),
   );
 }
