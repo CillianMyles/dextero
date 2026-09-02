@@ -137,6 +137,8 @@ Git mutation, deletion, and general shell authority remain separately gated.
 
 ## Milestone 7 — AI gateway and runtime ecosystem
 
+- [x] Add a Gemini function-calling adapter through the provider-neutral agent
+  loop with environment-controlled credentials and model selection.
 - [ ] Add an MCP client and dynamic tool registry.
 - [ ] Define manifests, trust levels, lifecycle, health, and version negotiation
   for runtime adapters.

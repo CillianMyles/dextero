@@ -32,7 +32,7 @@ final class TerminalChat {
   final String Function() _correlationIdFactory;
   final List<ChatEntry> _entries = [];
   final Set<String> _plainRenderedEntryIds = {};
-  var _plainEmptyRendered = false;
+  var _plainHeaderRendered = false;
   late HostStatus _status;
 
   Future<int> run({String? initialMessage, String? cancelRunId}) async {
@@ -147,13 +147,15 @@ final class TerminalChat {
       );
       return;
     }
-    if (_entries.isEmpty) {
-      if (!_plainEmptyRendered) {
-        _plainEmptyRendered = true;
-        _io.writeln('${_status.name} ${_status.version} — no messages yet');
-      }
-      return;
+    if (!_plainHeaderRendered) {
+      _plainHeaderRendered = true;
+      _io.writeln(
+        '${_status.name} ${_status.version} — '
+        '${_status.modelProvider} · ${_status.modelName}'
+        '${_entries.isEmpty ? ' — no messages yet' : ''}',
+      );
     }
+    if (_entries.isEmpty) return;
     for (final entry in _entries) {
       if (!_plainRenderedEntryIds.add(entry.entryId)) continue;
       _io.writeln(_renderer.plainEntryLine(entry));

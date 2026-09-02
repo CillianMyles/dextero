@@ -81,7 +81,7 @@ void main() {
         status: ChatEntryStatus.completed,
         content: 'two',
         correlationId: 'correlation-1',
-        source: ChatEntrySource.codex,
+        source: ChatEntrySource.model,
       ),
     );
     await Future<void>.delayed(Duration.zero);

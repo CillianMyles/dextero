@@ -14,6 +14,10 @@ final class TerminalRenderer {
         '${_terminalSafe(status.name)} ${_terminalSafe(status.version)}',
       )
       ..writeln('\x1b[2m${_rule()}\x1b[0m')
+      ..writeln(
+        '\x1b[2mModel: ${_terminalSafe(status.modelProvider)} · '
+        '${_terminalSafe(status.modelName)}\x1b[0m',
+      )
       ..writeln('\x1b[2m${_terminalSafe(status.retentionNotice)}\x1b[0m')
       ..writeln();
 

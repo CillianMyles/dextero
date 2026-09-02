@@ -8,3 +8,5 @@ fields:
   retentionNotice: String
   databaseRequired: bool
   streamingAvailable: bool
+  modelProvider: String
+  modelName: String
