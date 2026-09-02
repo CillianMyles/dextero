@@ -1,3 +1,4 @@
+import 'cancellation.dart';
 import 'tool.dart';
 
 enum MessageRole { user, assistant, tool }
@@ -42,5 +43,6 @@ abstract interface class AgentModel {
   Future<ModelTurn> nextTurn({
     required List<AgentMessage> messages,
     required List<ToolDefinition> tools,
+    CancellationToken? cancellationToken,
   });
 }

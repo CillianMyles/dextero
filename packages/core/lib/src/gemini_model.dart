@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'cancellation.dart';
 import 'model.dart';
 import 'tool.dart';
 
@@ -11,6 +12,7 @@ abstract interface class GeminiTransport {
   Future<JsonMap> generateContent({
     required String model,
     required JsonMap request,
+    CancellationToken? cancellationToken,
   });
 }
 
@@ -44,42 +46,61 @@ final class GeminiHttpTransport implements GeminiTransport {
   Future<JsonMap> generateContent({
     required String model,
     required JsonMap request,
+    CancellationToken? cancellationToken,
   }) async {
+    cancellationToken?.throwIfCancellationRequested();
     final uri = _apiEndpoint.resolve(
       'models/${Uri.encodeComponent(model)}:generateContent',
     );
     final client = HttpClient();
     try {
-      final encoded = utf8.encode(jsonEncode(request));
-      final httpRequest = await client.postUrl(uri).timeout(timeout);
-      httpRequest.headers
-        ..contentType = ContentType.json
-        ..set('x-goog-api-key', _apiKey)
-        ..contentLength = encoded.length;
-      httpRequest.add(encoded);
-      final response = await httpRequest.close().timeout(timeout);
-      final bytes = <int>[];
-      await for (final chunk in response.timeout(timeout)) {
-        if (bytes.length + chunk.length > maxResponseBytes) {
-          throw const FormatException('Gemini response exceeded size limit.');
-        }
-        bytes.addAll(chunk);
+      final operation = _send(client, uri, request);
+      if (cancellationToken == null) return await operation;
+      try {
+        return await Future.any([
+          operation,
+          cancellationToken.whenCancelled.then<JsonMap>((_) {
+            client.close(force: true);
+            throw const RunCancelledException();
+          }),
+        ]);
+      } on Object {
+        cancellationToken.throwIfCancellationRequested();
+        rethrow;
       }
-      final body = utf8.decode(bytes);
-      final decoded = body.isEmpty ? null : jsonDecode(body);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw GeminiApiException(
-          statusCode: response.statusCode,
-          message: _apiErrorMessage(decoded),
-        );
-      }
-      if (decoded is! Map) {
-        throw const FormatException('Gemini returned non-object JSON.');
-      }
-      return decoded.cast<String, Object?>();
     } finally {
       client.close(force: true);
     }
+  }
+
+  Future<JsonMap> _send(HttpClient client, Uri uri, JsonMap request) async {
+    final encoded = utf8.encode(jsonEncode(request));
+    final httpRequest = await client.postUrl(uri).timeout(timeout);
+    httpRequest.headers
+      ..contentType = ContentType.json
+      ..set('x-goog-api-key', _apiKey)
+      ..contentLength = encoded.length;
+    httpRequest.add(encoded);
+    final response = await httpRequest.close().timeout(timeout);
+    final bytes = <int>[];
+    await for (final chunk in response.timeout(timeout)) {
+      if (bytes.length + chunk.length > maxResponseBytes) {
+        throw const FormatException('Gemini response exceeded size limit.');
+      }
+      bytes.addAll(chunk);
+    }
+    final body = utf8.decode(bytes);
+    final decoded = body.isEmpty ? null : jsonDecode(body);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw GeminiApiException(
+        statusCode: response.statusCode,
+        message: _apiErrorMessage(decoded),
+      );
+    }
+    if (decoded is! Map) {
+      throw const FormatException('Gemini returned non-object JSON.');
+    }
+    return decoded.cast<String, Object?>();
   }
 
   static String _validatedApiKey(String value) {
@@ -154,6 +175,7 @@ final class GeminiModel implements AgentModel {
   Future<ModelTurn> nextTurn({
     required List<AgentMessage> messages,
     required List<ToolDefinition> tools,
+    CancellationToken? cancellationToken,
   }) async {
     if (messages.isEmpty) {
       throw ArgumentError.value(messages, 'messages', 'must not be empty');
@@ -183,6 +205,7 @@ final class GeminiModel implements AgentModel {
     final response = await _transport.generateContent(
       model: model,
       request: request,
+      cancellationToken: cancellationToken,
     );
     return _decodeTurn(response, messages.length);
   }

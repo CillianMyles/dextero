@@ -83,6 +83,7 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
   Future<JsonMap> generateContent({
     required String model,
     required JsonMap request,
+    CancellationToken? cancellationToken,
   }) async {
     if (_turn++ == 0) {
       return {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -204,6 +205,34 @@ void main() {
     expect(request.key, 'test-secret-key');
     expect(request.body, isA<Map>());
   });
+
+  test('HTTP transport aborts an in-flight request on cancellation', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final received = Completer<void>();
+    server.listen((request) {
+      if (!received.isCompleted) received.complete();
+    });
+    final cancellation = CancellationController();
+    final transport = GeminiHttpTransport(
+      apiKey: 'test-secret-key',
+      apiEndpoint: Uri.parse('http://localhost:${server.port}/v1beta/'),
+      timeout: const Duration(minutes: 1),
+    );
+
+    final response = transport.generateContent(
+      model: 'gemini-test',
+      request: const {'contents': <Object>[]},
+      cancellationToken: cancellation.token,
+    );
+    await received.future;
+    cancellation.cancel();
+
+    await expectLater(
+      response.timeout(const Duration(seconds: 1)),
+      throwsA(isA<RunCancelledException>()),
+    );
+  });
 }
 
 final class _QueueTransport implements GeminiTransport {
@@ -217,6 +246,7 @@ final class _QueueTransport implements GeminiTransport {
   Future<JsonMap> generateContent({
     required String model,
     required JsonMap request,
+    CancellationToken? cancellationToken,
   }) async {
     models.add(model);
     requests.add(request);
