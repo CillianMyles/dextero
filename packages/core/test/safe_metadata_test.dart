@@ -3,32 +3,33 @@ import 'package:test/test.dart';
 
 void main() {
   test(
-    'preserves message formatting while redacting and removing controls',
+    'preserves message formatting and credentials while removing controls',
     () {
       final summary = SafeMetadata.message(
-        'Line one\n\n  code\tvalue\nsecret=hidden\x1b[2J',
+        'Line one\n\n  code\tvalue\n'
+        'secret=hidden Bearer raw-token sk-abcdefghijklmnop\x1b[2J',
       );
 
-      expect(summary.text, 'Line one\n\n  code  value\nsecret=[REDACTED]');
+      expect(
+        summary.text,
+        'Line one\n\n  code  value\n'
+        'secret=hidden Bearer raw-token sk-abcdefghijklmnop',
+      );
       expect(summary.truncated, isFalse);
     },
   );
 
-  test('includes redacted tool failure details', () {
+  test('includes complete tool failure details', () {
     final summary = SafeMetadata.toolResult(
       'run_command',
       'password=hunter2 and raw stderr',
       success: false,
     );
 
-    expect(
-      summary.text,
-      'run_command failed: password=[REDACTED] and raw stderr',
-    );
-    expect(summary.text, isNot(contains('hunter2')));
+    expect(summary.text, 'run_command failed: password=hunter2 and raw stderr');
   });
 
-  test('includes the complete command and filtered structured output', () {
+  test('includes the complete command and structured output', () {
     final started = SafeMetadata.toolCall('run_command', const {
       'command': '/usr/bin/sed',
       'arguments': ['-n', '1,20p', 'a file.txt', '--flag', 'example-value'],
@@ -48,8 +49,7 @@ void main() {
     );
     expect(completed.text, contains('run_command completed (exit 7)'));
     expect(completed.text, contains('stdout:\nfirst\nsecond'));
-    expect(completed.text, contains('stderr:\ntoken=[REDACTED]\nfailed'));
-    expect(completed.text, isNot(contains('super-secret')));
+    expect(completed.text, contains('stderr:\ntoken=super-secret\nfailed'));
   });
 
   test('caps command output and carries upstream truncation', () {

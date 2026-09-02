@@ -55,7 +55,7 @@ void main() {
     },
   );
 
-  test('records redacted bounded errors and a failed lifecycle', () async {
+  test('records complete bounded errors and a failed lifecycle', () async {
     final store = InMemoryChatHistoryStore(identifiers: _SequenceIdentifiers());
     addTearDown(store.close);
     final service = ChatService(
@@ -75,8 +75,7 @@ void main() {
       (entry) => entry.kind == ChatEntryKind.error,
     );
 
-    expect(error.content, contains('token=[REDACTED]'));
-    expect(error.content, isNot(contains('super-secret')));
+    expect(error.content, contains('token=super-secret'));
     expect(error.content.length, lessThanOrEqualTo(480));
     expect(error.truncated, isTrue);
     expect(history.last.status, ChatEntryStatus.failed);
@@ -107,7 +106,7 @@ void main() {
         history
             .singleWhere((entry) => entry.kind == ChatEntryKind.toolCall)
             .content,
-        'run_command started: printf token=[REDACTED]',
+        'run_command started: printf token=super-secret',
       );
       expect(
         history

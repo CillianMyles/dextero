@@ -9,7 +9,7 @@ final class SafeSummary {
   final bool truncated;
 }
 
-/// Produces bounded, redacted metadata for display and canonical history.
+/// Produces bounded metadata for display and canonical history.
 abstract final class SafeMetadata {
   static const maxDisplayCharacters = 480;
   static const maxToolResultCharacters = 4000;
@@ -20,15 +20,6 @@ abstract final class SafeMetadata {
   static final _unsafeIdentifierCharacters = RegExp(r'[^a-zA-Z0-9_.:-]');
   static final _unsafeToolNameCharacters = RegExp(r'[^a-zA-Z0-9_.-]');
   static final _safeCommandArgument = RegExp(r'^[a-zA-Z0-9_./:=+,@%-]+$');
-  static final _bearerCredential = RegExp(
-    r'\bbearer\s+[a-z0-9._~+/=-]+',
-    caseSensitive: false,
-  );
-  static final _credential = RegExp(
-    r'''\b(authorization|api[_-]?key|access[_-]?token|token|secret|password|cookie)\b\s*[:=]\s*["']?[^\s,"'}]+''',
-    caseSensitive: false,
-  );
-  static final _openAiApiKey = RegExp(r'\bsk-[a-zA-Z0-9_-]{12,}\b');
   static final _ansiControlSequence = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
   static final _unsafeControlCharacters = RegExp(
     r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]',
@@ -39,11 +30,10 @@ abstract final class SafeMetadata {
     int maxCharacters = maxDisplayCharacters,
   }) {
     _validateLimit(maxCharacters);
-    var safe =
-        _stripUnsafeControls(_redact(value?.toString() ?? 'Unknown error'))
-            .replaceAll(_summaryWhitespace, ' ')
-            .replaceAll(_repeatedSpaces, ' ')
-            .trim();
+    var safe = _stripUnsafeControls(value?.toString() ?? 'Unknown error')
+        .replaceAll(_summaryWhitespace, ' ')
+        .replaceAll(_repeatedSpaces, ' ')
+        .trim();
     return _bounded(safe, maxCharacters: maxCharacters);
   }
 
@@ -55,7 +45,7 @@ abstract final class SafeMetadata {
     int maxCharacters = maxMessageCharacters,
   }) {
     _validateLimit(maxCharacters);
-    var safe = _stripUnsafeControls(_redact(value?.toString() ?? ''))
+    var safe = _stripUnsafeControls(value?.toString() ?? '')
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n')
         .replaceAll('\t', '  ')
@@ -155,8 +145,8 @@ abstract final class SafeMetadata {
 
   static String? _safePath(Object? value) {
     if (value is! String || value.trim().isEmpty) return null;
-    final redacted = _redact(value.trim());
-    return redacted.length <= 160 ? redacted : '${redacted.substring(0, 159)}…';
+    final path = value.trim();
+    return path.length <= 160 ? path : '${path.substring(0, 159)}…';
   }
 
   static String? _displayCommand(String toolName, JsonMap arguments) {
@@ -179,17 +169,6 @@ abstract final class SafeMetadata {
       return value;
     }
     return jsonEncode(value);
-  }
-
-  static String _redact(String value) {
-    var safe = value;
-    safe = safe.replaceAll(_bearerCredential, 'Bearer [REDACTED]');
-    safe = safe.replaceAllMapped(
-      _credential,
-      (match) => '${match.group(1)}=[REDACTED]',
-    );
-    safe = safe.replaceAll(_openAiApiKey, '[REDACTED]');
-    return safe;
   }
 
   static String _stripUnsafeControls(String value) => value

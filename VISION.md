@@ -21,6 +21,17 @@ default, while advanced users can inspect, configure, and extend the system.
   use rather than becoming isolated replacements.
 - **Progressive disclosure:** simple defaults do not remove advanced control.
 
+## Debuggability
+
+Early development prioritizes complete, inspectable diagnostics. Operator
+diagnostics should preserve model, message, tool, result, and response events
+in order, and may contain credentials or other sensitive data.
+
+Best-effort credential redaction is a possible later feature, not a current
+security boundary. Revisit it when comparable agent tools demonstrate an
+approach that is reliable without hiding the evidence needed to diagnose
+failures. Until then, exposed credentials must be revoked and rotated.
+
 ## AI gateway
 
 Dextero owns the user's memory, context, permissions, and tools; models are
