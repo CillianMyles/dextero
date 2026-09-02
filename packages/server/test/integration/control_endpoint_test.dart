@@ -4,10 +4,10 @@ import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:dextero_server/src/auth/dextero_token_authenticator.dart';
 import 'package:dextero_server/src/control/chat_runtime.dart';
 import 'package:dextero_server/src/generated/protocol.dart';
-import 'package:serverpod/serverpod.dart' show ServerConfig, ServerpodConfig;
 import 'package:test/test.dart';
 
 import 'test_tools/serverpod_test_tools.dart';
+import 'test_tools/test_server_config.dart';
 
 void main() {
   late core.InMemoryChatHistoryStore store;
@@ -101,7 +101,16 @@ void main() {
 
         expect(submission.userEntry.sequence, 0);
         expect(submission.userEntry.entryId, isNotEmpty);
-        expect(history.map((entry) => entry.sequence), [0, 1, 2, 3, 4, 5, 6]);
+        expect(history.map((entry) => entry.sequence), [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+        ]);
         expect(
           streamed.map((entry) => entry.entryId),
           history.map((entry) => entry.entryId),
@@ -112,6 +121,24 @@ void main() {
         });
         expect(history.first.kind, ChatEntryKind.userMessage);
         expect(history.last.status, ChatEntryStatus.completed);
+        expect(
+          history
+              .singleWhere((entry) => entry.kind == ChatEntryKind.toolCall)
+              .content,
+          'run_command started: printf "hello world"',
+        );
+        expect(
+          history
+              .singleWhere((entry) => entry.kind == ChatEntryKind.toolOutput)
+              .content,
+          'stdout:\nhello world',
+        );
+        expect(
+          history
+              .singleWhere((entry) => entry.kind == ChatEntryKind.toolResult)
+              .content,
+          contains('run_command completed (exit 0)'),
+        );
       },
     );
 
@@ -175,17 +202,8 @@ void main() {
           );
       expect(terminal.content, 'Response cancelled');
     });
-  }, configOverride: _useEphemeralApiPort);
+  }, configOverride: useEphemeralApiPort);
 }
-
-ServerpodConfig _useEphemeralApiPort(ServerpodConfig config) => config.copyWith(
-  apiServer: ServerConfig(
-    port: 0,
-    publicHost: 'localhost',
-    publicPort: 0,
-    publicScheme: 'http',
-  ),
-);
 
 final class _CancellableGeminiTransport implements core.GeminiTransport {
   final started = Completer<void>();
@@ -219,17 +237,33 @@ final class _FakeConversationAgent implements core.ConversationAgent {
     await onEvent(
       core.ConversationAgentEvent(
         kind: core.ConversationAgentEventKind.toolCallStarted,
-        summary: core.SafeMetadata.text('list_files started'),
+        summary: core.SafeMetadata.toolCall('run_command', const {
+          'command': 'printf',
+          'arguments': ['hello world'],
+        }),
         toolCallId: 'tool-call-1',
-        toolName: 'list_files',
+        toolName: 'run_command',
+      ),
+    );
+    await onEvent(
+      core.ConversationAgentEvent(
+        kind: core.ConversationAgentEventKind.toolOutput,
+        summary: core.SafeMetadata.message('stdout:\nhello world'),
+        toolCallId: 'tool-call-1',
+        toolName: 'run_command',
       ),
     );
     await onEvent(
       core.ConversationAgentEvent(
         kind: core.ConversationAgentEventKind.toolCallCompleted,
-        summary: core.SafeMetadata.text('list_files completed (4 entries)'),
+        summary: core.SafeMetadata.toolResult('run_command', const {
+          'exit_code': 0,
+          'stdout': 'hello world\n',
+          'stderr': '',
+          'truncated': false,
+        }, success: true),
         toolCallId: 'tool-call-1',
-        toolName: 'list_files',
+        toolName: 'run_command',
         success: true,
       ),
     );

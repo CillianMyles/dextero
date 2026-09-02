@@ -72,6 +72,8 @@ Turn current guardrails into enforceable product boundaries.
 - [ ] Classify actions by risk and map them to configurable approval policies.
 - [ ] Record immutable, structured audit events for grants, actions, results,
   and denials.
+- [ ] Separate the user task timeline from an operator diagnostics view that
+  preserves model, message, tool, result, and response events in order.
 - [ ] Filter inherited environment variables and redact secrets from events.
 - [ ] Introduce network egress policy and platform sandbox adapter interfaces.
 - [ ] Add approval expiry, denial, cancellation, and reconnect behaviour.

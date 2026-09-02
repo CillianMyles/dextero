@@ -123,9 +123,10 @@ void main() {
 
   test('returns tool failures to app-server as unsuccessful results', () async {
     final transport = _ScriptedTransport(toolName: 'fail');
+    final activities = <CodexAgentActivity>[];
     final run = await CodexAppServerAgent(
       transportFactory: () async => transport,
-    ).run('try it', tools: [_FailingTool()]);
+    ).run('try it', tools: [_FailingTool()], onActivity: activities.add);
 
     expect(run.output, 'The tool failed safely.');
     final toolResponse = transport.sent.singleWhere(
@@ -136,6 +137,86 @@ void main() {
     expect(
       ((result['contentItems']! as List).single as JsonMap)['text'],
       contains('tool exploded'),
+    );
+    expect(
+      activities
+          .singleWhere(
+            (activity) =>
+                activity.kind == CodexAgentActivityKind.toolCallCompleted,
+          )
+          .summary
+          .text,
+      'fail failed: Bad state: tool exploded',
+    );
+  });
+
+  test('records a redacted command and its bounded output', () async {
+    final transport = _ScriptedTransport(
+      toolName: 'run_command',
+      arguments: const {
+        'command': '/usr/bin/printf',
+        'arguments': ['%s', 'token=super-secret'],
+      },
+    );
+    final activities = <CodexAgentActivity>[];
+
+    await CodexAppServerAgent(
+      transportFactory: () async => transport,
+    ).run('run it', tools: [_CommandTool()], onActivity: activities.add);
+
+    final commandActivities = activities.where(
+      (activity) => activity.toolCallId == 'call-1',
+    );
+    expect(
+      commandActivities
+          .singleWhere(
+            (activity) =>
+                activity.kind == CodexAgentActivityKind.toolCallStarted,
+          )
+          .summary
+          .text,
+      'run_command started: /usr/bin/printf %s token=[REDACTED]',
+    );
+    final result = commandActivities
+        .singleWhere(
+          (activity) =>
+              activity.kind == CodexAgentActivityKind.toolCallCompleted,
+        )
+        .summary;
+    expect(result.text, contains('stdout:\ncommand output'));
+    expect(result.text, contains('stderr:\nwarning'));
+    expect(result.truncated, isFalse);
+  });
+
+  test('adapts built-in command execution details from app-server', () async {
+    final activities = <CodexAgentActivity>[];
+
+    await CodexAppServerAgent(
+      transportFactory: () async => _CommandExecutionTransport(),
+    ).run('run it', tools: const [], onActivity: activities.add);
+
+    final commandActivities = activities.where(
+      (activity) => activity.toolCallId == 'command-1',
+    );
+    expect(
+      commandActivities
+          .singleWhere(
+            (activity) =>
+                activity.kind == CodexAgentActivityKind.toolCallStarted,
+          )
+          .summary
+          .text,
+      'command_execution started: printf token=[REDACTED]',
+    );
+    expect(
+      commandActivities
+          .singleWhere(
+            (activity) =>
+                activity.kind == CodexAgentActivityKind.toolCallCompleted,
+          )
+          .summary
+          .text,
+      contains('output:\nsafe output'),
     );
   });
 
@@ -236,6 +317,27 @@ final class _FailingTool implements Tool {
   }) => throw StateError('tool exploded');
 }
 
+final class _CommandTool implements Tool {
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'run_command',
+    description: 'Run a command.',
+    inputSchema: {'type': 'object'},
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) => const {
+    'exit_code': 0,
+    'stdout': 'command output\n',
+    'stderr': 'warning\n',
+    'truncated': false,
+  };
+}
+
 base class _FakeTransport implements CodexAppServerTransport {
   final _controller = StreamController<JsonMap>();
   final sent = <JsonMap>[];
@@ -262,10 +364,15 @@ base class _FakeTransport implements CodexAppServerTransport {
 }
 
 final class _ScriptedTransport extends _FakeTransport {
-  _ScriptedTransport({required this.toolName, this.output});
+  _ScriptedTransport({
+    required this.toolName,
+    this.output,
+    this.arguments = const {'value': 'hello'},
+  });
 
   final String toolName;
   final String? output;
+  final JsonMap arguments;
 
   @override
   void respond(JsonMap message) {
@@ -296,7 +403,7 @@ final class _ScriptedTransport extends _FakeTransport {
               'id': 'call-1',
               'type': 'dynamicToolCall',
               'tool': toolName,
-              'arguments': {'token': 'raw-secret-value'},
+              'arguments': arguments,
               'status': 'inProgress',
             },
           },
@@ -309,7 +416,7 @@ final class _ScriptedTransport extends _FakeTransport {
             'turnId': 'turn-1',
             'callId': 'call-1',
             'tool': toolName,
-            'arguments': {'value': 'hello'},
+            'arguments': arguments,
           },
         });
       case null:
@@ -394,6 +501,70 @@ final class _NoOutputTransport extends _FakeTransport {
           'id': 2,
           'result': {
             'turn': {'id': 'turn-1'},
+          },
+        });
+        emit({
+          'method': 'turn/completed',
+          'params': {
+            'turn': {'status': 'completed'},
+          },
+        });
+    }
+  }
+}
+
+final class _CommandExecutionTransport extends _FakeTransport {
+  @override
+  void respond(JsonMap message) {
+    switch (message['method']) {
+      case 'initialize':
+        emit({'id': 0, 'result': <String, Object?>{}});
+      case 'thread/start':
+        emit({
+          'id': 1,
+          'result': {
+            'thread': {'id': 'thread-1'},
+          },
+        });
+      case 'turn/start':
+        emit({
+          'id': 2,
+          'result': {
+            'turn': {'id': 'turn-1'},
+          },
+        });
+        emit({
+          'method': 'item/started',
+          'params': {
+            'item': {
+              'id': 'command-1',
+              'type': 'commandExecution',
+              'command': 'printf token=super-secret',
+              'status': 'inProgress',
+            },
+          },
+        });
+        emit({
+          'method': 'item/completed',
+          'params': {
+            'item': {
+              'id': 'command-1',
+              'type': 'commandExecution',
+              'command': 'printf token=super-secret',
+              'aggregatedOutput': 'safe output\n',
+              'exitCode': 0,
+              'status': 'completed',
+            },
+          },
+        });
+        emit({
+          'method': 'item/completed',
+          'params': {
+            'item': {
+              'id': 'message-1',
+              'type': 'agentMessage',
+              'text': 'Done.',
+            },
           },
         });
         emit({

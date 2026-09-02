@@ -554,7 +554,7 @@ final class CodexAppServerAgent {
                 rawItem['tool'] is String
                     ? rawItem['tool']! as String
                     : 'dynamic_tool',
-                null,
+                _dynamicToolContent(rawItem),
                 success: success,
               )
             : SafeMetadata.toolCall(
@@ -568,11 +568,14 @@ final class CodexAppServerAgent {
       ),
       'commandExecution' => (
         'command_execution',
-        SafeMetadata.text(
-          completed
-              ? 'Command execution ${success ? 'completed' : 'failed'}'
-              : 'Command execution started',
-        ),
+        completed
+            ? SafeMetadata.toolResult('command_execution', {
+                'exit_code': rawItem['exitCode'],
+                'output': rawItem['aggregatedOutput'],
+              }, success: success)
+            : SafeMetadata.toolCall('command_execution', {
+                'command': rawItem['command'],
+              }),
       ),
       'fileChange' => (
         'file_change',
@@ -584,11 +587,15 @@ final class CodexAppServerAgent {
       ),
       'mcpToolCall' => (
         rawItem['tool'] is String ? rawItem['tool']! as String : 'mcp_tool',
-        SafeMetadata.text(
-          completed
-              ? 'MCP tool ${success ? 'completed' : 'failed'}'
-              : 'MCP tool started',
-        ),
+        completed
+            ? SafeMetadata.toolResult(
+                rawItem['tool'] is String
+                    ? rawItem['tool']! as String
+                    : 'mcp_tool',
+                rawItem['error'],
+                success: success,
+              )
+            : SafeMetadata.text('MCP tool started'),
       ),
       'webSearch' => (
         'web_search',
@@ -608,6 +615,17 @@ final class CodexAppServerAgent {
       toolName: toolName,
       success: completed ? success : null,
     );
+  }
+
+  Object? _dynamicToolContent(Map rawItem) {
+    final contentItems = rawItem['contentItems'];
+    if (contentItems is! List) return null;
+    final text = contentItems
+        .whereType<Map>()
+        .where((item) => item['type'] == 'inputText' && item['text'] is String)
+        .map((item) => item['text']! as String)
+        .join('\n');
+    return text.isEmpty ? null : text;
   }
 
   String _encodeToolContent(Object? content) {

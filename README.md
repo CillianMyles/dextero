@@ -109,9 +109,10 @@ or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. Serverpod 3.4.13 may bind beyond loopback, so keep port
 8080 firewalled from untrusted networks.
 
-Chat history stores bounded, redacted tool summaries instead of raw arguments
-or results. The current in-memory implementation loses its single conversation
-when the server restarts; no Postgres service is required.
+Chat history stores bounded, redacted tool summaries. Command events include
+the command and a capped stdout/stderr excerpt; tool failures include their
+display-safe error text. The current in-memory implementation loses its single
+conversation when the server restarts; no Postgres service is required.
 
 Gemini credentials remain in the server process and are sent in the
 `x-goog-api-key` request header. They are not placed in request URLs, chat

@@ -1,10 +1,10 @@
 import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:dextero_server/src/control/chat_runtime.dart';
 import 'package:dextero_server/src/generated/protocol.dart';
-import 'package:serverpod/serverpod.dart' show ServerConfig, ServerpodConfig;
 import 'package:test/test.dart';
 
 import '../integration/test_tools/serverpod_test_tools.dart';
+import '../integration/test_tools/test_server_config.dart';
 
 void main() {
   late core.InMemoryChatHistoryStore store;
@@ -77,17 +77,8 @@ void main() {
         );
       },
     );
-  }, configOverride: _useEphemeralApiPort);
+  }, configOverride: useEphemeralApiPort);
 }
-
-ServerpodConfig _useEphemeralApiPort(ServerpodConfig config) => config.copyWith(
-  apiServer: ServerConfig(
-    port: 0,
-    publicHost: 'localhost',
-    publicPort: 0,
-    publicScheme: 'http',
-  ),
-);
 
 final class _AcceptanceAgent implements core.ConversationAgent {
   @override

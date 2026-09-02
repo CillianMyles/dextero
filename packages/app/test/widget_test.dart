@@ -168,14 +168,69 @@ void main() {
       expect(find.text('Event'), findsOneWidget);
       expect(find.text('v1 · Warning'), findsOneWidget);
       expect(find.text('7'), findsOneWidget);
-      expect(find.text('Run'), findsOneWidget);
+      expect(find.text('Run ID'), findsOneWidget);
       expect(find.text('run-7'), findsOneWidget);
-      expect(find.text('Correlation'), findsOneWidget);
+      expect(find.text('Correlation ID'), findsOneWidget);
       expect(find.text('correlation-7'), findsOneWidget);
       expect(find.text('Tool call'), findsOneWidget);
       expect(find.text('call-7'), findsOneWidget);
     },
   );
+
+  testWidgets('renders command, output, and tool error diagnostics', (
+    tester,
+  ) async {
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 1,
+          entryId: 'entry-command',
+          kind: ChatEntryKind.toolCall,
+          status: ChatEntryStatus.running,
+          content: 'run_command started: sed -n 1,20p README.md',
+          toolCallId: 'command-1',
+          toolName: 'run_command',
+        ),
+        _entry(
+          sequence: 2,
+          entryId: 'entry-command-output',
+          kind: ChatEntryKind.toolOutput,
+          status: ChatEntryStatus.running,
+          content: 'stdout:\n# Dextero\n\nLocal agent.',
+          toolCallId: 'command-1',
+          toolName: 'run_command',
+        ),
+        _entry(
+          sequence: 3,
+          entryId: 'entry-read-error',
+          kind: ChatEntryKind.toolResult,
+          status: ChatEntryStatus.failed,
+          content: 'read_file failed: File not found: missing.txt',
+          toolCallId: 'read-1',
+          toolName: 'read_file',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Run command started'), findsOneWidget);
+    expect(
+      find.text('run_command started: sed -n 1,20p README.md'),
+      findsOneWidget,
+    );
+    expect(find.text('Run command output'), findsOneWidget);
+    expect(find.text('stdout:\n# Dextero\n\nLocal agent.'), findsOneWidget);
+    expect(find.text('Read file result'), findsOneWidget);
+    expect(
+      find.text('read_file failed: File not found: missing.txt'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('keeps expanded failed activity responsive at compact width', (
     tester,

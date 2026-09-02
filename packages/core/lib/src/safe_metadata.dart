@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'tool.dart';
 
 final class SafeSummary {
@@ -7,9 +9,10 @@ final class SafeSummary {
   final bool truncated;
 }
 
-/// Produces display metadata without retaining raw tool inputs or outputs.
+/// Produces bounded, redacted metadata for display and canonical history.
 abstract final class SafeMetadata {
   static const maxDisplayCharacters = 480;
+  static const maxToolResultCharacters = 4000;
   static const maxMessageCharacters = 16000;
 
   static SafeSummary text(
@@ -46,8 +49,13 @@ abstract final class SafeMetadata {
     if ({'list_files', 'read_file', 'edit_file'}.contains(toolName)) {
       final path = _safePath(arguments['path']);
       if (path != null) detail = ' for $path';
-    } else if (toolName == 'run_command' && arguments['command'] is String) {
-      detail = ' for ${_safeExecutable(arguments['command']! as String)}';
+    } else if ({
+      'run_command',
+      'run_shell',
+      'command_execution',
+    }.contains(toolName)) {
+      final command = _displayCommand(toolName, arguments);
+      if (command != null) detail = ': $command';
     }
     return text('${_safeToolName(toolName)} started$detail');
   }
@@ -72,7 +80,8 @@ abstract final class SafeMetadata {
   }) {
     final outcome = success ? 'completed' : 'failed';
     if (result is! Map) {
-      return text('${_safeToolName(toolName)} $outcome');
+      final detail = !success && result != null ? ': $result' : '';
+      return text('${_safeToolName(toolName)} $outcome$detail');
     }
     final map = result.cast<Object?, Object?>();
     var detail = '';
@@ -81,11 +90,43 @@ abstract final class SafeMetadata {
     } else if ({'read_file', 'edit_file'}.contains(toolName)) {
       final path = _safePath(map['path']);
       if (path != null) detail = ' for $path';
-    } else if ({'run_command', 'run_shell'}.contains(toolName) &&
+    } else if ({
+          'run_command',
+          'run_shell',
+          'command_execution',
+        }.contains(toolName) &&
         map['exit_code'] is int) {
       detail = ' (exit ${map['exit_code']})';
     }
-    return text('${_safeToolName(toolName)} $outcome$detail');
+    final heading = '${_safeToolName(toolName)} $outcome$detail';
+    if ({'run_command', 'run_shell', 'command_execution'}.contains(toolName)) {
+      final sections = <String>[];
+      for (final (label, key) in const [
+        ('stdout', 'stdout'),
+        ('stderr', 'stderr'),
+        ('output', 'output'),
+      ]) {
+        final value = map[key];
+        if (value is String && value.isNotEmpty) {
+          sections.add('$label:\n$value');
+        }
+      }
+      if (sections.isNotEmpty) {
+        final summary = message(
+          '$heading\n${sections.join('\n')}',
+          maxCharacters: maxToolResultCharacters,
+        );
+        return SafeSummary(
+          summary.text,
+          truncated: summary.truncated || map['truncated'] == true,
+        );
+      }
+    }
+    if (!success) {
+      final error = map['error'] ?? map['message'];
+      if (error != null) return text('$heading: $error');
+    }
+    return text(heading);
   }
 
   static String _safeToolName(String name) {
@@ -99,9 +140,27 @@ abstract final class SafeMetadata {
     return redacted.length <= 160 ? redacted : '${redacted.substring(0, 159)}…';
   }
 
-  static String _safeExecutable(String value) {
-    final normalized = value.replaceAll('\\', '/');
-    return _redact(normalized.split('/').last);
+  static String? _displayCommand(String toolName, JsonMap arguments) {
+    final command = arguments['command'];
+    if (command is! String || command.trim().isEmpty) return null;
+    if (toolName != 'run_command') return command.trim();
+    final rawArguments = arguments['arguments'];
+    if (rawArguments is! List ||
+        rawArguments.any((value) => value is! String)) {
+      return command.trim();
+    }
+    return <String>[
+      command.trim(),
+      ...rawArguments.cast<String>().map(_displayArgument),
+    ].join(' ');
+  }
+
+  static String _displayArgument(String value) {
+    if (value.isNotEmpty &&
+        RegExp(r'^[a-zA-Z0-9_./:=+,@%-]+$').hasMatch(value)) {
+      return value;
+    }
+    return jsonEncode(value);
   }
 
   static String _redact(String value) {
@@ -112,7 +171,7 @@ abstract final class SafeMetadata {
     );
     safe = safe.replaceAllMapped(
       RegExp(
-        r'''\b(authorization|api[_-]?key|access[_-]?token|token|secret|password|cookie)\b\s*[:=]\s*["']?[^\s,"'}]+''',
+        r'''\b(authorization|api[_-]?key|access[_-]?token|token|secret|password|cookie)\b(?:\s*[:=]\s*|\s+)["']?[^\s,"'}]+''',
         caseSensitive: false,
       ),
       (match) => '${match.group(1)}=[REDACTED]',
