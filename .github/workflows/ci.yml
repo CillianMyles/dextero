@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   test:
-    name: Repository checks
+    name: Code checks
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -33,7 +33,7 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Run repository checks
+      - name: Run code checks (formatting, static analysis, tests)
         run: make check
 
   app-build:
