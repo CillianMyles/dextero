@@ -70,8 +70,9 @@ make dev-macos
 # make dev-windows
 ```
 
-For Android or iOS, choose a target reported by `flutter devices`. A physical
-device also needs a `CONTROL_URL` that reaches this computer over the local
+For Android or iOS, choose a target reported by `flutter devices`. Android
+defaults to the standard emulator host address, `http://10.0.2.2:8080/`. A
+physical device needs a `CONTROL_URL` that reaches this computer over the local
 network:
 
 ```sh

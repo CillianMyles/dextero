@@ -5,6 +5,7 @@ DART ?= dart
 FLUTTER ?= flutter
 SERVERPOD ?= serverpod
 CONTROL_URL ?= http://localhost:8080/
+SERVER_READY_URL ?= http://localhost:8080/
 WORKSPACE ?= $(CURDIR)
 APP_DEVICE ?= chrome
 DEV_TOKEN_FILE := .dart_tool/dev-token
@@ -101,9 +102,11 @@ app: $(DEV_TOKEN_FILE) ## Run the Flutter client (Chrome by default; set APP_DEV
 app-web: ## Run the Flutter web client in Chrome (start the server separately).
 	@$(MAKE) --no-print-directory app APP_DEVICE=chrome
 
+app-android dev-android: CONTROL_URL = http://10.0.2.2:8080/
+
 app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
-	@$(MAKE) --no-print-directory app APP_DEVICE="$(DEVICE)"
+	@$(MAKE) --no-print-directory app APP_DEVICE="$(DEVICE)" CONTROL_URL="$(CONTROL_URL)"
 
 app-ios: ## Run the Flutter iOS client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an iOS device ID from 'flutter devices'."; exit 2; }
@@ -133,7 +136,7 @@ dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default
 	 trap cleanup EXIT INT TERM; \
 	 DEXTERO_CONTROL_TOKEN="$$token" DEXTERO_WORKSPACE="$(WORKSPACE)" \
 	   $(DART) run packages/server/bin/server.dart & server_pid=$$!; \
-	 until curl --silent --output /dev/null "$(CONTROL_URL)"; do \
+	 until curl --silent --output /dev/null "$(SERVER_READY_URL)"; do \
 	   kill -0 $$server_pid 2>/dev/null || { echo "Server exited before becoming ready"; exit 1; }; \
 	   sleep 0.25; \
 	 done; \
@@ -147,7 +150,7 @@ dev-web: ## Start the server and Flutter web client together.
 
 dev-android: ## Start the server and Android client (set DEVICE to a device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
-	@$(MAKE) --no-print-directory dev APP_DEVICE="$(DEVICE)"
+	@$(MAKE) --no-print-directory dev APP_DEVICE="$(DEVICE)" CONTROL_URL="$(CONTROL_URL)"
 
 dev-ios: ## Start the server and iOS client (set DEVICE to a device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an iOS device ID from 'flutter devices'."; exit 2; }
