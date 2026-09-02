@@ -28,7 +28,7 @@ cli ─┘
 
 The app and CLI use the generated client without importing or launching the
 server runtime. User messages are stored before assistant work begins; replies,
-safe tool activity, lifecycle, and errors append to the same ordered history.
+tool activity, lifecycle, and errors append to the same ordered history.
 
 ## Run
 
@@ -125,10 +125,12 @@ or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. Serverpod 3.4.13 may bind beyond loopback, so keep port
 8080 firewalled from untrusted networks.
 
-Chat history stores bounded, redacted tool summaries. Command events include
-the command and a capped stdout/stderr excerpt; tool failures include their
-display-safe error text. The current in-memory implementation loses its single
-conversation when the server restarts; no Postgres service is required.
+Chat history includes best-effort-redacted command and tool activity, with
+capped per-event stdout/stderr excerpts. This is an observability feature, not
+a security or retention boundary: commands and results may contain sensitive
+data, and the total activity-event count is not currently bounded. The current
+in-memory implementation loses its single conversation when the server
+restarts; no Postgres service is required.
 
 Gemini credentials remain in the server process and are sent in the
 `x-goog-api-key` request header. They are not placed in request URLs, chat

@@ -22,8 +22,8 @@ Make every task observable and controllable before adding more authority.
 
 - [x] Establish append-only user, assistant, tool, lifecycle, and error history
   with stable conversation, entry, run, tool-call, and correlation IDs.
-- [x] Adapt real Codex activity into bounded safe summaries without retaining
-  raw tool arguments or results.
+- [x] Adapt real Codex activity into readable tool summaries, including the
+  command and output details needed to understand what happened.
 - [x] Expose typed submit, history, and cursor-stream operations through the
   Flutter and terminal chats.
 - [x] Test the path at every layer, including a terminal-to-server network
@@ -38,6 +38,10 @@ Make every task observable and controllable before adding more authority.
 
 History is currently in memory behind a persistence interface and is lost when
 the server restarts.
+
+Milestone 1 treats activity history as an observability feature, not a security
+or retention boundary. Perfect secret redaction and a lifetime bound on the
+number of retained activity events are intentionally outside this milestone.
 
 **Exit condition:** a task can be watched and cancelled through one typed event
 contract without relying on terminal scraping.
@@ -74,7 +78,6 @@ Turn current guardrails into enforceable product boundaries.
   and denials.
 - [ ] Separate the user task timeline from an operator diagnostics view that
   preserves model, message, tool, result, and response events in order.
-- [ ] Filter inherited environment variables and redact secrets from events.
 - [ ] Introduce network egress policy and platform sandbox adapter interfaces.
 - [ ] Add approval expiry, denial, cancellation, and reconnect behaviour.
 - [ ] Ensure remote controllers cannot bypass local policy.
@@ -246,3 +249,10 @@ These concerns cut across all milestones:
 - Dynamically loading arbitrary Dart packages into an AOT process
 - Replacing mature coding agents with a weaker in-house imitation
 - Claiming one executable or one automation implementation works everywhere
+
+## Parking lot — revisit only if it proves useful
+
+These are not milestone commitments:
+
+- Stronger structured redaction of commands and tool results.
+- Coalescing or lifetime caps for retained activity events.
