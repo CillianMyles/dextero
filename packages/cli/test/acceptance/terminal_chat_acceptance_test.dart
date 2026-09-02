@@ -15,7 +15,7 @@ void main() {
         store: store,
         agent: ModelConversationAgent(
           model: GeminiModel(transport: _AcceptanceGeminiTransport()),
-          tools: [_AcceptanceListFilesTool()],
+          tools: [_AcceptanceRunCommandTool(), _AcceptanceReadFileTool()],
           providerName: 'Gemini',
         ),
       );
@@ -55,14 +55,40 @@ void main() {
       expect(io.errors, isEmpty);
       expect(io.output.join(), contains('gemini · gemini-3.7-flash'));
       expect(io.output.join(), contains('[you] Inspect the workspace'));
-      expect(io.output.join(), contains('[list_files] list_files started'));
+      expect(
+        io.output.join(),
+        contains('[run_command] run_command started: printf "workspace ready"'),
+      );
+      expect(
+        io.output.join(),
+        contains('[run_command] run_command stdout: 15 bytes'),
+      );
+      expect(io.output.join(), contains('stdout:\nworkspace ready'));
+      expect(
+        io.output.join(),
+        contains('[read_file] read_file failed: File not found: missing.txt'),
+      );
       expect(io.output.join(), contains('[dextero] Workspace\nready'));
       final history = await store.history(conversation.id);
-      expect(history.map((entry) => entry.sequence), [0, 1, 2, 3, 4, 5, 6]);
+      expect(history.map((entry) => entry.sequence), [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+      ]);
       expect(history.map((entry) => entry.kind), [
         ChatEntryKind.userMessage,
         ChatEntryKind.lifecycle,
         ChatEntryKind.lifecycle,
+        ChatEntryKind.toolCall,
+        ChatEntryKind.toolOutput,
+        ChatEntryKind.toolResult,
         ChatEntryKind.toolCall,
         ChatEntryKind.toolResult,
         ChatEntryKind.assistantMessage,
@@ -85,7 +111,8 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
     required JsonMap request,
     CancellationToken? cancellationToken,
   }) async {
-    if (_turn++ == 0) {
+    final turn = _turn++;
+    if (turn == 0) {
       return {
         'candidates': [
           {
@@ -94,8 +121,11 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
                 {
                   'functionCall': {
                     'id': 'acceptance-tool-1',
-                    'name': 'list_files',
-                    'args': <String, Object?>{},
+                    'name': 'run_command',
+                    'args': {
+                      'command': 'printf',
+                      'arguments': ['workspace ready'],
+                    },
                   },
                   'thoughtSignature': 'acceptance-signature',
                 },
@@ -105,12 +135,29 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
         ],
       };
     }
-    final contents = request['contents']! as List;
-    final toolResponse =
-        ((((contents.last as Map)['parts'] as List).single
-                as Map)['functionResponse']
-            as Map);
-    expect(toolResponse['id'], 'acceptance-tool-1');
+    final toolResponse = _lastToolResponse(request);
+    if (turn == 1) {
+      expect(toolResponse['id'], 'acceptance-tool-1');
+      return {
+        'candidates': [
+          {
+            'content': {
+              'parts': [
+                {
+                  'functionCall': {
+                    'id': 'acceptance-tool-2',
+                    'name': 'read_file',
+                    'args': {'path': 'missing.txt'},
+                  },
+                  'thoughtSignature': 'acceptance-signature-2',
+                },
+              ],
+            },
+          },
+        ],
+      };
+    }
+    expect(toolResponse['id'], 'acceptance-tool-2');
     return {
       'candidates': [
         {
@@ -123,14 +170,63 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
       ],
     };
   }
+
+  Map _lastToolResponse(JsonMap request) {
+    final contents = request['contents']! as List;
+    return ((((contents.last as Map)['parts'] as List).single
+            as Map)['functionResponse']
+        as Map);
+  }
 }
 
-final class _AcceptanceListFilesTool implements Tool {
+final class _AcceptanceRunCommandTool implements Tool {
   @override
   ToolDefinition get definition => const ToolDefinition(
-    name: 'list_files',
-    description: 'List workspace files.',
-    inputSchema: {'type': 'object', 'additionalProperties': false},
+    name: 'run_command',
+    description: 'Run a command.',
+    inputSchema: {
+      'type': 'object',
+      'properties': {
+        'command': {'type': 'string'},
+        'arguments': {
+          'type': 'array',
+          'items': {'type': 'string'},
+        },
+      },
+      'additionalProperties': false,
+    },
+  );
+
+  @override
+  Future<Object?> call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) async {
+    if (onOutput != null) {
+      await onOutput(const ToolOutputUpdate(stream: 'stdout', byteCount: 15));
+    }
+    return const {
+      'exit_code': 0,
+      'stdout': 'workspace ready',
+      'stderr': '',
+      'truncated': false,
+    };
+  }
+}
+
+final class _AcceptanceReadFileTool implements Tool {
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'read_file',
+    description: 'Read a file.',
+    inputSchema: {
+      'type': 'object',
+      'properties': {
+        'path': {'type': 'string'},
+      },
+      'additionalProperties': false,
+    },
   );
 
   @override
@@ -138,7 +234,16 @@ final class _AcceptanceListFilesTool implements Tool {
     JsonMap arguments, {
     CancellationToken? cancellationToken,
     ToolOutputSink? onOutput,
-  }) => const {'entries': <Object>[]};
+  }) => throw const _AcceptanceToolError('File not found: missing.txt');
+}
+
+final class _AcceptanceToolError implements Exception {
+  const _AcceptanceToolError(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 final class _AcceptanceIo implements TerminalIo {

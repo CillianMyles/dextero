@@ -467,9 +467,9 @@ class _ActivityRow extends StatelessWidget {
               ),
               _TechnicalDetail(label: 'Sequence', value: '${entry.sequence}'),
               if (entry.runId case final runId?)
-                _TechnicalDetail(label: 'Run', value: runId),
+                _TechnicalDetail(label: 'Run ID', value: runId),
               _TechnicalDetail(
-                label: 'Correlation',
+                label: 'Correlation ID',
                 value: entry.correlationId,
               ),
               if (entry.toolCallId case final toolCallId?)

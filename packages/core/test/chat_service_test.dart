@@ -82,6 +82,48 @@ void main() {
     expect(history.last.status, ChatEntryStatus.failed);
   });
 
+  test(
+    'stores display-safe command, output, and tool failure details',
+    () async {
+      final store = InMemoryChatHistoryStore(
+        identifiers: _SequenceIdentifiers(),
+      );
+      addTearDown(store.close);
+      final service = ChatService(
+        store: store,
+        agent: _DiagnosticAgent(),
+        identifiers: _SequenceIdentifiers(),
+      );
+      final conversation = await service.createConversation();
+
+      final submission = await service.submit(
+        conversationId: conversation.id,
+        message: 'diagnose',
+      );
+      await _waitForTerminal(store, conversation.id, submission.runId);
+      final history = await store.history(conversation.id);
+
+      expect(
+        history
+            .singleWhere((entry) => entry.kind == ChatEntryKind.toolCall)
+            .content,
+        'run_command started: printf token=[REDACTED]',
+      );
+      expect(
+        history
+            .singleWhere((entry) => entry.kind == ChatEntryKind.toolOutput)
+            .content,
+        'stdout:\ncommand output',
+      );
+      final failure = history.singleWhere(
+        (entry) => entry.kind == ChatEntryKind.toolResult,
+      );
+      expect(failure.status, ChatEntryStatus.failed);
+      expect(failure.content, 'read_file failed: File not found: missing.txt');
+      expect(failure.toolCallId, 'failed-read-1');
+    },
+  );
+
   test('rejects concurrent runs in one conversation', () async {
     final agent = _ControlledAgent();
     final store = InMemoryChatHistoryStore();
@@ -223,6 +265,49 @@ final class _FailingAgent implements ConversationAgent {
     required CancellationToken cancellationToken,
   }) async {
     throw StateError('token=super-secret ${'x' * 600}');
+  }
+}
+
+final class _DiagnosticAgent implements ConversationAgent {
+  @override
+  Future<ConversationAgentResult> run(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+  }) async {
+    await onEvent(
+      ConversationAgentEvent(
+        kind: ConversationAgentEventKind.toolCallStarted,
+        summary: SafeMetadata.toolCall('run_command', const {
+          'command': 'printf',
+          'arguments': ['token=super-secret'],
+        }),
+        toolCallId: 'command-1',
+        toolName: 'run_command',
+      ),
+    );
+    await onEvent(
+      ConversationAgentEvent(
+        kind: ConversationAgentEventKind.toolOutput,
+        summary: SafeMetadata.message('stdout:\ncommand output'),
+        toolCallId: 'command-1',
+        toolName: 'run_command',
+      ),
+    );
+    await onEvent(
+      ConversationAgentEvent(
+        kind: ConversationAgentEventKind.toolCallCompleted,
+        summary: SafeMetadata.toolResult(
+          'read_file',
+          'File not found: missing.txt',
+          success: false,
+        ),
+        toolCallId: 'failed-read-1',
+        toolName: 'read_file',
+        success: false,
+      ),
+    );
+    return const ConversationAgentResult(output: 'Diagnostics complete.');
   }
 }
 
