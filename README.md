@@ -71,13 +71,13 @@ make dev-macos
 ```
 
 For Android or iOS, choose a target reported by `flutter devices`. Android
-defaults to the standard emulator host address, `http://10.0.2.2:8080/`. A
-physical device needs a `CONTROL_URL` that reaches this computer over the local
-network:
+debug runs default to the standard emulator host address,
+`http://10.0.2.2:8080/`. A physical device needs an authenticated HTTPS proxy
+or protected tunnel that reaches this computer:
 
 ```sh
-make dev-android DEVICE=<device-id> CONTROL_URL=http://<host>:8080/
-# make dev-ios DEVICE=<device-id> CONTROL_URL=http://<host>:8080/
+make dev-android DEVICE=<device-id> CONTROL_URL=https://<protected-host>/
+# make dev-ios DEVICE=<device-id> CONTROL_URL=https://<protected-host>/
 ```
 
 When the server is already running, replace `dev-` with `app-` in any platform
