@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:dextero_app/main.dart';
 import 'package:dextero_app/src/dextero_controller.dart';
 import 'package:dextero_server/dextero_client.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shad/shad.dart';
 
 void main() {
   testWidgets('shows loading and then a clear empty conversation', (
@@ -26,6 +27,9 @@ void main() {
     expect(find.text('Until restart'), findsOneWidget);
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
     expect(find.text('Gemini · gemini-3.7-flash'), findsOneWidget);
+    expect(find.byType(ShadEmpty), findsOneWidget);
+    expect(find.byType(ShadBadge), findsNWidgets(3));
+    expect(find.byType(ShadInput), findsOneWidget);
   });
 
   testWidgets('keeps the connected chat controls usable at phone width', (
@@ -291,7 +295,7 @@ void main() {
     await tester.pump();
 
     expect(controller.submitting, isTrue);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(ShadSpinner), findsOneWidget);
 
     accepted.complete(_submission('Hello'));
     await tester.pumpAndSettle();
@@ -329,7 +333,7 @@ void main() {
 
     expect(controller.busy, isTrue);
     expect(
-      tester.widget<TextField>(find.byKey(const Key('chat-message'))).enabled,
+      tester.widget<ShadInput>(find.byKey(const Key('chat-message'))).enabled,
       isFalse,
     );
 
@@ -346,7 +350,7 @@ void main() {
 
     expect(controller.busy, isFalse);
     expect(
-      tester.widget<TextField>(find.byKey(const Key('chat-message'))).enabled,
+      tester.widget<ShadInput>(find.byKey(const Key('chat-message'))).enabled,
       isTrue,
     );
   });

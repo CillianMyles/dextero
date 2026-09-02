@@ -1,7 +1,11 @@
 import 'package:dextero_server/dextero_client.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show SelectableText, ThemeMode;
+import 'package:flutter/services.dart' show TextInputAction;
+import 'package:flutter/widgets.dart';
+import 'package:shad/shad.dart';
 
 import 'src/dextero_controller.dart';
+import 'src/dextero_design.dart';
 
 const _controlToken = String.fromEnvironment('DEXTERO_CONTROL_TOKEN');
 const _controlUrl = String.fromEnvironment(
@@ -27,17 +31,12 @@ class DexteroApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ShadApp(
       debugShowCheckedModeBanner: false,
       title: 'Dextero',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff335c67),
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xfff7f5f0),
-        useMaterial3: true,
-      ),
+      theme: DexteroDesign.lightTheme,
+      darkTheme: DexteroDesign.darkTheme,
+      themeMode: ThemeMode.system,
       home: DexteroHomePage(controller: controller),
     );
   }
@@ -98,46 +97,53 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
+    final theme = ShadTheme.of(context);
     final canSend =
         controller.hostStatus != null &&
         !controller.busy &&
         _messageController.text.trim().isNotEmpty;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 960),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _Header(controller: controller),
-                  const SizedBox(height: 18),
-                  if (controller.error case final error?) ...[
-                    _ErrorBanner(message: error),
-                    const SizedBox(height: 12),
-                  ],
-                  Expanded(
-                    child: _ConversationView(
-                      state: controller.loadState,
-                      entries: controller.entries,
-                      scrollController: _scrollController,
+    return ColoredBox(
+      color: theme.colorScheme.background,
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) => Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: DexteroDesign.contentMaxWidth,
+              ),
+              child: Padding(
+                padding: DexteroDesign.pagePadding(constraints.maxWidth),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Header(controller: controller),
+                    const SizedBox(height: 20),
+                    if (controller.error case final error?) ...[
+                      _ErrorBanner(message: error),
+                      const SizedBox(height: 12),
+                    ],
+                    Expanded(
+                      child: _ConversationPanel(
+                        state: controller.loadState,
+                        entries: controller.entries,
+                        scrollController: _scrollController,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _Composer(
-                    messageController: _messageController,
-                    enabled: controller.hostStatus != null && !controller.busy,
-                    canSend: canSend,
-                    submitting: controller.submitting,
-                    cancelling: controller.cancelling,
-                    working: controller.busy && !controller.submitting,
-                    onSend: _send,
-                    onCancel: _cancel,
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _Composer(
+                      messageController: _messageController,
+                      enabled:
+                          controller.hostStatus != null && !controller.busy,
+                      canSend: canSend,
+                      submitting: controller.submitting,
+                      cancelling: controller.cancelling,
+                      working: controller.busy && !controller.submitting,
+                      onSend: _send,
+                      onCancel: _cancel,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -157,42 +163,39 @@ class _Header extends StatelessWidget {
     final status = controller.hostStatus;
     final badges = <Widget>[
       if (status != null)
-        Chip(
+        _StatusBadge(
           key: const Key('model-provider'),
-          avatar: const Icon(Icons.psychology_outlined, size: 16),
-          label: Text(
-            '${_displayName(status.modelProvider)} · ${status.modelName}',
-          ),
+          icon: LucideIcons.bot,
+          label: '${_displayName(status.modelProvider)} · ${status.modelName}',
         ),
       if (status != null)
-        Tooltip(
-          message: status.retentionNotice,
-          child: const Chip(
-            avatar: Icon(Icons.memory, size: 16),
-            label: Text('Until restart'),
+        ShadTooltip(
+          builder: (context) => Text(status.retentionNotice),
+          child: const _StatusBadge(
+            icon: LucideIcons.database,
+            label: 'Until restart',
           ),
         ),
-      Chip(
-        avatar: Icon(
-          status == null ? Icons.cloud_off_outlined : Icons.circle,
-          size: 14,
-          color: status == null ? null : Colors.green.shade700,
-        ),
-        label: Text(
-          status == null ? 'Disconnected' : '${status.name} ${status.version}',
-        ),
+      _StatusBadge(
+        icon: status == null ? LucideIcons.cloudOff : LucideIcons.circle,
+        iconColor: status == null
+            ? null
+            : DexteroDesign.success(ShadTheme.of(context).brightness),
+        label: status == null
+            ? 'Disconnected'
+            : '${status.name} ${status.version}',
       ),
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 900) {
+        if (constraints.maxWidth < DexteroDesign.compactBreakpoint) {
           return Column(
             key: const Key('compact-header'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _Brand(),
-              const SizedBox(height: 10),
-              Wrap(spacing: 8, runSpacing: 8, children: badges),
+              const SizedBox(height: 14),
+              Wrap(spacing: 6, runSpacing: 6, children: badges),
             ],
           );
         }
@@ -214,35 +217,152 @@ class _Brand extends StatelessWidget {
   const _Brand();
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.foreground,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            LucideIcons.sparkles,
+            size: 19,
+            color: theme.colorScheme.background,
+          ),
         ),
-        child: Icon(
-          Icons.auto_awesome,
-          color: Theme.of(context).colorScheme.onPrimary,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dextero',
+                style: theme.textTheme.h3.copyWith(
+                  color: theme.colorScheme.foreground,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                'Local agent workspace',
+                style: theme.textTheme.small.copyWith(
+                  color: theme.colorScheme.mutedForeground,
+                ),
+              ),
+            ],
+          ),
         ),
+      ],
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.icon,
+    required this.label,
+    this.iconColor,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return ShadBadge.outline(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
+            color: iconColor ?? theme.colorScheme.mutedForeground,
+          ),
+          const SizedBox(width: 6),
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+        ],
       ),
-      const SizedBox(width: 14),
-      const Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Dextero',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _ConversationPanel extends StatelessWidget {
+  const _ConversationPanel({
+    required this.state,
+    required this.entries,
+    required this.scrollController,
+  });
+
+  final ChatLoadState state;
+  final List<ChatEntry> entries;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.card,
+        border: Border.all(color: theme.colorScheme.border),
+        borderRadius: theme.radius,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  LucideIcons.messagesSquare,
+                  size: 16,
+                  color: theme.colorScheme.mutedForeground,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Conversation',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.small.copyWith(
+                      color: theme.colorScheme.foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  entries.isEmpty
+                      ? 'No messages'
+                      : '${entries.length} ${entries.length == 1 ? 'event' : 'events'}',
+                  style: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.mutedForeground,
+                  ),
+                ),
+              ],
             ),
-            Text('One local conversation'),
-          ],
-        ),
+          ),
+          Container(height: 1, color: theme.colorScheme.border),
+          Expanded(
+            child: _ConversationView(
+              state: state,
+              entries: entries,
+              scrollController: scrollController,
+            ),
+          ),
+        ],
       ),
-    ],
-  );
+    );
+  }
 }
 
 class _ConversationView extends StatelessWidget {
@@ -263,7 +383,11 @@ class _ConversationView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(key: Key('history-loading')),
+            ShadSpinner(
+              key: Key('history-loading'),
+              size: 22,
+              semanticLabel: 'Loading conversation',
+            ),
             SizedBox(height: 12),
             Text('Loading conversation…'),
           ],
@@ -271,27 +395,21 @@ class _ConversationView extends StatelessWidget {
       );
     }
     if (state == ChatLoadState.empty || entries.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 38),
-            SizedBox(height: 12),
-            Text(
-              'Start a conversation with Dextero.',
-              key: Key('empty-history'),
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            SizedBox(height: 4),
-            Text('Messages and safe activity summaries will appear here.'),
-          ],
+      return const ShadEmpty(
+        icon: Icon(LucideIcons.messageSquare),
+        title: Text(
+          'Start a conversation with Dextero.',
+          key: Key('empty-history'),
+        ),
+        description: Text(
+          'Messages and safe activity summaries will appear here.',
         ),
       );
     }
     return ListView.separated(
       key: const Key('chat-history'),
       controller: scrollController,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(16),
       itemCount: entries.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) => _ChatEntryCard(entry: entries[index]),
@@ -325,34 +443,64 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
     return Align(
       alignment: user ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 700),
-        child: Material(
-          color: user ? scheme.primaryContainer : scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(18),
+        constraints: const BoxConstraints(
+          maxWidth: DexteroDesign.messageMaxWidth,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: user ? scheme.primary : scheme.background,
+            border: user ? null : Border.all(color: scheme.border),
+            borderRadius: user
+                ? const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    topRight: Radius.circular(4),
+                    bottomLeft: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  )
+                : const BorderRadius.only(
+                    topLeft: Radius.circular(4),
+                    topRight: Radius.circular(14),
+                    bottomLeft: Radius.circular(14),
+                    bottomRight: Radius.circular(14),
+                  ),
+          ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   user ? 'You' : 'Dextero',
-                  style: Theme.of(context).textTheme.labelSmall,
+                  style: theme.textTheme.small.copyWith(
+                    color: user
+                        ? scheme.primaryForeground.withValues(alpha: 0.76)
+                        : scheme.mutedForeground,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 SelectableText(
                   entry.content,
                   key: Key('entry-${entry.entryId}'),
-                  style: const TextStyle(fontSize: 16, height: 1.4),
+                  style: theme.textTheme.p.copyWith(
+                    color: user ? scheme.primaryForeground : scheme.foreground,
+                    height: 1.45,
+                  ),
                 ),
                 if (entry.truncated) ...[
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 6),
                   Text(
                     'Summary truncated',
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: theme.textTheme.small.copyWith(
+                      color: user
+                          ? scheme.primaryForeground.withValues(alpha: 0.7)
+                          : scheme.mutedForeground,
+                    ),
                   ),
                 ],
               ],
@@ -371,110 +519,169 @@ class _ActivityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = ShadTheme.of(context);
+    final scheme = theme.colorScheme;
     final isError =
         entry.kind == ChatEntryKind.error ||
         entry.status == ChatEntryStatus.failed;
     final isWarning = entry.status == ChatEntryStatus.warning;
     final background = isError
-        ? scheme.errorContainer
+        ? scheme.destructive.withValues(alpha: 0.08)
         : isWarning
-        ? const Color(0xffffefd1)
-        : scheme.surfaceContainerHighest;
+        ? DexteroDesign.warning(
+            theme.brightness,
+          ).withValues(alpha: theme.brightness == Brightness.dark ? 0.12 : 0.08)
+        : scheme.muted.withValues(alpha: 0.58);
     final foreground = isError
-        ? scheme.onErrorContainer
+        ? scheme.destructive
         : isWarning
-        ? const Color(0xff694c00)
-        : scheme.onSurface;
+        ? DexteroDesign.warning(theme.brightness)
+        : scheme.foreground;
     return Align(
       alignment: Alignment.centerLeft,
-      child: Material(
+      child: Container(
         key: Key('entry-${entry.entryId}'),
-        color: background,
-        borderRadius: BorderRadius.circular(12),
+        decoration: BoxDecoration(
+          color: background,
+          border: Border.all(
+            color: isError || isWarning
+                ? foreground.withValues(alpha: 0.24)
+                : scheme.border,
+          ),
+          borderRadius: theme.radius,
+        ),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 700),
-          child: ExpansionTile(
-            key: Key('activity-details-${entry.entryId}'),
-            tilePadding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
-            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            iconColor: foreground,
-            collapsedIconColor: foreground,
-            shape: const Border(),
-            collapsedShape: const Border(),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Icon(_activityIcon(entry), size: 18, color: foreground),
-                    Text(
-                      _activityLabel(entry),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: foreground,
-                        fontWeight: FontWeight.w700,
+          constraints: const BoxConstraints(
+            maxWidth: DexteroDesign.messageMaxWidth,
+          ),
+          child: ShadCollapsible(
+            trigger: (context, open, toggle) => Semantics(
+              button: true,
+              expanded: open,
+              child: GestureDetector(
+                key: Key('activity-details-${entry.entryId}'),
+                behavior: HitTestBehavior.opaque,
+                onTap: toggle,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(13, 11, 11, 11),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Icon(
+                          _activityIcon(entry),
+                          size: 16,
+                          color: foreground,
+                        ),
                       ),
-                    ),
-                    _ActivityBadge(
-                      label: _displayName(entry.status.name),
-                      foreground: foreground,
-                    ),
-                    if (entry.truncated)
-                      _ActivityBadge(
-                        key: Key('activity-truncated-${entry.entryId}'),
-                        label: 'Truncated',
-                        foreground: foreground,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 7,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  _activityLabel(entry),
+                                  style: theme.textTheme.small.copyWith(
+                                    color: foreground,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                _ActivityBadge(
+                                  label: _displayName(entry.status.name),
+                                  foreground: foreground,
+                                ),
+                                if (entry.truncated)
+                                  _ActivityBadge(
+                                    key: Key(
+                                      'activity-truncated-${entry.entryId}',
+                                    ),
+                                    label: 'Truncated',
+                                    foreground: foreground,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              entry.content,
+                              key: Key('activity-summary-${entry.entryId}'),
+                              style: theme.textTheme.small.copyWith(
+                                color: scheme.foreground,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  _timestamp(entry.createdAt),
+                                  style: theme.textTheme.small.copyWith(
+                                    color: scheme.mutedForeground,
+                                  ),
+                                ),
+                                Text(
+                                  '• ${_displayName(entry.source.name)}',
+                                  style: theme.textTheme.small.copyWith(
+                                    color: scheme.mutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                  ],
+                      const SizedBox(width: 8),
+                      AnimatedRotation(
+                        turns: open ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 160),
+                        child: Icon(
+                          LucideIcons.chevronDown,
+                          size: 16,
+                          color: scheme.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 7),
-                Text(
-                  entry.content,
-                  key: Key('activity-summary-${entry.entryId}'),
-                  style: TextStyle(color: foreground, height: 1.35),
-                ),
-                const SizedBox(height: 7),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      _timestamp(entry.createdAt),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelSmall?.copyWith(color: foreground),
-                    ),
-                    Text(
-                      '• ${_displayName(entry.source.name)}',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelSmall?.copyWith(color: foreground),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-            children: [
-              Divider(color: foreground.withValues(alpha: 0.25)),
-              _TechnicalDetail(
-                label: 'Event',
-                value:
-                    'v${entry.eventVersion} · ${_displayName(entry.family.name)}',
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(39, 0, 13, 12),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: scheme.border)),
               ),
-              _TechnicalDetail(label: 'Sequence', value: '${entry.sequence}'),
-              if (entry.runId case final runId?)
-                _TechnicalDetail(label: 'Run ID', value: runId),
-              _TechnicalDetail(
-                label: 'Correlation ID',
-                value: entry.correlationId,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  _TechnicalDetail(
+                    label: 'Event',
+                    value:
+                        'v${entry.eventVersion} · ${_displayName(entry.family.name)}',
+                  ),
+                  _TechnicalDetail(
+                    label: 'Sequence',
+                    value: '${entry.sequence}',
+                  ),
+                  if (entry.runId case final runId?)
+                    _TechnicalDetail(label: 'Run ID', value: runId),
+                  _TechnicalDetail(
+                    label: 'Correlation ID',
+                    value: entry.correlationId,
+                  ),
+                  if (entry.toolCallId case final toolCallId?)
+                    _TechnicalDetail(label: 'Tool call', value: toolCallId),
+                ],
               ),
-              if (entry.toolCallId case final toolCallId?)
-                _TechnicalDetail(label: 'Tool call', value: toolCallId),
-            ],
+            ),
           ),
         ),
       ),
@@ -513,21 +720,21 @@ class _ActivityRow extends StatelessWidget {
       value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 
   IconData _activityIcon(ChatEntry entry) => switch (entry.kind) {
-    ChatEntryKind.assistantDelta => Icons.notes_outlined,
-    ChatEntryKind.toolCall => Icons.build_outlined,
-    ChatEntryKind.toolOutput => Icons.terminal_outlined,
+    ChatEntryKind.assistantDelta => LucideIcons.fileText,
+    ChatEntryKind.toolCall => LucideIcons.wrench,
+    ChatEntryKind.toolOutput => LucideIcons.terminal,
     ChatEntryKind.toolResult =>
       entry.status == ChatEntryStatus.failed
-          ? Icons.error_outline
-          : Icons.check_circle_outline,
-    ChatEntryKind.error => Icons.error_outline,
+          ? LucideIcons.circleAlert
+          : LucideIcons.checkCircle2,
+    ChatEntryKind.error => LucideIcons.circleAlert,
     _ => switch (entry.status) {
-      ChatEntryStatus.queued => Icons.schedule,
-      ChatEntryStatus.running => Icons.sync,
-      ChatEntryStatus.completed => Icons.check_circle_outline,
-      ChatEntryStatus.failed => Icons.error_outline,
-      ChatEntryStatus.cancelled => Icons.cancel_outlined,
-      _ => Icons.info_outline,
+      ChatEntryStatus.queued => LucideIcons.clock3,
+      ChatEntryStatus.running => LucideIcons.loaderCircle,
+      ChatEntryStatus.completed => LucideIcons.checkCircle2,
+      ChatEntryStatus.failed => LucideIcons.circleAlert,
+      ChatEntryStatus.cancelled => LucideIcons.circleStop,
+      _ => LucideIcons.info,
     },
   };
 }
@@ -543,18 +750,10 @@ class _ActivityBadge extends StatelessWidget {
   final Color foreground;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(
-      border: Border.all(color: foreground.withValues(alpha: 0.35)),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      label,
-      style: Theme.of(
-        context,
-      ).textTheme.labelSmall?.copyWith(color: foreground),
-    ),
+  Widget build(BuildContext context) => ShadBadge.outline(
+    foregroundColor: foreground,
+    backgroundColor: const Color(0x00000000),
+    child: Text(label),
   );
 }
 
@@ -565,24 +764,35 @@ class _TechnicalDetail extends StatelessWidget {
   final String value;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 6),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 88,
-          child: Text(label, style: Theme.of(context).textTheme.labelSmall),
-        ),
-        Expanded(
-          child: SelectableText(
-            value,
-            style: Theme.of(context).textTheme.bodySmall,
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              label,
+              style: theme.textTheme.small.copyWith(
+                color: theme.colorScheme.mutedForeground,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          Expanded(
+            child: SelectableText(
+              value,
+              style: theme.textTheme.small.copyWith(
+                color: theme.colorScheme.foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Composer extends StatelessWidget {
@@ -608,56 +818,71 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      elevation: 1,
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const Key('chat-message'),
-                controller: messageController,
-                enabled: enabled,
-                minLines: 1,
-                maxLines: 5,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
-                  hintText: working ? 'Dextero is working…' : 'Message Dextero',
-                  border: InputBorder.none,
+    final theme = ShadTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.card,
+        border: Border.all(color: theme.colorScheme.border),
+        borderRadius: theme.radius,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xff000000).withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.18 : 0.05,
+            ),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: ShadInput(
+              key: const Key('chat-message'),
+              controller: messageController,
+              enabled: enabled,
+              minLines: 1,
+              maxLines: 5,
+              textInputAction: TextInputAction.newline,
+              placeholder: Text(
+                working ? 'Dextero is working…' : 'Message Dextero',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (working)
+            ShadTooltip(
+              builder: (context) => const Text('Cancel run'),
+              child: ShadGestureDetector(
+                child: ShadIconButton.destructive(
+                  key: const Key('cancel-run'),
+                  semanticLabel: 'Cancel run',
+                  enabled: !cancelling,
+                  onPressed: cancelling ? null : onCancel,
+                  icon: cancelling
+                      ? const ShadSpinner(size: 16)
+                      : const Icon(LucideIcons.square),
+                ),
+              ),
+            )
+          else
+            ShadTooltip(
+              builder: (context) => const Text('Send message'),
+              child: ShadGestureDetector(
+                child: ShadIconButton(
+                  key: const Key('send-message'),
+                  semanticLabel: 'Send message',
+                  enabled: canSend,
+                  onPressed: canSend ? onSend : null,
+                  icon: submitting
+                      ? const ShadSpinner(size: 16)
+                      : const Icon(LucideIcons.arrowUp),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            if (working)
-              IconButton.filledTonal(
-                key: const Key('cancel-run'),
-                tooltip: 'Cancel run',
-                onPressed: cancelling ? null : onCancel,
-                icon: cancelling
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.stop_rounded),
-              )
-            else
-              IconButton.filled(
-                key: const Key('send-message'),
-                tooltip: 'Send message',
-                onPressed: canSend ? onSend : null,
-                icon: submitting
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.arrow_upward_rounded),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -669,20 +894,10 @@ class _ErrorBanner extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => ShadAlert.destructive(
     key: const Key('error-banner'),
-    color: Theme.of(context).colorScheme.errorContainer,
-    borderRadius: BorderRadius.circular(12),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.error_outline),
-          const SizedBox(width: 10),
-          Expanded(child: Text(message)),
-        ],
-      ),
-    ),
+    icon: const Icon(LucideIcons.circleAlert),
+    title: const Text('Connection problem'),
+    description: Text(message),
   );
 }
