@@ -14,7 +14,7 @@ for planned work.
 packages/
 ├── core/    agent loop, tools, and model adapters
 ├── server/  Serverpod host, API, and generated client
-├── app/     Flutter web and macOS app
+├── app/     Flutter app for Android, iOS, Linux, macOS, web, and Windows
 └── cli/     terminal client
 ```
 
@@ -35,8 +35,10 @@ safe tool activity, lifecycle, and errors append to the same ordered history.
 Requirements:
 
 - Dart 3.10+
-- Flutter with web support and Chrome
-- Full Xcode installation for optional macOS native runs
+- Flutter with the intended target platform enabled
+- Chrome for web, Android Studio for Android, or Xcode for iOS and macOS
+- GTK 3 development libraries for Linux or Visual Studio with Desktop C++ for
+  Windows
 - Codex CLI authenticated with `codex login`, or a Gemini API key
 - OpenSSL
 
@@ -60,16 +62,27 @@ automatic provider choice; explicitly choosing Gemini requires
 `GEMINI_API_KEY`. The Flutter app and CLI show the active provider and model
 reported by the server.
 
-Use the native macOS app for local development or platform checks:
+Use the native client for the current desktop platform:
 
 ```sh
 make dev-macos
+# make dev-linux
+# make dev-windows
 ```
 
-When the server is already running, use `make app-web` or `make app-macos` to
-start only the corresponding client. The local bearer token and control URL are
-passed to Flutter as compile-time defines so the same entrypoint works on web
-and macOS.
+For Android or iOS, choose a target reported by `flutter devices`. A physical
+device also needs a `CONTROL_URL` that reaches this computer over the local
+network:
+
+```sh
+make dev-android DEVICE=<device-id> CONTROL_URL=http://<host>:8080/
+# make dev-ios DEVICE=<device-id> CONTROL_URL=http://<host>:8080/
+```
+
+When the server is already running, replace `dev-` with `app-` in any platform
+command to start only the client. The bearer token and control URL are passed
+to Flutter as compile-time defines so every platform uses the same entrypoint.
+Desktop targets must be run on their matching host operating system.
 
 Start an interactive terminal chat in a second terminal while the server is
 running. Use `/exit` to leave:

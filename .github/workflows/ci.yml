@@ -35,3 +35,59 @@ jobs:
 
       - name: Run repository checks
         run: make check
+
+  app-build:
+    name: App build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: android
+            os: ubuntu-latest
+            command: flutter build apk --debug
+          - target: ios
+            os: macos-latest
+            command: flutter build ios --simulator --debug
+          - target: linux
+            os: ubuntu-latest
+            command: flutter build linux --debug
+          - target: macos
+            os: macos-latest
+            command: flutter build macos --debug
+          - target: web
+            os: ubuntu-latest
+            command: flutter build web --debug
+          - target: windows
+            os: windows-latest
+            command: flutter build windows --debug
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        if: matrix.target == 'android'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Linux build dependencies
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgtk-3-dev ninja-build
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: packages/app/pubspec.yaml
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build app
+        working-directory: packages/app
+        run: ${{ matrix.command }}
