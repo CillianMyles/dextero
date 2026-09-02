@@ -109,7 +109,7 @@ final class DexteroController extends ChangeNotifier {
     if (!configured) {
       _setError(
         'DEXTERO_CONTROL_TOKEN is missing. Start the app with '
-        '`make app-web` or `make app-macos`.',
+        '`make app-<platform>`.',
       );
       return;
     }

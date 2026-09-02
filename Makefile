@@ -11,7 +11,8 @@ DEV_TOKEN_FILE := .dart_tool/dev-token
 
 .PHONY: help doctor bootstrap tools token generate format format-check analyze \
 	test test-core test-server test-app test-app-web test-cli check server app \
-	app-web app-macos cli core dev dev-web dev-macos
+	app-web app-android app-ios app-linux app-macos app-windows cli core dev \
+	dev-web dev-android dev-ios dev-linux dev-macos dev-windows
 
 help: ## Show the available developer commands.
 	@printf "Dextero development\n\n"
@@ -100,8 +101,22 @@ app: $(DEV_TOKEN_FILE) ## Run the Flutter client (Chrome by default; set APP_DEV
 app-web: ## Run the Flutter web client in Chrome (start the server separately).
 	@$(MAKE) --no-print-directory app APP_DEVICE=chrome
 
+app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
+	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
+	@$(MAKE) --no-print-directory app APP_DEVICE="$(DEVICE)"
+
+app-ios: ## Run the Flutter iOS client (set DEVICE to a connected device ID).
+	@test -n "$(DEVICE)" || { echo "Set DEVICE to an iOS device ID from 'flutter devices'."; exit 2; }
+	@$(MAKE) --no-print-directory app APP_DEVICE="$(DEVICE)"
+
+app-linux: ## Run the Flutter Linux client (start the server separately).
+	@$(MAKE) --no-print-directory app APP_DEVICE=linux
+
 app-macos: ## Run the Flutter macOS client (start the server separately).
 	@$(MAKE) --no-print-directory app APP_DEVICE=macos
+
+app-windows: ## Run the Flutter Windows client (start the server separately).
+	@$(MAKE) --no-print-directory app APP_DEVICE=windows
 
 cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
@@ -130,5 +145,19 @@ dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default
 dev-web: ## Start the server and Flutter web client together.
 	@$(MAKE) --no-print-directory dev APP_DEVICE=chrome
 
+dev-android: ## Start the server and Android client (set DEVICE to a device ID).
+	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
+	@$(MAKE) --no-print-directory dev APP_DEVICE="$(DEVICE)"
+
+dev-ios: ## Start the server and iOS client (set DEVICE to a device ID).
+	@test -n "$(DEVICE)" || { echo "Set DEVICE to an iOS device ID from 'flutter devices'."; exit 2; }
+	@$(MAKE) --no-print-directory dev APP_DEVICE="$(DEVICE)"
+
+dev-linux: ## Start the server and Flutter Linux client together.
+	@$(MAKE) --no-print-directory dev APP_DEVICE=linux
+
 dev-macos: ## Start the server and Flutter macOS client together.
 	@$(MAKE) --no-print-directory dev APP_DEVICE=macos
+
+dev-windows: ## Start the server and Flutter Windows client together.
+	@$(MAKE) --no-print-directory dev APP_DEVICE=windows

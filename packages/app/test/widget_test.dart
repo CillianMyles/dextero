@@ -402,7 +402,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Disconnected'), findsOneWidget);
-    expect(find.textContaining('make app-web'), findsOneWidget);
+    expect(find.textContaining('make app-<platform>'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
