@@ -290,6 +290,12 @@ final class GeminiModel implements AgentModel {
       );
     }
     final candidate = candidates.first as Map;
+    final finishReason = candidate['finishReason'];
+    if (finishReason != null && finishReason != 'STOP') {
+      throw FormatException(
+        'Gemini candidate ended unsuccessfully${_finishDetail(candidate)}.',
+      );
+    }
     final content = candidate['content'];
     if (content is! Map || content['parts'] is! List) {
       throw FormatException(

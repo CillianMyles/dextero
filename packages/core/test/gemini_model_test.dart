@@ -163,6 +163,39 @@ void main() {
     );
   });
 
+  test('rejects partial text from an unsuccessfully finished candidate', () {
+    final model = GeminiModel(
+      transport: _QueueTransport([
+        {
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': 'This answer is incomplete'},
+                ],
+              },
+              'finishReason': 'MAX_TOKENS',
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(
+      model.nextTurn(
+        messages: [AgentMessage.user('Write a long answer')],
+        tools: const [],
+      ),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('MAX_TOKENS'),
+        ),
+      ),
+    );
+  });
+
   test('HTTP transport sends the key only in the header', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
