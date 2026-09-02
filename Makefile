@@ -13,7 +13,8 @@ DEV_TOKEN_FILE := .dart_tool/dev-token
 .PHONY: help doctor bootstrap tools token generate format format-check analyze \
 	test test-core test-server test-app test-app-web test-cli check server app \
 	app-web app-android app-ios app-linux app-macos app-windows cli core dev \
-	dev-web dev-android dev-ios dev-linux dev-macos dev-windows
+	dev-web dev-android dev-ios dev-linux dev-macos dev-windows \
+	validate-android-control-url
 
 help: ## Show the available developer commands.
 	@printf "Dextero development\n\n"
@@ -103,6 +104,13 @@ app-web: ## Run the Flutter web client in Chrome (start the server separately).
 	@$(MAKE) --no-print-directory app APP_DEVICE=chrome
 
 app-android dev-android: CONTROL_URL = http://10.0.2.2:8080/
+app-android dev-android: validate-android-control-url
+
+validate-android-control-url:
+	@case "$(CONTROL_URL)" in \
+	  https://*|http://10.0.2.2:*) ;; \
+	  *) echo "Android CONTROL_URL must use HTTPS or the 10.0.2.2 emulator host."; exit 2 ;; \
+	esac
 
 app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
