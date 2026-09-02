@@ -108,7 +108,7 @@ cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
 	 $(DART) run packages/cli/bin/dextero.dart $(if $(PROMPT),"$(PROMPT)",)
 
-core: ## Run the core directly through Codex without Serverpod.
+core: ## Run the core directly through the configured provider without Serverpod.
 	@$(DART) run packages/core/bin/dextero_core.dart $(if $(PROMPT),"$(PROMPT)",)
 
 dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default).
