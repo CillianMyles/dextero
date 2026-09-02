@@ -16,7 +16,7 @@ DEV_TOKEN_FILE := .dart_tool/dev-token
 	test test-core test-server test-app test-app-web test-cli check server app \
 	app-web app-android app-ios app-linux app-macos app-windows cli core dev \
 	dev-web dev-android dev-ios dev-linux dev-macos dev-windows \
-	validate-android-control-url
+	validate-android-control-url validate-ios-control-url
 
 help: ## Show the available developer commands.
 	@printf "Dextero development\n\n"
@@ -108,10 +108,24 @@ app-web: ## Run the Flutter web client in Chrome (start the server separately).
 app-android dev-android: validate-android-control-url
 
 validate-android-control-url:
-	@case "$(ANDROID_CONTROL_URL)" in \
-	  https://*|http://10.0.2.2:*) ;; \
-	  *) echo "Android CONTROL_URL must use HTTPS or the 10.0.2.2 emulator host."; exit 2 ;; \
-	esac
+	@url="$(ANDROID_CONTROL_URL)"; \
+	if [[ "$$url" =~ ^https:// ]] || \
+	   [[ "$$url" =~ ^http://10\.0\.2\.2(:[0-9]+)?(/.*)?$$ ]]; then \
+	  exit 0; \
+	fi; \
+	echo "Android CONTROL_URL must use HTTPS or the 10.0.2.2 emulator host."; \
+	exit 2
+
+app-ios dev-ios: validate-ios-control-url
+
+validate-ios-control-url:
+	@url="$(CONTROL_URL)"; \
+	if [[ "$$url" =~ ^https:// ]] || \
+	   [[ "$$url" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$$ ]]; then \
+	  exit 0; \
+	fi; \
+	echo "iOS CONTROL_URL must use HTTPS or an HTTP loopback host for the simulator."; \
+	exit 2
 
 app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
