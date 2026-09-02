@@ -39,8 +39,10 @@ Requirements:
 - Chrome for web, Android Studio for Android, or Xcode for iOS and macOS
 - GTK 3 development libraries for Linux or Visual Studio with Desktop C++ for
   Windows
+- GNU Make and Bash; on Windows, run the Make targets from MSYS2 or another
+  Bash environment with `bash.exe` available on `PATH`
 - Codex CLI authenticated with `codex login`, or a Gemini API key
-- OpenSSL
+- OpenSSL and curl
 
 Start the server and web app:
 
