@@ -1,4 +1,8 @@
+ifeq ($(OS),Windows_NT)
+SHELL := bash.exe
+else
 SHELL := /bin/bash
+endif
 .DEFAULT_GOAL := help
 
 DART ?= dart
