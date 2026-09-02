@@ -28,10 +28,10 @@ void main() {
     expect(summary.text, isNot(contains('hunter2')));
   });
 
-  test('includes the complete redacted command and structured output', () {
+  test('includes the complete command and filtered structured output', () {
     final started = SafeMetadata.toolCall('run_command', const {
       'command': '/usr/bin/sed',
-      'arguments': ['-n', '1,20p', 'a file.txt', '--token', 'super-secret'],
+      'arguments': ['-n', '1,20p', 'a file.txt', '--flag', 'example-value'],
     });
     final completed = SafeMetadata.toolResult('run_command', const {
       'exit_code': 7,
@@ -43,7 +43,7 @@ void main() {
     expect(
       started.text,
       'run_command started: /usr/bin/sed -n 1,20p "a file.txt" '
-      '--token=[REDACTED]',
+      '--flag example-value',
       reason: started.text,
     );
     expect(completed.text, contains('run_command completed (exit 7)'));

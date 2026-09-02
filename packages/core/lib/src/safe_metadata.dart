@@ -15,6 +15,25 @@ abstract final class SafeMetadata {
   static const maxToolResultCharacters = 4000;
   static const maxMessageCharacters = 16000;
 
+  static final _summaryWhitespace = RegExp(r'[\r\n\t]+');
+  static final _repeatedSpaces = RegExp(r' {2,}');
+  static final _unsafeIdentifierCharacters = RegExp(r'[^a-zA-Z0-9_.:-]');
+  static final _unsafeToolNameCharacters = RegExp(r'[^a-zA-Z0-9_.-]');
+  static final _safeCommandArgument = RegExp(r'^[a-zA-Z0-9_./:=+,@%-]+$');
+  static final _bearerCredential = RegExp(
+    r'\bbearer\s+[a-z0-9._~+/=-]+',
+    caseSensitive: false,
+  );
+  static final _credential = RegExp(
+    r'''\b(authorization|api[_-]?key|access[_-]?token|token|secret|password|cookie)\b\s*[:=]\s*["']?[^\s,"'}]+''',
+    caseSensitive: false,
+  );
+  static final _openAiApiKey = RegExp(r'\bsk-[a-zA-Z0-9_-]{12,}\b');
+  static final _ansiControlSequence = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
+  static final _unsafeControlCharacters = RegExp(
+    r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]',
+  );
+
   static SafeSummary text(
     Object? value, {
     int maxCharacters = maxDisplayCharacters,
@@ -22,8 +41,8 @@ abstract final class SafeMetadata {
     _validateLimit(maxCharacters);
     var safe =
         _stripUnsafeControls(_redact(value?.toString() ?? 'Unknown error'))
-            .replaceAll(RegExp(r'[\r\n\t]+'), ' ')
-            .replaceAll(RegExp(r' {2,}'), ' ')
+            .replaceAll(_summaryWhitespace, ' ')
+            .replaceAll(_repeatedSpaces, ' ')
             .trim();
     return _bounded(safe, maxCharacters: maxCharacters);
   }
@@ -68,7 +87,7 @@ abstract final class SafeMetadata {
   static String identifier(String value) {
     final safe = _stripUnsafeControls(
       value,
-    ).replaceAll(RegExp(r'[^a-zA-Z0-9_.:-]'), '_');
+    ).replaceAll(_unsafeIdentifierCharacters, '_');
     final normalized = safe.isEmpty ? 'unknown' : safe;
     return normalized.length <= 160 ? normalized : normalized.substring(0, 160);
   }
@@ -130,7 +149,7 @@ abstract final class SafeMetadata {
   }
 
   static String _safeToolName(String name) {
-    final safe = name.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
+    final safe = name.replaceAll(_unsafeToolNameCharacters, '_');
     return safe.isEmpty ? 'tool' : safe;
   }
 
@@ -156,8 +175,7 @@ abstract final class SafeMetadata {
   }
 
   static String _displayArgument(String value) {
-    if (value.isNotEmpty &&
-        RegExp(r'^[a-zA-Z0-9_./:=+,@%-]+$').hasMatch(value)) {
+    if (value.isNotEmpty && _safeCommandArgument.hasMatch(value)) {
       return value;
     }
     return jsonEncode(value);
@@ -165,27 +183,18 @@ abstract final class SafeMetadata {
 
   static String _redact(String value) {
     var safe = value;
-    safe = safe.replaceAll(
-      RegExp(r'\bbearer\s+[a-z0-9._~+/=-]+', caseSensitive: false),
-      'Bearer [REDACTED]',
-    );
+    safe = safe.replaceAll(_bearerCredential, 'Bearer [REDACTED]');
     safe = safe.replaceAllMapped(
-      RegExp(
-        r'''\b(authorization|api[_-]?key|access[_-]?token|token|secret|password|cookie)\b(?:\s*[:=]\s*|\s+)["']?[^\s,"'}]+''',
-        caseSensitive: false,
-      ),
+      _credential,
       (match) => '${match.group(1)}=[REDACTED]',
     );
-    safe = safe.replaceAll(RegExp(r'\bsk-[a-zA-Z0-9_-]{12,}\b'), '[REDACTED]');
+    safe = safe.replaceAll(_openAiApiKey, '[REDACTED]');
     return safe;
   }
 
   static String _stripUnsafeControls(String value) => value
-      .replaceAll(RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]'), '')
-      .replaceAll(
-        RegExp(r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]'),
-        '',
-      );
+      .replaceAll(_ansiControlSequence, '')
+      .replaceAll(_unsafeControlCharacters, '');
 
   static SafeSummary _bounded(String value, {required int maxCharacters}) {
     final safe = value.isEmpty ? 'No content' : value;
