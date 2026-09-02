@@ -150,7 +150,7 @@ void main() {
     );
   });
 
-  test('records a redacted command and its bounded output', () async {
+  test('records a complete command and its bounded output', () async {
     final transport = _ScriptedTransport(
       toolName: 'run_command',
       arguments: const {
@@ -175,7 +175,7 @@ void main() {
           )
           .summary
           .text,
-      'run_command started: /usr/bin/printf %s token=[REDACTED]',
+      'run_command started: /usr/bin/printf %s token=super-secret',
     );
     final result = commandActivities
         .singleWhere(
@@ -206,7 +206,7 @@ void main() {
           )
           .summary
           .text,
-      'command_execution started: printf token=[REDACTED]',
+      'command_execution started: printf token=super-secret',
     );
     expect(
       commandActivities
