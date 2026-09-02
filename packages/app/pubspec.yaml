@@ -14,11 +14,9 @@ dependencies:
     path: ../server
   flutter:
     sdk: flutter
+  shad: ^0.99.4
 
 dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
-
-flutter:
-  uses-material-design: true
