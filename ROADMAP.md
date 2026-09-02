@@ -39,10 +39,9 @@ Make every task observable and controllable before adding more authority.
 History is currently in memory behind a persistence interface and is lost when
 the server restarts.
 
-Milestone 1 treats activity history as sensitive diagnostic data, not a
-security or retention boundary. It intentionally does not redact credentials;
-a lifetime bound on the number of retained activity events is also outside
-this milestone.
+Milestone 1 treats activity history as an observability feature, not a security
+or retention boundary. A lifetime bound on the number of retained activity
+events is outside this milestone.
 
 **Exit condition:** a task can be watched and cancelled through one typed event
 contract without relying on terminal scraping.
