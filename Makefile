@@ -4,7 +4,9 @@ SHELL := /bin/bash
 DART ?= dart
 FLUTTER ?= flutter
 SERVERPOD ?= serverpod
+CONTROL_URL_SOURCE := $(origin CONTROL_URL)
 CONTROL_URL ?= http://localhost:8080/
+ANDROID_CONTROL_URL := $(if $(filter undefined,$(CONTROL_URL_SOURCE)),http://10.0.2.2:8080/,$(CONTROL_URL))
 SERVER_READY_URL ?= http://localhost:8080/
 WORKSPACE ?= $(CURDIR)
 APP_DEVICE ?= chrome
@@ -103,18 +105,17 @@ app: $(DEV_TOKEN_FILE) ## Run the Flutter client (Chrome by default; set APP_DEV
 app-web: ## Run the Flutter web client in Chrome (start the server separately).
 	@$(MAKE) --no-print-directory app APP_DEVICE=chrome
 
-app-android dev-android: CONTROL_URL = http://10.0.2.2:8080/
 app-android dev-android: validate-android-control-url
 
 validate-android-control-url:
-	@case "$(CONTROL_URL)" in \
+	@case "$(ANDROID_CONTROL_URL)" in \
 	  https://*|http://10.0.2.2:*) ;; \
 	  *) echo "Android CONTROL_URL must use HTTPS or the 10.0.2.2 emulator host."; exit 2 ;; \
 	esac
 
 app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
-	@$(MAKE) --no-print-directory app APP_DEVICE="$(DEVICE)" CONTROL_URL="$(CONTROL_URL)"
+	@$(MAKE) --no-print-directory app APP_DEVICE="$(DEVICE)" CONTROL_URL="$(ANDROID_CONTROL_URL)"
 
 app-ios: ## Run the Flutter iOS client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an iOS device ID from 'flutter devices'."; exit 2; }
@@ -158,7 +159,7 @@ dev-web: ## Start the server and Flutter web client together.
 
 dev-android: ## Start the server and Android client (set DEVICE to a device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
-	@$(MAKE) --no-print-directory dev APP_DEVICE="$(DEVICE)" CONTROL_URL="$(CONTROL_URL)"
+	@$(MAKE) --no-print-directory dev APP_DEVICE="$(DEVICE)" CONTROL_URL="$(ANDROID_CONTROL_URL)"
 
 dev-ios: ## Start the server and iOS client (set DEVICE to a device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an iOS device ID from 'flutter devices'."; exit 2; }
