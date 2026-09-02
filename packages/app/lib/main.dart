@@ -1,6 +1,6 @@
 import 'package:dextero_server/dextero_client.dart';
 import 'package:flutter/material.dart' show SelectableText, ThemeMode;
-import 'package:flutter/services.dart' show TextInputAction;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, TextInputAction;
 import 'package:flutter/widgets.dart';
 import 'package:shad/shad.dart';
 
@@ -556,99 +556,115 @@ class _ActivityRow extends StatelessWidget {
             maxWidth: DexteroDesign.messageMaxWidth,
           ),
           child: ShadCollapsible(
-            trigger: (context, open, toggle) => Semantics(
-              button: true,
-              expanded: open,
-              child: GestureDetector(
-                key: Key('activity-details-${entry.entryId}'),
-                behavior: HitTestBehavior.opaque,
+            trigger: (context, open, toggle) => FocusableActionDetector(
+              key: Key('activity-details-${entry.entryId}'),
+              mouseCursor: SystemMouseCursors.click,
+              shortcuts: const {
+                SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+                SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+              },
+              actions: {
+                ActivateIntent: CallbackAction<ActivateIntent>(
+                  onInvoke: (_) {
+                    toggle();
+                    return null;
+                  },
+                ),
+              },
+              child: Semantics(
+                button: true,
+                expanded: open,
                 onTap: toggle,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(13, 11, 11, 11),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 1),
-                        child: Icon(
-                          _activityIcon(entry),
-                          size: 16,
-                          color: foreground,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: toggle,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(13, 11, 11, 11),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Icon(
+                            _activityIcon(entry),
+                            size: 16,
+                            color: foreground,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 7,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  _activityLabel(entry),
-                                  style: theme.textTheme.small.copyWith(
-                                    color: foreground,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                _ActivityBadge(
-                                  label: _displayName(entry.status.name),
-                                  foreground: foreground,
-                                ),
-                                if (entry.truncated)
-                                  _ActivityBadge(
-                                    key: Key(
-                                      'activity-truncated-${entry.entryId}',
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 7,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    _activityLabel(entry),
+                                    style: theme.textTheme.small.copyWith(
+                                      color: foreground,
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                    label: 'Truncated',
+                                  ),
+                                  _ActivityBadge(
+                                    label: _displayName(entry.status.name),
                                     foreground: foreground,
                                   ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              entry.content,
-                              key: Key('activity-summary-${entry.entryId}'),
-                              style: theme.textTheme.small.copyWith(
-                                color: scheme.foreground,
-                                height: 1.4,
+                                  if (entry.truncated)
+                                    _ActivityBadge(
+                                      key: Key(
+                                        'activity-truncated-${entry.entryId}',
+                                      ),
+                                      label: 'Truncated',
+                                      foreground: foreground,
+                                    ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Text(
-                                  _timestamp(entry.createdAt),
-                                  style: theme.textTheme.small.copyWith(
-                                    color: scheme.mutedForeground,
-                                  ),
+                              const SizedBox(height: 6),
+                              Text(
+                                entry.content,
+                                key: Key('activity-summary-${entry.entryId}'),
+                                style: theme.textTheme.small.copyWith(
+                                  color: scheme.foreground,
+                                  height: 1.4,
                                 ),
-                                Text(
-                                  '• ${_displayName(entry.source.name)}',
-                                  style: theme.textTheme.small.copyWith(
-                                    color: scheme.mutedForeground,
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  Text(
+                                    _timestamp(entry.createdAt),
+                                    style: theme.textTheme.small.copyWith(
+                                      color: scheme.mutedForeground,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                  Text(
+                                    '• ${_displayName(entry.source.name)}',
+                                    style: theme.textTheme.small.copyWith(
+                                      color: scheme.mutedForeground,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      AnimatedRotation(
-                        turns: open ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 160),
-                        child: Icon(
-                          LucideIcons.chevronDown,
-                          size: 16,
-                          color: scheme.mutedForeground,
+                        const SizedBox(width: 8),
+                        AnimatedRotation(
+                          turns: open ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 160),
+                          child: Icon(
+                            LucideIcons.chevronDown,
+                            size: 16,
+                            color: scheme.mutedForeground,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

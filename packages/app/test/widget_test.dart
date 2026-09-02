@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dextero_app/main.dart';
 import 'package:dextero_app/src/dextero_controller.dart';
 import 'package:dextero_server/dextero_client.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shad/shad.dart';
@@ -178,6 +179,12 @@ void main() {
       expect(find.text('correlation-7'), findsOneWidget);
       expect(find.text('Tool call'), findsOneWidget);
       expect(find.text('call-7'), findsOneWidget);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('run-7'), findsNothing);
     },
   );
 
