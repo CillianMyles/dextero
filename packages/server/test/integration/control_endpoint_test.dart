@@ -137,8 +137,15 @@ void main() {
     });
 
     test('cancels an active run through the typed endpoint', () async {
-      final cancellable = _CancellableConversationAgent();
-      service = core.ChatService(store: store, agent: cancellable);
+      final transport = _CancellableGeminiTransport();
+      service = core.ChatService(
+        store: store,
+        agent: core.ModelConversationAgent(
+          model: core.GeminiModel(transport: transport),
+          tools: const [],
+          providerName: 'Gemini',
+        ),
+      );
       conversationId = (await service.createConversation()).id;
       ChatRuntime.configure(
         chatService: service,
@@ -148,7 +155,7 @@ void main() {
         authenticatedSession,
         ChatSubmitRequest(conversationId: conversationId, message: 'Long task'),
       );
-      await cancellable.started.future;
+      await transport.started.future;
 
       expect(
         await endpoints.control.cancelRun(
@@ -180,17 +187,17 @@ ServerpodConfig _useEphemeralApiPort(ServerpodConfig config) => config.copyWith(
   ),
 );
 
-final class _CancellableConversationAgent implements core.ConversationAgent {
+final class _CancellableGeminiTransport implements core.GeminiTransport {
   final started = Completer<void>();
 
   @override
-  Future<core.ConversationAgentResult> run(
-    String prompt, {
-    required core.ConversationAgentEventSink onEvent,
-    required core.CancellationToken cancellationToken,
+  Future<core.JsonMap> generateContent({
+    required String model,
+    required core.JsonMap request,
+    core.CancellationToken? cancellationToken,
   }) async {
     started.complete();
-    await cancellationToken.whenCancelled;
+    await cancellationToken!.whenCancelled;
     cancellationToken.throwIfCancellationRequested();
     throw StateError('unreachable');
   }

@@ -183,5 +183,6 @@ final class _QueueModel implements AgentModel {
   Future<ModelTurn> nextTurn({
     required List<AgentMessage> messages,
     required List<ToolDefinition> tools,
+    CancellationToken? cancellationToken,
   }) async => _turns[_index++];
 }

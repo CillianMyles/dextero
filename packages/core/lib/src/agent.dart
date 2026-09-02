@@ -73,6 +73,7 @@ final class AgentLoop {
       final response = await _model.nextTurn(
         messages: List.unmodifiable(messages),
         tools: List.unmodifiable(definitions),
+        cancellationToken: cancellationToken,
       );
       cancellationToken?.throwIfCancellationRequested();
       messages.add(
