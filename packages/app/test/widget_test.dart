@@ -180,6 +180,8 @@ void main() {
   testWidgets('renders command, output, and tool error diagnostics', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final api = _FakeChatApi(
       status: Future.value(_status()),
       initialHistory: [
