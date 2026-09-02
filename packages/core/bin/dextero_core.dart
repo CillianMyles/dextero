@@ -7,38 +7,17 @@ Future<void> main(List<String> arguments) async {
       ? 'List the Dart files in lib, read one, and briefly describe it.'
       : arguments.join(' ');
   final root = Directory.current.path;
-  final tools = <Tool>[
-    ListFilesTool(root: root),
-    ReadFileTool(root: root),
-    EditFileTool(root: root),
-    RunCommandTool(workingDirectory: root),
-    RunShellTool(workingDirectory: root),
-  ];
   try {
-    final geminiApiKey = Platform.environment['GEMINI_API_KEY']?.trim();
-    if (geminiApiKey != null && geminiApiKey.isNotEmpty) {
-      final model =
-          Platform.environment['DEXTERO_GEMINI_MODEL']?.trim().isNotEmpty ==
-              true
-          ? Platform.environment['DEXTERO_GEMINI_MODEL']!.trim()
-          : defaultGeminiModel;
-      final run = await AgentLoop(
-        model: GeminiModel(
-          model: model,
-          transport: GeminiHttpTransport(apiKey: geminiApiKey),
-        ),
-        tools: tools,
-      ).run(prompt);
-      stdout.writeln(run.output);
-      stdout.writeln('($model, ${run.turns} model turns)');
-      return;
-    }
-    final run = await CodexAppServerAgent(
-      workingDirectory: root,
-    ).run(prompt, tools: tools);
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(
+      Platform.environment,
+    );
+    final cancellation = CancellationController();
+    final run = await configuration
+        .createAgent(workspace: root)
+        .run(prompt, onEvent: (_) {}, cancellationToken: cancellation.token);
     stdout.writeln(run.output);
     stdout.writeln(
-      '(thread ${run.threadId}, ${run.toolCalls} dynamic tool calls)',
+      '(${configuration.providerName}, ${configuration.modelName})',
     );
   } on Object catch (error) {
     stderr.writeln('Agent failed: $error');
