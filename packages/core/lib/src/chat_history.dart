@@ -35,7 +35,7 @@ enum ChatEntryStatus {
   cancelled,
 }
 
-enum ChatEntrySource { user, dextero, codex }
+enum ChatEntrySource { user, dextero, model }
 
 final class ChatConversation {
   const ChatConversation({required this.id, required this.createdAt});

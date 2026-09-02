@@ -157,6 +157,14 @@ class _Header extends StatelessWidget {
     final status = controller.hostStatus;
     final badges = <Widget>[
       if (status != null)
+        Chip(
+          key: const Key('model-provider'),
+          avatar: const Icon(Icons.psychology_outlined, size: 16),
+          label: Text(
+            '${_displayName(status.modelProvider)} · ${status.modelName}',
+          ),
+        ),
+      if (status != null)
         Tooltip(
           message: status.retentionNotice,
           child: const Chip(
@@ -177,7 +185,7 @@ class _Header extends StatelessWidget {
     ];
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 620) {
+        if (constraints.maxWidth < 900) {
           return Column(
             key: const Key('compact-header'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -197,6 +205,9 @@ class _Header extends StatelessWidget {
       },
     );
   }
+
+  String _displayName(String value) =>
+      value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
 }
 
 class _Brand extends StatelessWidget {

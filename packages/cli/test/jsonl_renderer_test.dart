@@ -17,7 +17,7 @@ void main() {
         content: 'Read README.md',
         createdAt: DateTime.utc(2026, 9, 1, 20, 30),
         correlationId: 'cli-1',
-        source: ChatEntrySource.codex,
+        source: ChatEntrySource.model,
         truncated: false,
         runId: 'run-1',
         toolCallId: 'call-1',

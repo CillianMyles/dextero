@@ -20,13 +20,19 @@ help: ## Show the available developer commands.
 doctor: ## Check the local tools used by the workspace.
 	@command -v $(DART) >/dev/null || { echo "Missing Dart SDK"; exit 1; }
 	@command -v $(FLUTTER) >/dev/null || { echo "Missing Flutter SDK"; exit 1; }
-	@command -v codex >/dev/null || { echo "Missing Codex CLI (required to run tasks)"; exit 1; }
 	@command -v openssl >/dev/null || { echo "Missing openssl (used for the dev token)"; exit 1; }
 	@command -v curl >/dev/null || { echo "Missing curl (used by make dev readiness checks)"; exit 1; }
 	@printf "Dart:    "; $(DART) --version
 	@printf "Flutter: "; $(FLUTTER) --version | head -n 1
-	@printf "Codex:   "; codex --version
-	@codex login status >/dev/null || { echo "Codex is not authenticated; run 'codex login'"; exit 1; }
+	@if [ "$(DEXTERO_MODEL_PROVIDER)" = "gemini" ] && [ -z "$(GEMINI_API_KEY)" ]; then \
+	  echo "GEMINI_API_KEY is required when DEXTERO_MODEL_PROVIDER=gemini"; exit 1; \
+	elif [ -n "$(GEMINI_API_KEY)" ] && [ "$(DEXTERO_MODEL_PROVIDER)" != "codex" ]; then \
+	  echo "Gemini:  API key configured"; \
+	else \
+	  command -v codex >/dev/null || { echo "Missing Codex CLI (or configure GEMINI_API_KEY)"; exit 1; }; \
+	  printf "Codex:   "; codex --version; \
+	  codex login status >/dev/null || { echo "Codex is not authenticated; run 'codex login'"; exit 1; }; \
+	fi
 	@if command -v $(SERVERPOD) >/dev/null; then printf "Serverpod: "; $(SERVERPOD) version; else echo "Serverpod: not installed (make tools)"; fi
 
 bootstrap: doctor ## Resolve every Dart and Flutter workspace dependency.

@@ -36,6 +36,7 @@ void main() {
     expect(frame, contains('list_files started'));
     expect(frame, contains('Finished the work'));
     expect(frame, contains('server restarts'));
+    expect(frame, contains('gemini · gemini-3.7-flash'));
     expect(
       const TerminalRenderer().plainEntryLine(entries.last),
       '[dextero] Finished the work',
@@ -66,6 +67,8 @@ HostStatus _status() => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
+  modelProvider: 'gemini',
+  modelName: 'gemini-3.7-flash',
 );
 
 ChatEntry _entry({
@@ -85,7 +88,7 @@ ChatEntry _entry({
   correlationId: 'correlation-1',
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
-      : ChatEntrySource.codex,
+      : ChatEntrySource.model,
   truncated: false,
   runId: 'run-1',
   toolName: toolName,

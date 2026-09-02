@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_core/dextero_core.dart';
 import 'package:dextero_server/dextero_server.dart';
@@ -9,13 +11,28 @@ void main() {
     () async {
       const token = 'acceptance-token-0123456789-0123456789';
       final store = InMemoryChatHistoryStore();
-      final service = ChatService(store: store, agent: _AcceptanceAgent());
+      final service = ChatService(
+        store: store,
+        agent: ModelConversationAgent(
+          model: GeminiModel(transport: _AcceptanceGeminiTransport()),
+          tools: [_AcceptanceListFilesTool()],
+          providerName: 'Gemini',
+        ),
+      );
       final conversation = await service.createConversation();
+      final portProbe = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
+      final apiPort = portProbe.port;
+      await portProbe.close();
       final pod = await startControlServer(
         token: token,
         chatService: service,
         defaultConversationId: conversation.id,
-        apiPort: 0,
+        modelProvider: 'gemini',
+        modelName: defaultGeminiModel,
+        apiPort: apiPort,
         runInGuardedZone: false,
       );
       addTearDown(() async {
@@ -36,6 +53,7 @@ void main() {
 
       expect(exitCode, 0);
       expect(io.errors, isEmpty);
+      expect(io.output.join(), contains('gemini · gemini-3.7-flash'));
       expect(io.output.join(), contains('[you] Inspect the workspace'));
       expect(io.output.join(), contains('[list_files] list_files started'));
       expect(io.output.join(), contains('[dextero] Workspace\nready'));
@@ -58,46 +76,68 @@ void main() {
   );
 }
 
-final class _AcceptanceAgent implements ConversationAgent {
+final class _AcceptanceGeminiTransport implements GeminiTransport {
+  var _turn = 0;
+
   @override
-  Future<ConversationAgentResult> run(
-    String prompt, {
-    required ConversationAgentEventSink onEvent,
-    required CancellationToken cancellationToken,
+  Future<JsonMap> generateContent({
+    required String model,
+    required JsonMap request,
   }) async {
-    await onEvent(
-      ConversationAgentEvent(
-        kind: ConversationAgentEventKind.lifecycle,
-        summary: SafeMetadata.text('Codex is working'),
-      ),
-    );
-    await onEvent(
-      ConversationAgentEvent(
-        kind: ConversationAgentEventKind.toolCallStarted,
-        summary: SafeMetadata.toolCall('list_files', const {}),
-        toolCallId: 'acceptance-tool-1',
-        toolName: 'list_files',
-      ),
-    );
-    await onEvent(
-      ConversationAgentEvent(
-        kind: ConversationAgentEventKind.toolCallCompleted,
-        summary: SafeMetadata.toolResult('list_files', const {
-          'entries': <Object>[],
-        }, success: true),
-        toolCallId: 'acceptance-tool-1',
-        toolName: 'list_files',
-        success: true,
-      ),
-    );
-    await onEvent(
-      ConversationAgentEvent(
-        kind: ConversationAgentEventKind.assistantMessage,
-        summary: SafeMetadata.message('Workspace\nready'),
-      ),
-    );
-    return const ConversationAgentResult(output: 'Workspace\nready');
+    if (_turn++ == 0) {
+      return {
+        'candidates': [
+          {
+            'content': {
+              'parts': [
+                {
+                  'functionCall': {
+                    'id': 'acceptance-tool-1',
+                    'name': 'list_files',
+                    'args': <String, Object?>{},
+                  },
+                  'thoughtSignature': 'acceptance-signature',
+                },
+              ],
+            },
+          },
+        ],
+      };
+    }
+    final contents = request['contents']! as List;
+    final toolResponse =
+        ((((contents.last as Map)['parts'] as List).single
+                as Map)['functionResponse']
+            as Map);
+    expect(toolResponse['id'], 'acceptance-tool-1');
+    return {
+      'candidates': [
+        {
+          'content': {
+            'parts': [
+              {'text': 'Workspace\nready'},
+            ],
+          },
+        },
+      ],
+    };
   }
+}
+
+final class _AcceptanceListFilesTool implements Tool {
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'list_files',
+    description: 'List workspace files.',
+    inputSchema: {'type': 'object', 'additionalProperties': false},
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) => const {'entries': <Object>[]};
 }
 
 final class _AcceptanceIo implements TerminalIo {

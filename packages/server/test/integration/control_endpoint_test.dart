@@ -4,6 +4,7 @@ import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:dextero_server/src/auth/dextero_token_authenticator.dart';
 import 'package:dextero_server/src/control/chat_runtime.dart';
 import 'package:dextero_server/src/generated/protocol.dart';
+import 'package:serverpod/serverpod.dart' show ServerConfig, ServerpodConfig;
 import 'package:test/test.dart';
 
 import 'test_tools/serverpod_test_tools.dart';
@@ -61,6 +62,8 @@ void main() {
       expect(status.retentionNotice, contains('server restarts'));
       expect(status.databaseRequired, isFalse);
       expect(status.streamingAvailable, isTrue);
+      expect(status.modelProvider, 'codex');
+      expect(status.modelName, 'default');
       expect(status.startedAt.isUtc, isTrue);
     });
 
@@ -165,8 +168,17 @@ void main() {
           );
       expect(terminal.content, 'Response cancelled');
     });
-  });
+  }, configOverride: _useEphemeralApiPort);
 }
+
+ServerpodConfig _useEphemeralApiPort(ServerpodConfig config) => config.copyWith(
+  apiServer: ServerConfig(
+    port: 0,
+    publicHost: 'localhost',
+    publicPort: 0,
+    publicScheme: 'http',
+  ),
+);
 
 final class _CancellableConversationAgent implements core.ConversationAgent {
   final started = Completer<void>();

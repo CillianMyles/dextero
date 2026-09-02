@@ -25,6 +25,7 @@ void main() {
     expect(find.byKey(const Key('empty-history')), findsOneWidget);
     expect(find.text('Until restart'), findsOneWidget);
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
+    expect(find.text('Gemini · gemini-3.7-flash'), findsOneWidget);
   });
 
   testWidgets('keeps the connected chat controls usable at phone width', (
@@ -154,7 +155,7 @@ void main() {
       expect(find.text('Warning'), findsOneWidget);
       expect(find.text('Truncated'), findsOneWidget);
       expect(find.text('2026-09-01 19:57:21 UTC'), findsOneWidget);
-      expect(find.text('• Codex'), findsOneWidget);
+      expect(find.text('• Model'), findsOneWidget);
       expect(find.text('run-7'), findsNothing);
       expect(find.text('call-7'), findsNothing);
 
@@ -416,6 +417,8 @@ HostStatus _status() => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
+  modelProvider: 'gemini',
+  modelName: 'gemini-3.7-flash',
 );
 
 ChatSubmission _submission(String message) => ChatSubmission(
@@ -456,7 +459,7 @@ ChatEntry _entry({
   correlationId: correlationId,
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
-      : ChatEntrySource.codex,
+      : ChatEntrySource.model,
   truncated: truncated,
   runId: runId,
   toolCallId: toolCallId,

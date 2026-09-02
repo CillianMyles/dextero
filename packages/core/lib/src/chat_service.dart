@@ -199,7 +199,7 @@ final class ChatService {
           kind: ChatEntryKind.assistantMessage,
           status: ChatEntryStatus.completed,
           content: output.text,
-          source: ChatEntrySource.codex,
+          source: ChatEntrySource.model,
           truncated: output.truncated,
         );
       }
@@ -298,7 +298,7 @@ final class ChatService {
       kind: kind,
       status: status,
       content: event.summary.text,
-      source: ChatEntrySource.codex,
+      source: ChatEntrySource.model,
       truncated: event.summary.truncated,
       toolCallId: event.toolCallId == null
           ? null

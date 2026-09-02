@@ -16,7 +16,7 @@ import 'package:serverpod/serverpod.dart' as _i1;
 enum ChatEntrySource implements _i1.SerializableModel {
   user,
   dextero,
-  codex;
+  model;
 
   static ChatEntrySource fromJson(String name) {
     switch (name) {
@@ -24,8 +24,8 @@ enum ChatEntrySource implements _i1.SerializableModel {
         return ChatEntrySource.user;
       case 'dextero':
         return ChatEntrySource.dextero;
-      case 'codex':
-        return ChatEntrySource.codex;
+      case 'model':
+        return ChatEntrySource.model;
       default:
         throw ArgumentError(
           'Value "$name" cannot be converted to "ChatEntrySource"',

@@ -24,6 +24,8 @@ abstract class HostStatus
     required this.retentionNotice,
     required this.databaseRequired,
     required this.streamingAvailable,
+    required this.modelProvider,
+    required this.modelName,
   });
 
   factory HostStatus({
@@ -35,6 +37,8 @@ abstract class HostStatus
     required String retentionNotice,
     required bool databaseRequired,
     required bool streamingAvailable,
+    required String modelProvider,
+    required String modelName,
   }) = _HostStatusImpl;
 
   factory HostStatus.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -53,6 +57,8 @@ abstract class HostStatus
       streamingAvailable: _i1.BoolJsonExtension.fromJson(
         jsonSerialization['streamingAvailable'],
       ),
+      modelProvider: jsonSerialization['modelProvider'] as String,
+      modelName: jsonSerialization['modelName'] as String,
     );
   }
 
@@ -72,6 +78,10 @@ abstract class HostStatus
 
   bool streamingAvailable;
 
+  String modelProvider;
+
+  String modelName;
+
   /// Returns a shallow copy of this [HostStatus]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -84,6 +94,8 @@ abstract class HostStatus
     String? retentionNotice,
     bool? databaseRequired,
     bool? streamingAvailable,
+    String? modelProvider,
+    String? modelName,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -97,6 +109,8 @@ abstract class HostStatus
       'retentionNotice': retentionNotice,
       'databaseRequired': databaseRequired,
       'streamingAvailable': streamingAvailable,
+      'modelProvider': modelProvider,
+      'modelName': modelName,
     };
   }
 
@@ -112,6 +126,8 @@ abstract class HostStatus
       'retentionNotice': retentionNotice,
       'databaseRequired': databaseRequired,
       'streamingAvailable': streamingAvailable,
+      'modelProvider': modelProvider,
+      'modelName': modelName,
     };
   }
 
@@ -131,6 +147,8 @@ class _HostStatusImpl extends HostStatus {
     required String retentionNotice,
     required bool databaseRequired,
     required bool streamingAvailable,
+    required String modelProvider,
+    required String modelName,
   }) : super._(
          name: name,
          version: version,
@@ -140,6 +158,8 @@ class _HostStatusImpl extends HostStatus {
          retentionNotice: retentionNotice,
          databaseRequired: databaseRequired,
          streamingAvailable: streamingAvailable,
+         modelProvider: modelProvider,
+         modelName: modelName,
        );
 
   /// Returns a shallow copy of this [HostStatus]
@@ -155,6 +175,8 @@ class _HostStatusImpl extends HostStatus {
     String? retentionNotice,
     bool? databaseRequired,
     bool? streamingAvailable,
+    String? modelProvider,
+    String? modelName,
   }) {
     return HostStatus(
       name: name ?? this.name,
@@ -165,6 +187,8 @@ class _HostStatusImpl extends HostStatus {
       retentionNotice: retentionNotice ?? this.retentionNotice,
       databaseRequired: databaseRequired ?? this.databaseRequired,
       streamingAvailable: streamingAvailable ?? this.streamingAvailable,
+      modelProvider: modelProvider ?? this.modelProvider,
+      modelName: modelName ?? this.modelName,
     );
   }
 }

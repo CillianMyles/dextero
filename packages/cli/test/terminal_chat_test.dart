@@ -257,6 +257,8 @@ HostStatus _status() => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
+  modelProvider: 'gemini',
+  modelName: 'gemini-3.7-flash',
 );
 
 ChatEntry _entry({
@@ -276,7 +278,7 @@ ChatEntry _entry({
   correlationId: 'cli-test-1',
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
-      : ChatEntrySource.codex,
+      : ChatEntrySource.model,
   truncated: false,
   runId: 'run-1',
 );

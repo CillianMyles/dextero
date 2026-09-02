@@ -35,13 +35,20 @@ final class ToolCall {
     required this.id,
     required this.name,
     required this.arguments,
+    this.providerMetadata = const {},
   });
 
   final String id;
   final String name;
   final JsonMap arguments;
+  final JsonMap providerMetadata;
 
-  JsonMap toJson() => {'id': id, 'name': name, 'arguments': arguments};
+  JsonMap toJson() => {
+    'id': id,
+    'name': name,
+    'arguments': arguments,
+    if (providerMetadata.isNotEmpty) 'providerMetadata': providerMetadata,
+  };
 }
 
 final class ToolResult {

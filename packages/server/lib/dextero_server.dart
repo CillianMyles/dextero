@@ -4,11 +4,14 @@ import 'package:dextero_core/dextero_core.dart';
 import 'package:serverpod/serverpod.dart';
 
 import 'src/auth/dextero_token_authenticator.dart';
+import 'src/control/agent_runtime_configuration.dart';
 import 'src/control/chat_runtime.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 
 export 'src/control/chat_runtime.dart' show ChatRuntime;
+export 'src/control/agent_runtime_configuration.dart'
+    show AgentProvider, AgentRuntimeConfiguration;
 
 /// Starts the database-free local control plane.
 Future<void> run(List<String> arguments) async {
@@ -23,19 +26,13 @@ Future<void> run(List<String> arguments) async {
   final workspace = Directory(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
   ).absolute.path;
+  final agentConfiguration = AgentRuntimeConfiguration.fromEnvironment(
+    Platform.environment,
+  );
   final store = InMemoryChatHistoryStore();
   final service = ChatService(
     store: store,
-    agent: CodexConversationAgent(
-      agent: CodexAppServerAgent(workingDirectory: workspace),
-      tools: [
-        ListFilesTool(root: workspace),
-        ReadFileTool(root: workspace),
-        EditFileTool(root: workspace),
-        RunCommandTool(workingDirectory: workspace),
-        RunShellTool(workingDirectory: workspace),
-      ],
-    ),
+    agent: agentConfiguration.createAgent(workspace: workspace),
   );
   final conversation = await service.createConversation();
   await startControlServer(
@@ -43,6 +40,8 @@ Future<void> run(List<String> arguments) async {
     token: token,
     chatService: service,
     defaultConversationId: conversation.id,
+    modelProvider: agentConfiguration.providerName,
+    modelName: agentConfiguration.modelName,
   );
 }
 
@@ -57,6 +56,8 @@ Future<Serverpod> startControlServer({
   List<String> arguments = const [],
   int? apiPort,
   bool runInGuardedZone = true,
+  String modelProvider = 'codex',
+  String modelName = 'default',
 }) async {
   if (token.length < 32) {
     throw ArgumentError.value(
@@ -68,6 +69,8 @@ Future<Serverpod> startControlServer({
   ChatRuntime.configure(
     chatService: chatService,
     defaultConversationId: defaultConversationId,
+    modelProvider: modelProvider,
+    modelName: modelName,
   );
   final config = apiPort == null
       ? null

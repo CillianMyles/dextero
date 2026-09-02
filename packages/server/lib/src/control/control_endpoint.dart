@@ -23,6 +23,8 @@ final class ControlEndpoint extends Endpoint {
     retentionNotice: 'History is retained only until the server restarts.',
     databaseRequired: false,
     streamingAvailable: true,
+    modelProvider: ChatRuntime.modelProvider,
+    modelName: ChatRuntime.modelName,
   );
 
   /// Canonically accepts a user message before starting assistant work.
