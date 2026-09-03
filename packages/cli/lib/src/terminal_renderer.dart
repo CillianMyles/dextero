@@ -28,7 +28,11 @@ final class TerminalRenderer {
     }
     final runId = safeText(entry.runId!);
     final approvalId = safeText(entry.approvalId!);
+    final truncationWarning = entry.truncated
+        ? 'WARNING: Approval preview truncated; part of the proposed edit is not shown.\n'
+        : '';
     return '$content\n'
+        '$truncationWarning'
         'Run ID: $runId\n'
         'Approval ID: $approvalId\n'
         'Approve: make approve RUN_ID=$runId APPROVAL_ID=$approvalId';

@@ -73,7 +73,7 @@ void main() {
     expect(client.requests, isEmpty);
   });
 
-  test('shows how to resume a pending approval', () async {
+  test('shows how to resume a truncated pending approval', () async {
     final tester = await nocterm.NoctermTester.create(
       size: const nocterm.Size(110, 24),
     );
@@ -87,6 +87,7 @@ void main() {
           status: ChatEntryStatus.pending,
           content: 'edit_file requires approval for README.md',
           approvalId: 'approval-7',
+          truncated: true,
         ),
       ],
     );
@@ -103,6 +104,12 @@ void main() {
     expect(
       tester.terminalState.containsText(
         'make approve RUN_ID=run-1 APPROVAL_ID=approval-7',
+      ),
+      isTrue,
+    );
+    expect(
+      tester.terminalState.containsText(
+        'WARNING: Approval preview truncated; part of the proposed edit is not shown.',
       ),
       isTrue,
     );
@@ -254,6 +261,7 @@ ChatEntry _entry({
   required ChatEntryStatus status,
   required String content,
   String? approvalId,
+  bool truncated = false,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: id,
@@ -266,7 +274,7 @@ ChatEntry _entry({
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
       : ChatEntrySource.model,
-  truncated: false,
+  truncated: truncated,
   runId: 'run-1',
   approvalId: approvalId,
 );

@@ -35,6 +35,26 @@ void main() {
     );
   });
 
+  test('warns when a pending approval preview is truncated', () {
+    final entry = _entry(
+      sequence: 4,
+      kind: ChatEntryKind.approval,
+      status: ChatEntryStatus.pending,
+      content: 'edit_file requires approval for "very-long-path"',
+      approvalId: 'approval-8',
+      truncated: true,
+    );
+
+    final rendered = const TerminalRenderer().plainEntryLine(entry);
+
+    expect(
+      rendered,
+      contains(
+        'WARNING: Approval preview truncated; part of the proposed edit is not shown.',
+      ),
+    );
+  });
+
   test('removes terminal control sequences from history content', () {
     final entry = _entry(
       sequence: 0,
@@ -57,6 +77,7 @@ ChatEntry _entry({
   required String content,
   String? toolName,
   String? approvalId,
+  bool truncated = false,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: 'entry-$sequence',
@@ -69,7 +90,7 @@ ChatEntry _entry({
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
       : ChatEntrySource.model,
-  truncated: false,
+  truncated: truncated,
   runId: 'run-1',
   toolName: toolName,
   approvalId: approvalId,
