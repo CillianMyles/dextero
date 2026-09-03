@@ -133,6 +133,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
         ChatSubmitRequest(
           conversationId: status.conversationId,
           message: message,
+          modelName: status.modelName,
           correlationId: component.correlationIdFactory(),
         ),
       );

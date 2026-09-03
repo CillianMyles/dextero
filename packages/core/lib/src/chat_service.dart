@@ -70,18 +70,23 @@ final class ChatService {
     required ConversationAgent agent,
     IdentifierGenerator? identifiers,
   }) : _store = store,
-       _agent = agent,
+       _defaultAgent = agent,
        _identifiers = identifiers ?? SecureIdentifierGenerator();
 
   final ChatHistoryStore _store;
-  ConversationAgent _agent;
+  final ConversationAgent _defaultAgent;
   final IdentifierGenerator _identifiers;
+  final Map<String, ConversationAgent> _agents = {};
   final Map<String, _ActiveRun> _activeRuns = {};
   Future<void> _submissionLock = Future.value();
 
   ChatHistoryStore get store => _store;
 
-  Future<ChatConversation> createConversation() => _store.createConversation();
+  Future<ChatConversation> createConversation() async {
+    final conversation = await _store.createConversation();
+    _agents[conversation.id] = _defaultAgent;
+    return conversation;
+  }
 
   /// Replaces the conversation agent before the first message is accepted.
   Future<void> selectAgent({
@@ -97,7 +102,7 @@ final class ChatService {
         'The model can only be changed before the first message.',
       );
     }
-    _agent = agent;
+    _agents[conversationId] = agent;
   });
 
   Future<ChatSubmission> submit({
@@ -123,6 +128,7 @@ final class ChatService {
           'A response is already running for this conversation.',
         );
       }
+      final agent = _agents[conversationId] ?? _defaultAgent;
 
       final runId = _identifiers.next('run');
       final effectiveCorrelationId = _normalizeCorrelationId(correlationId);
@@ -147,6 +153,7 @@ final class ChatService {
         runId: runId,
         correlationId: effectiveCorrelationId,
         prompt: normalized,
+        agent: agent,
         cancellationToken: cancellation.token,
       );
       unawaited(completion);
@@ -176,6 +183,7 @@ final class ChatService {
     required String runId,
     required String correlationId,
     required String prompt,
+    required ConversationAgent agent,
     required CancellationToken cancellationToken,
   }) async {
     var assistantRecorded = false;
@@ -191,7 +199,7 @@ final class ChatService {
         source: ChatEntrySource.dextero,
       );
       cancellationToken.throwIfCancellationRequested();
-      final result = await _agent.run(
+      final result = await agent.run(
         prompt,
         cancellationToken: cancellationToken,
         onEvent: (event) async {

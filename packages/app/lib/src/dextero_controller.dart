@@ -202,6 +202,7 @@ final class DexteroController extends ChangeNotifier {
         ChatSubmitRequest(
           conversationId: status.conversationId,
           message: normalized,
+          modelName: status.modelName,
           correlationId: _correlationIdFactory(),
         ),
       );

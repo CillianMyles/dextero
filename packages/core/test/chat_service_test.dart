@@ -186,6 +186,46 @@ void main() {
     await _waitForTerminal(store, conversation.id, submission.runId);
   });
 
+  test('scopes selected agents to their conversation', () async {
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final service = ChatService(store: store, agent: _StaticAgent('initial'));
+    final firstConversation = await service.createConversation();
+    final secondConversation = await service.createConversation();
+
+    final firstSubmission = await service.submit(
+      conversationId: firstConversation.id,
+      message: 'first',
+    );
+    await _waitForTerminal(store, firstConversation.id, firstSubmission.runId);
+    await service.selectAgent(
+      conversationId: secondConversation.id,
+      agent: _StaticAgent('selected'),
+    );
+
+    final nextFirstSubmission = await service.submit(
+      conversationId: firstConversation.id,
+      message: 'first again',
+    );
+    final secondSubmission = await service.submit(
+      conversationId: secondConversation.id,
+      message: 'second',
+    );
+    await Future.wait([
+      _waitForTerminal(store, firstConversation.id, nextFirstSubmission.runId),
+      _waitForTerminal(store, secondConversation.id, secondSubmission.runId),
+    ]);
+
+    final firstOutputs = (await store.history(firstConversation.id))
+        .where((entry) => entry.kind == ChatEntryKind.assistantMessage)
+        .map((entry) => entry.content);
+    final secondOutput = (await store.history(
+      secondConversation.id,
+    )).singleWhere((entry) => entry.kind == ChatEntryKind.assistantMessage);
+    expect(firstOutputs, ['initial', 'initial']);
+    expect(secondOutput.content, 'selected');
+  });
+
   test(
     'cancels the active run and records a clean terminal lifecycle',
     () async {
