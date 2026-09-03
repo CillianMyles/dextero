@@ -418,7 +418,9 @@ void main() {
           entryId: 'entry-approval-pending',
           kind: ChatEntryKind.approval,
           status: ChatEntryStatus.pending,
-          content: 'edit_file started for README.md',
+          content:
+              'edit_file requires approval for README.md\n'
+              '--- old text\n-old\n+++ new text\n+new',
           toolCallId: 'edit-call-1',
           toolName: 'edit_file',
           approvalId: 'approval-1',
@@ -433,7 +435,13 @@ void main() {
 
     expect(find.byKey(const Key('approval-prompt')), findsOneWidget);
     expect(find.text('Approval required'), findsNWidgets(2));
-    expect(find.text('edit_file started for README.md'), findsNWidgets(2));
+    expect(
+      find.text(
+        'edit_file requires approval for README.md\n'
+        '--- old text\n-old\n+++ new text\n+new',
+      ),
+      findsNWidgets(2),
+    );
 
     await tester.tap(find.byKey(const Key('approve-work')));
     await tester.pumpAndSettle();

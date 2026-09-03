@@ -12,11 +12,27 @@ final class TerminalRenderer {
       ChatEntryKind.toolOutput ||
       ChatEntryKind.toolResult => entry.toolName ?? entry.kind.name,
       ChatEntryKind.approval => 'approval',
-      ChatEntryKind.approval => 'approval',
       ChatEntryKind.lifecycle => entry.status.name,
       ChatEntryKind.error => 'error',
     };
-    return '[${safeText(label)}] ${safeText(entry.content)}';
+    return '[${safeText(label)}] ${entryContent(entry)}';
+  }
+
+  String entryContent(ChatEntry entry) {
+    final content = safeText(entry.content);
+    if (entry.kind != ChatEntryKind.approval ||
+        entry.status != ChatEntryStatus.pending ||
+        entry.runId == null ||
+        entry.approvalId == null) {
+      return content;
+    }
+    final runId = safeText(entry.runId!);
+    final approvalId = safeText(entry.approvalId!);
+    return '$content\n'
+        'Run ID: $runId\n'
+        'Approval ID: $approvalId\n'
+        'Approve: dart run packages/cli/bin/dextero.dart '
+        '--approve $runId $approvalId';
   }
 
   String safeText(String value) => value

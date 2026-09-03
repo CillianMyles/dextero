@@ -295,8 +295,10 @@ final class _ApprovalConversationAgent
       core.ToolApprovalRequest(
         toolCallId: 'endpoint-edit-1',
         toolName: 'edit_file',
-        summary: core.SafeMetadata.toolCall('edit_file', const {
+        summary: core.SafeMetadata.approvalRequest('edit_file', const {
           'path': 'README.md',
+          'oldText': 'old',
+          'newText': 'new',
         }),
       ),
     );

@@ -331,8 +331,10 @@ final class _ApprovalAgent
       ToolApprovalRequest(
         toolCallId: 'call-edit-1',
         toolName: 'edit_file',
-        summary: SafeMetadata.toolCall('edit_file', const {
+        summary: SafeMetadata.approvalRequest('edit_file', const {
           'path': 'README.md',
+          'oldText': 'old',
+          'newText': 'new',
         }),
       ),
     );

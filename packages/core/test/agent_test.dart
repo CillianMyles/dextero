@@ -99,7 +99,11 @@ void main() {
           ToolCall(
             id: 'call-edit-1',
             name: 'edit_file',
-            arguments: {'path': 'README.md'},
+            arguments: {
+              'path': 'README.md',
+              'oldText': 'old heading',
+              'newText': 'new heading',
+            },
           ),
         ],
       ),
@@ -121,7 +125,9 @@ void main() {
     final request = await requested.future;
 
     expect(request.toolCallId, 'call-edit-1');
-    expect(request.summary.text, 'edit_file started for README.md');
+    expect(request.summary.text, contains('edit_file requires approval'));
+    expect(request.summary.text, contains('-old heading'));
+    expect(request.summary.text, contains('+new heading'));
     expect(tool.calls, 0);
 
     approval.complete(true);

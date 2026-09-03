@@ -112,7 +112,15 @@ void main() {
       expect(io.output.join(), contains('[dextero] Workspace\nready'));
       expect(
         io.output.join(),
-        contains('[approval] edit_file started for README.md'),
+        contains('[approval] edit_file requires approval for README.md'),
+      );
+      expect(io.output.join(), contains('--- old text\n-old'));
+      expect(io.output.join(), contains('+++ new text\n+new'));
+      expect(io.output.join(), contains('Run ID: ${pending.runId}'));
+      expect(io.output.join(), contains('Approval ID: ${pending.approvalId}'));
+      expect(
+        io.output.join(),
+        contains('--approve ${pending.runId} ${pending.approvalId}'),
       );
       expect(io.output.join(), contains('[approval] edit_file approved'));
       expect(editTool.calls, 1);

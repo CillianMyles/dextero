@@ -171,7 +171,7 @@ final class AgentLoop {
         ToolApprovalRequest(
           toolCallId: call.id,
           toolName: call.name,
-          summary: SafeMetadata.toolCall(call.name, call.arguments),
+          summary: SafeMetadata.approvalRequest(call.name, call.arguments),
         ),
       );
       cancellationToken?.throwIfCancellationRequested();

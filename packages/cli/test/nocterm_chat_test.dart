@@ -73,6 +73,39 @@ void main() {
     expect(client.requests, isEmpty);
   });
 
+  test('shows how to resume a pending approval', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(110, 24),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient(
+      historyEntries: [
+        _entry(
+          sequence: 0,
+          id: 'approval-pending',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.pending,
+          content: 'edit_file requires approval for README.md',
+          approvalId: 'approval-7',
+        ),
+      ],
+    );
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.terminalState.containsText('Run ID: run-1'), isTrue);
+    expect(
+      tester.terminalState.containsText('Approval ID: approval-7'),
+      isTrue,
+    );
+    expect(
+      tester.terminalState.containsText('--approve run-1 approval-7'),
+      isTrue,
+    );
+  });
+
   test('keeps Ctrl+C active while a response stream is pending', () async {
     final tester = await nocterm.NoctermTester.create();
     addTearDown(tester.dispose);
@@ -117,6 +150,13 @@ final class _FakeClient implements TerminalChatClient {
 
   @override
   Future<bool> cancelRun(String conversationId, String runId) async => true;
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async => true;
 
   @override
   Future<List<ChatEntry>> history(String conversationId) async => [
@@ -185,6 +225,7 @@ ChatEntry _entry({
   required ChatEntryKind kind,
   required ChatEntryStatus status,
   required String content,
+  String? approvalId,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: id,
@@ -199,4 +240,5 @@ ChatEntry _entry({
       : ChatEntrySource.model,
   truncated: false,
   runId: 'run-1',
+  approvalId: approvalId,
 );

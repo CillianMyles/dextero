@@ -490,7 +490,7 @@ final class CodexAppServerAgent {
                   ToolApprovalRequest(
                     toolCallId: callId,
                     toolName: name,
-                    summary: SafeMetadata.toolCall(name, arguments),
+                    summary: SafeMetadata.approvalRequest(name, arguments),
                   ),
                 );
             cancellationToken?.throwIfCancellationRequested();

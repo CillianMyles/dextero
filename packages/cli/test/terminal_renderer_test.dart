@@ -16,6 +16,28 @@ void main() {
     );
   });
 
+  test('renders pending approval identifiers and the resume command', () {
+    final entry = _entry(
+      sequence: 3,
+      kind: ChatEntryKind.approval,
+      status: ChatEntryStatus.pending,
+      content: 'edit_file requires approval for README.md',
+      approvalId: 'approval-7',
+    );
+
+    final rendered = const TerminalRenderer().plainEntryLine(entry);
+
+    expect(rendered, contains('Run ID: run-1'));
+    expect(rendered, contains('Approval ID: approval-7'));
+    expect(
+      rendered,
+      contains(
+        'dart run packages/cli/bin/dextero.dart '
+        '--approve run-1 approval-7',
+      ),
+    );
+  });
+
   test('removes terminal control sequences from history content', () {
     final entry = _entry(
       sequence: 0,
@@ -37,6 +59,7 @@ ChatEntry _entry({
   required ChatEntryStatus status,
   required String content,
   String? toolName,
+  String? approvalId,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: 'entry-$sequence',
@@ -52,4 +75,5 @@ ChatEntry _entry({
   truncated: false,
   runId: 'run-1',
   toolName: toolName,
+  approvalId: approvalId,
 );
