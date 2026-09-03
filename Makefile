@@ -138,13 +138,10 @@ app-ios dev-ios: validate-ios-control-url
 
 validate-ios-control-url:
 	@url="$(CONTROL_URL)"; \
-	if [[ "$$url" =~ ^https:// ]] || \
-	   [[ "$$url" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$$ ]] || \
-	   [[ "$$url" =~ ^http://\[::1\](:[0-9]+)?(/.*)?$$ ]]; then \
+	if [[ "$$url" =~ ^https:// ]]; then \
 	  exit 0; \
 	fi; \
-	echo "iOS CONTROL_URL must use HTTPS or an HTTP loopback host for the simulator."; \
-	exit 2
+	$(DART) run tool/validate_ios_control_url.dart "$$url"
 
 app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }

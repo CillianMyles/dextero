@@ -60,7 +60,13 @@ void main() {
   });
 
   test('iOS validation accepts the derived IPv6 loopback URL', () async {
-    for (final bindAddress in ['::1', '::']) {
+    for (final bindAddress in [
+      '::1',
+      '0::1',
+      '0:0:0::0:1',
+      '0:0:0:0:0:0:0:1',
+      '::',
+    ]) {
       final result = await _validateIosControlUrl(bindAddress: bindAddress);
 
       expect(
