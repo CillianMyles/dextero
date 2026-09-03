@@ -103,6 +103,7 @@ final class DexteroController extends ChangeNotifier {
   final List<ChatEntry> _entries = [];
   final Set<String> _terminalRunIds = {};
   final Set<String> _locallyResolvedApprovalIds = {};
+  final Set<String> _locallyCancelledRunIds = {};
   StreamSubscription<ChatEntry>? _historySubscription;
   HostStatus? _hostStatus;
   ChatLoadState _loadState = ChatLoadState.loading;
@@ -122,7 +123,11 @@ final class DexteroController extends ChangeNotifier {
   bool get approving => _approving;
   bool get selectingModel => _selectingModel;
   bool get busy => _submitting || _activeRunId != null;
-  bool get canCancel => _activeRunId != null && !_cancelling && !_approving;
+  bool get canCancel =>
+      _activeRunId != null &&
+      !_locallyCancelledRunIds.contains(_activeRunId) &&
+      !_cancelling &&
+      !_approving;
   bool get canApprove => pendingApproval != null && !_cancelling && !_approving;
   bool get canSubmit => _hostStatus != null && !busy && !_selectingModel;
   bool get canSelectModel =>
@@ -145,6 +150,7 @@ final class DexteroController extends ChangeNotifier {
       if (entry.kind == ChatEntryKind.approval &&
           entry.status == ChatEntryStatus.pending &&
           entry.approvalId != null &&
+          !_locallyCancelledRunIds.contains(entry.runId) &&
           !resolved.contains(entry.approvalId)) {
         return entry;
       }
@@ -194,27 +200,7 @@ final class DexteroController extends ChangeNotifier {
       if (!accepted) {
         _error = 'The run had already finished before cancellation.';
       } else {
-        final resolvedApprovalIds = _entries
-            .where(
-              (entry) =>
-                  entry.kind == ChatEntryKind.approval &&
-                  entry.status != ChatEntryStatus.pending,
-            )
-            .map((entry) => entry.approvalId)
-            .whereType<String>()
-            .toSet();
-        _locallyResolvedApprovalIds.addAll(
-          _entries
-              .where(
-                (entry) =>
-                    entry.runId == runId &&
-                    entry.kind == ChatEntryKind.approval &&
-                    entry.status == ChatEntryStatus.pending &&
-                    entry.approvalId != null &&
-                    !resolvedApprovalIds.contains(entry.approvalId),
-              )
-              .map((entry) => entry.approvalId!),
-        );
+        _locallyCancelledRunIds.add(runId);
       }
       return accepted;
     } on Object catch (error) {

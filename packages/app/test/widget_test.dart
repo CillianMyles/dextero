@@ -408,9 +408,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.cancellations, [('conversation-1', 'run-1')]);
+    expect(controller.canCancel, isFalse);
+    expect(await controller.cancelActiveRun(), isFalse);
+    expect(api.cancellations, hasLength(1));
     api.emit(
       _entry(
         sequence: 2,
+        entryId: 'entry-delayed-approval',
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.pending,
+        content: 'edit_file requires approval for README.md',
+        toolCallId: 'edit-call-delayed',
+        toolName: 'edit_file',
+        approvalId: 'approval-delayed',
+        family: ChatEventFamily.approval,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.pendingApproval, isNull);
+    expect(controller.canApprove, isFalse);
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, isEmpty);
+    api.emit(
+      _entry(
+        sequence: 3,
         entryId: 'entry-cancelled',
         kind: ChatEntryKind.lifecycle,
         status: ChatEntryStatus.cancelled,
