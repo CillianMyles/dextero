@@ -20,8 +20,12 @@ Future<int> run(List<String> arguments) async {
       Platform.environment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/';
   final jsonl = arguments.isNotEmpty && arguments.first == '--jsonl';
   final effectiveArguments = jsonl ? arguments.skip(1).toList() : arguments;
+  final client = ServerpodTerminalChatClient(serverUrl: rawUrl, token: token);
+  if (io.hasTerminal && !jsonl && effectiveArguments.isEmpty) {
+    return runNoctermChat(client: client);
+  }
   final chat = TerminalChat(
-    client: ServerpodTerminalChatClient(serverUrl: rawUrl, token: token),
+    client: client,
     io: io,
     outputMode: jsonl ? TerminalOutputMode.jsonl : TerminalOutputMode.human,
   );

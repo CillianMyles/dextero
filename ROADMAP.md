@@ -15,6 +15,7 @@ Milestones are directional, not release-date promises.
 - [x] Deterministic demos and focused tool/protocol tests
 - [x] Native Dart AOT compilation spike
 - [x] Initial macOS Flutter app and terminal-client control-plane spike
+- [x] Nocterm full-screen terminal UI spike
 
 ## Milestone 1 — chat and typed control backbone
 
