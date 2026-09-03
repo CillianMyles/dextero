@@ -44,6 +44,20 @@ void main() {
     },
   );
 
+  test('selects the requested model before loading history', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: client,
+      io: io,
+    ).run(initialMessage: 'Do the work', modelName: 'gemini-pro');
+
+    expect(result, 0);
+    expect(client.modelSelections, ['gemini-pro']);
+    expect(io.output.join(), contains('gemini · gemini-pro'));
+  });
+
   test(
     'reports client errors through the deterministic error stream',
     () async {
@@ -121,6 +135,7 @@ final class _FakeClient implements TerminalChatClient {
   final cursors = <int>[];
   bool closed = false;
   final cancellations = <(String, String)>[];
+  final modelSelections = <String>[];
 
   @override
   Future<void> close() async {
@@ -140,6 +155,12 @@ final class _FakeClient implements TerminalChatClient {
   Future<HostStatus> status() async {
     if (statusError != null) throw statusError!;
     return _status();
+  }
+
+  @override
+  Future<HostStatus> selectModel(String modelName) async {
+    modelSelections.add(modelName);
+    return _status(modelName: modelName);
   }
 
   @override
@@ -251,7 +272,7 @@ final class _FakeIo implements TerminalIo {
   void writeln(String value) => output.add('$value\n');
 }
 
-HostStatus _status() => HostStatus(
+HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
   startedAt: DateTime.utc(2026),
@@ -261,7 +282,8 @@ HostStatus _status() => HostStatus(
   databaseRequired: false,
   streamingAvailable: true,
   modelProvider: 'gemini',
-  modelName: 'gemini-2.5-flash',
+  modelName: modelName,
+  availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
 );
 
 ChatEntry _entry({

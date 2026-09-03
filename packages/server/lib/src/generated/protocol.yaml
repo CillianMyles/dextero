@@ -1,5 +1,6 @@
 control:
   - status:
+  - selectModel:
   - submitMessage:
   - cancelRun:
   - history:

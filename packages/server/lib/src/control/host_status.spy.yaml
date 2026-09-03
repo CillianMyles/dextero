@@ -10,3 +10,4 @@ fields:
   streamingAvailable: bool
   modelProvider: String
   modelName: String
+  availableModels: List<String>

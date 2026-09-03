@@ -3,6 +3,12 @@ SHELL := bash.exe
 else
 SHELL := /bin/bash
 endif
+
+ENV_FILE ?= .env
+-include $(ENV_FILE)
+export DEXTERO_MODEL_PROVIDER DEXTERO_CODEX_MODEL DEXTERO_CODEX_MODELS
+export GEMINI_API_KEY DEXTERO_GEMINI_MODEL DEXTERO_GEMINI_MODELS
+
 .DEFAULT_GOAL := help
 
 DART ?= dart
@@ -151,7 +157,8 @@ app-windows: ## Run the Flutter Windows client (start the server separately).
 cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
 	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
-	 $(DART) run packages/cli/bin/dextero.dart $(if $(PROMPT),"$(PROMPT)",)
+	 $(DART) run packages/cli/bin/dextero.dart \
+	 $(if $(MODEL),--model "$(MODEL)",) $(if $(PROMPT),"$(PROMPT)",)
 
 core: ## Run the core directly through the configured provider without Serverpod.
 	@$(DART) run packages/core/bin/dextero_core.dart $(if $(PROMPT),"$(PROMPT)",)

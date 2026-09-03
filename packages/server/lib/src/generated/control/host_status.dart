@@ -12,6 +12,7 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod/serverpod.dart' as _i1;
+import 'package:dextero_server/src/generated/protocol.dart' as _i2;
 
 abstract class HostStatus
     implements _i1.SerializableModel, _i1.ProtocolSerialization {
@@ -26,6 +27,7 @@ abstract class HostStatus
     required this.streamingAvailable,
     required this.modelProvider,
     required this.modelName,
+    required this.availableModels,
   });
 
   factory HostStatus({
@@ -39,6 +41,7 @@ abstract class HostStatus
     required bool streamingAvailable,
     required String modelProvider,
     required String modelName,
+    required List<String> availableModels,
   }) = _HostStatusImpl;
 
   factory HostStatus.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -59,6 +62,9 @@ abstract class HostStatus
       ),
       modelProvider: jsonSerialization['modelProvider'] as String,
       modelName: jsonSerialization['modelName'] as String,
+      availableModels: _i2.Protocol().deserialize<List<String>>(
+        jsonSerialization['availableModels'],
+      ),
     );
   }
 
@@ -82,6 +88,8 @@ abstract class HostStatus
 
   String modelName;
 
+  List<String> availableModels;
+
   /// Returns a shallow copy of this [HostStatus]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -96,6 +104,7 @@ abstract class HostStatus
     bool? streamingAvailable,
     String? modelProvider,
     String? modelName,
+    List<String>? availableModels,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -111,6 +120,7 @@ abstract class HostStatus
       'streamingAvailable': streamingAvailable,
       'modelProvider': modelProvider,
       'modelName': modelName,
+      'availableModels': availableModels.toJson(),
     };
   }
 
@@ -128,6 +138,7 @@ abstract class HostStatus
       'streamingAvailable': streamingAvailable,
       'modelProvider': modelProvider,
       'modelName': modelName,
+      'availableModels': availableModels.toJson(),
     };
   }
 
@@ -149,6 +160,7 @@ class _HostStatusImpl extends HostStatus {
     required bool streamingAvailable,
     required String modelProvider,
     required String modelName,
+    required List<String> availableModels,
   }) : super._(
          name: name,
          version: version,
@@ -160,6 +172,7 @@ class _HostStatusImpl extends HostStatus {
          streamingAvailable: streamingAvailable,
          modelProvider: modelProvider,
          modelName: modelName,
+         availableModels: availableModels,
        );
 
   /// Returns a shallow copy of this [HostStatus]
@@ -177,6 +190,7 @@ class _HostStatusImpl extends HostStatus {
     bool? streamingAvailable,
     String? modelProvider,
     String? modelName,
+    List<String>? availableModels,
   }) {
     return HostStatus(
       name: name ?? this.name,
@@ -189,6 +203,8 @@ class _HostStatusImpl extends HostStatus {
       streamingAvailable: streamingAvailable ?? this.streamingAvailable,
       modelProvider: modelProvider ?? this.modelProvider,
       modelName: modelName ?? this.modelName,
+      availableModels:
+          availableModels ?? this.availableModels.map((e0) => e0).toList(),
     );
   }
 }

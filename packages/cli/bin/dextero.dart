@@ -12,15 +12,19 @@ typedef TerminalClientFactory =
       required String token,
     });
 
-typedef TuiRunner = Future<int> Function({required TerminalChatClient client});
+typedef TuiRunner =
+    Future<int> Function({
+      required TerminalChatClient client,
+      String? modelName,
+    });
 
 TerminalChatClient _createClient({
   required String serverUrl,
   required String token,
 }) => ServerpodTerminalChatClient(serverUrl: serverUrl, token: token);
 
-Future<int> _runTui({required TerminalChatClient client}) =>
-    runNoctermChat(client: client);
+Future<int> _runTui({required TerminalChatClient client, String? modelName}) =>
+    runNoctermChat(client: client, modelName: modelName);
 
 Future<int> run(
   List<String> arguments, {
@@ -40,30 +44,55 @@ Future<int> run(
 
   final rawUrl =
       effectiveEnvironment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/';
-  final jsonl = arguments.isNotEmpty && arguments.first == '--jsonl';
-  final effectiveArguments = jsonl ? arguments.skip(1).toList() : arguments;
+  var jsonl = false;
+  String? modelName;
+  String? cancelRunId;
+  final message = <String>[];
+  for (var index = 0; index < arguments.length; index++) {
+    final argument = arguments[index];
+    switch (argument) {
+      case '--jsonl':
+        jsonl = true;
+      case '--model':
+        if (index + 1 >= arguments.length) {
+          io.error('Usage: dextero [--jsonl] [--model <name>] [message]');
+          return 64;
+        }
+        modelName = arguments[++index];
+      case '--cancel':
+        if (index + 1 >= arguments.length) {
+          io.error('Usage: dextero --cancel <run-id>');
+          return 64;
+        }
+        cancelRunId = arguments[++index];
+      default:
+        message.add(argument);
+    }
+  }
+  if (cancelRunId != null && message.isNotEmpty) {
+    io.error('A cancellation request cannot include a message.');
+    return 64;
+  }
+  if (cancelRunId != null && modelName != null) {
+    io.error('A cancellation request cannot select a model.');
+    return 64;
+  }
   final client = clientFactory(serverUrl: rawUrl, token: token);
   if (io.hasInputTerminal &&
       io.hasOutputTerminal &&
       !jsonl &&
-      effectiveArguments.isEmpty) {
-    return tuiRunner(client: client);
+      message.isEmpty &&
+      cancelRunId == null) {
+    return tuiRunner(client: client, modelName: modelName);
   }
   final chat = TerminalChat(
     client: client,
     io: io,
     outputMode: jsonl ? TerminalOutputMode.jsonl : TerminalOutputMode.human,
   );
-  if (effectiveArguments case ['--cancel', final runId]) {
-    return chat.run(cancelRunId: runId);
-  }
-  if (effectiveArguments.isNotEmpty && effectiveArguments.first == '--cancel') {
-    io.error('Usage: dextero --cancel <run-id>');
-    return 64;
-  }
   return chat.run(
-    initialMessage: effectiveArguments.isEmpty
-        ? null
-        : effectiveArguments.join(' '),
+    initialMessage: message.isEmpty ? null : message.join(' '),
+    cancelRunId: cancelRunId,
+    modelName: modelName,
   );
 }

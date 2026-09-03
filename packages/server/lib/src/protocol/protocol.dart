@@ -110,6 +110,9 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i1.getType<_i9.HostStatus?>()) {
       return (data != null ? _i9.HostStatus.fromJson(data) : null) as T;
     }
+    if (t == List<String>) {
+      return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
     if (t == List<_i10.ChatEntry>) {
       return (data as List).map((e) => deserialize<_i10.ChatEntry>(e)).toList()
           as T;
