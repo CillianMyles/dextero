@@ -11,6 +11,14 @@ void main() {
     expect(configuration.availableModels, [defaultCodexModel, codexSparkModel]);
   });
 
+  test('uses default model choices when Make exports an empty list', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'DEXTERO_CODEX_MODELS': '',
+    });
+
+    expect(configuration.availableModels, [defaultCodexModel, codexSparkModel]);
+  });
+
   test('selects Gemini when an API key is plugged in', () {
     final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
       'GEMINI_API_KEY': 'secret-key',
