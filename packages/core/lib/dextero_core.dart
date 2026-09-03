@@ -1,5 +1,6 @@
 export 'src/agent.dart';
 export 'src/agent_runtime_configuration.dart';
+export 'src/approval.dart';
 export 'src/cancellation.dart';
 export 'src/chat_history.dart';
 export 'src/chat_service.dart';

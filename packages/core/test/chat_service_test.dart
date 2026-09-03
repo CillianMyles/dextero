@@ -209,6 +209,137 @@ void main() {
       expect(assistant.truncated, isFalse);
     },
   );
+
+  test('records and resolves one gated action before work continues', () async {
+    final agent = _ApprovalAgent();
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final service = ChatService(store: store, agent: agent);
+    final conversation = await service.createConversation();
+    final submission = await service.submit(
+      conversationId: conversation.id,
+      message: 'edit the readme',
+      correlationId: 'approval-test-1',
+    );
+    final pending = await store
+        .watch(conversation.id)
+        .firstWhere(
+          (entry) =>
+              entry.kind == ChatEntryKind.approval &&
+              entry.status == ChatEntryStatus.pending,
+        );
+
+    expect(pending.family, ChatEventFamily.approval);
+    expect(pending.approvalId, isNotNull);
+    expect(pending.toolName, 'edit_file');
+    expect(agent.executed, isFalse);
+    expect(
+      await service.approve(
+        conversationId: conversation.id,
+        runId: submission.runId,
+        approvalId: pending.approvalId!,
+      ),
+      isTrue,
+    );
+
+    await _waitForTerminal(store, conversation.id, submission.runId);
+    final approvals = (await store.history(
+      conversation.id,
+    )).where((entry) => entry.approvalId == pending.approvalId).toList();
+    expect(approvals.map((entry) => entry.status), [
+      ChatEntryStatus.pending,
+      ChatEntryStatus.approved,
+    ]);
+    expect(agent.executed, isTrue);
+    expect(
+      await service.approve(
+        conversationId: conversation.id,
+        runId: submission.runId,
+        approvalId: pending.approvalId!,
+      ),
+      isFalse,
+    );
+  });
+
+  test('cancels a run while its gated action is pending', () async {
+    final agent = _ApprovalAgent();
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final service = ChatService(store: store, agent: agent);
+    final conversation = await service.createConversation();
+    final submission = await service.submit(
+      conversationId: conversation.id,
+      message: 'edit the readme',
+    );
+    final pending = await store
+        .watch(conversation.id)
+        .firstWhere(
+          (entry) =>
+              entry.kind == ChatEntryKind.approval &&
+              entry.status == ChatEntryStatus.pending,
+        );
+
+    expect(
+      await service.cancel(
+        conversationId: conversation.id,
+        runId: submission.runId,
+      ),
+      isTrue,
+    );
+    final terminal = await _waitForTerminal(
+      store,
+      conversation.id,
+      submission.runId,
+    );
+
+    expect(terminal.status, ChatEntryStatus.cancelled);
+    expect(agent.executed, isFalse);
+    expect(
+      (await store.history(conversation.id)).singleWhere(
+        (entry) =>
+            entry.approvalId == pending.approvalId &&
+            entry.status == ChatEntryStatus.cancelled,
+      ),
+      isNotNull,
+    );
+  });
+}
+
+final class _ApprovalAgent
+    implements ConversationAgent, ApprovalAwareConversationAgent {
+  var executed = false;
+
+  @override
+  Future<ConversationAgentResult> run(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+  }) => runWithApproval(
+    prompt,
+    onEvent: onEvent,
+    cancellationToken: cancellationToken,
+  );
+
+  @override
+  Future<ConversationAgentResult> runWithApproval(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+    ToolApprovalRequester? onApprovalRequest,
+  }) async {
+    final approved = await onApprovalRequest!(
+      ToolApprovalRequest(
+        toolCallId: 'call-edit-1',
+        toolName: 'edit_file',
+        summary: SafeMetadata.toolCall('edit_file', const {
+          'path': 'README.md',
+        }),
+      ),
+    );
+    cancellationToken.throwIfCancellationRequested();
+    executed = approved;
+    return const ConversationAgentResult(output: 'README edited');
+  }
 }
 
 final class _ControlledAgent implements ConversationAgent {

@@ -54,15 +54,16 @@ Prove the product architecture with the smallest useful remote controller.
 - [x] Add a database-free Serverpod Mini service with a generated conversation
   contract for submitting, inspecting, and streaming history.
 - [x] Expose an endpoint to cancel work.
-- [ ] Expose endpoints to approve work.
+- [x] Expose endpoints to approve work.
 - [x] Use that contract from the Flutter and terminal chats.
-- [ ] Add one understandable approval interaction to the app.
+- [x] Add one understandable approval interaction to the app.
 - [x] Start with in-memory task state and document the restart limitation.
-- [ ] Add local-only development defaults and explicit network binding.
+- [x] Add local-only development defaults and explicit network binding.
 
-Current security boundary: control endpoints require a bootstrap bearer token.
-Serverpod 3.4.13 still binds its listener to all IPv6 interfaces, so the port
-must remain firewalled until explicit binding or device pairing is available.
+Current security boundary: control endpoints require a bootstrap bearer token,
+the host binds to IPv4 loopback by default, and `edit_file` requires explicit
+approval. Non-loopback binding is opt-in and must remain firewalled until
+device pairing is available.
 
 **Exit condition:** a Flutter client can continue the local conversation,
 observe typed activity, approve a gated action, cancel it, and receive the

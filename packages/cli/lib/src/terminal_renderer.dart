@@ -11,6 +11,8 @@ final class TerminalRenderer {
       ChatEntryKind.toolCall ||
       ChatEntryKind.toolOutput ||
       ChatEntryKind.toolResult => entry.toolName ?? entry.kind.name,
+      ChatEntryKind.approval => 'approval',
+      ChatEntryKind.approval => 'approval',
       ChatEntryKind.lifecycle => entry.status.name,
       ChatEntryKind.error => 'error',
     };

@@ -1,4 +1,5 @@
 import 'agent.dart';
+import 'approval.dart';
 import 'cancellation.dart';
 import 'chat_service.dart';
 import 'model.dart';
@@ -6,11 +7,13 @@ import 'safe_metadata.dart';
 import 'tool.dart';
 
 /// Adapts any provider-neutral [AgentModel] to Dextero's conversation runtime.
-final class ModelConversationAgent implements ConversationAgent {
+final class ModelConversationAgent
+    implements ConversationAgent, ApprovalAwareConversationAgent {
   ModelConversationAgent({
     required AgentModel model,
     required List<Tool> tools,
     required this.providerName,
+    this.approvalRequiredTools = const {},
     this.maxTurns = 12,
   }) : _model = model,
        _tools = List.unmodifiable(tools);
@@ -18,6 +21,7 @@ final class ModelConversationAgent implements ConversationAgent {
   final AgentModel _model;
   final List<Tool> _tools;
   final String providerName;
+  final Set<String> approvalRequiredTools;
   final int maxTurns;
 
   @override
@@ -25,6 +29,18 @@ final class ModelConversationAgent implements ConversationAgent {
     String prompt, {
     required ConversationAgentEventSink onEvent,
     required CancellationToken cancellationToken,
+  }) => runWithApproval(
+    prompt,
+    onEvent: onEvent,
+    cancellationToken: cancellationToken,
+  );
+
+  @override
+  Future<ConversationAgentResult> runWithApproval(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+    ToolApprovalRequester? onApprovalRequest,
   }) async {
     await onEvent(
       ConversationAgentEvent(
@@ -33,9 +49,15 @@ final class ModelConversationAgent implements ConversationAgent {
       ),
     );
     final result =
-        await AgentLoop(model: _model, tools: _tools, maxTurns: maxTurns).run(
+        await AgentLoop(
+          model: _model,
+          tools: _tools,
+          approvalRequiredTools: approvalRequiredTools,
+          maxTurns: maxTurns,
+        ).run(
           prompt,
           cancellationToken: cancellationToken,
+          onApprovalRequest: onApprovalRequest,
           onActivity: (activity) => onEvent(
             ConversationAgentEvent(
               kind: switch (activity.kind) {

@@ -86,6 +86,21 @@ void main() {
     expect(io.output.join(), contains('Cancellation requested'));
   });
 
+  test('approves a pending action by run and approval id', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: client,
+      io: io,
+    ).run(approveRunId: 'run-42', approvalId: 'approval-7');
+
+    expect(result, 0);
+    expect(client.approvals, [('conversation-1', 'run-42', 'approval-7')]);
+    expect(client.requests, isEmpty);
+    expect(io.output.join(), contains('Approved approval-7'));
+  });
+
   test('emits only stable JSONL events in automation mode', () async {
     final client = _FakeClient();
     final io = _FakeIo(lines: const []);
@@ -121,6 +136,7 @@ final class _FakeClient implements TerminalChatClient {
   final cursors = <int>[];
   bool closed = false;
   final cancellations = <(String, String)>[];
+  final approvals = <(String, String, String)>[];
 
   @override
   Future<void> close() async {
@@ -130,6 +146,16 @@ final class _FakeClient implements TerminalChatClient {
   @override
   Future<bool> cancelRun(String conversationId, String runId) async {
     cancellations.add((conversationId, runId));
+    return true;
+  }
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async {
+    approvals.add((conversationId, runId, approvalId));
     return true;
   }
 

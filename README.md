@@ -98,6 +98,11 @@ make cli
 
 Cancel a known run from another terminal with
 `dart run packages/cli/bin/dextero.dart --cancel <run-id>`.
+Approve a pending file edit with the run and approval IDs shown in history:
+
+```sh
+dart run packages/cli/bin/dextero.dart --approve <run-id> <approval-id>
+```
 
 Send one message non-interactively:
 
@@ -125,8 +130,19 @@ Run `make help` for other commands.
 
 The MVP uses a bootstrap bearer token; it does not yet provide device pairing
 or OS-level sandboxing. Core can edit files and run processes inside
-`DEXTERO_WORKSPACE`. Serverpod 3.4.13 may bind beyond loopback, so keep port
-8080 firewalled from untrusted networks.
+`DEXTERO_WORKSPACE`. File edits pause for explicit approval, but process tools
+do not yet have the policy coverage planned for Milestone 3.
+
+The host binds to `127.0.0.1` by default. Set `BIND_ADDRESS` to a numeric IP
+only when a protected local-network controller or tunnel needs direct access:
+
+```sh
+make server BIND_ADDRESS=192.168.1.20
+```
+
+The bearer token does not encrypt traffic. Keep non-loopback port 8080
+firewalled from untrusted networks and use an authenticated HTTPS proxy or
+protected tunnel for physical devices.
 
 Chat history includes command and tool activity with capped per-event
 stdout/stderr excerpts. Treat it as sensitive diagnostic data, not a security
@@ -141,9 +157,9 @@ history, or tool subprocess environments.
 ## Serverpod changes
 
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
-typed `submitMessage`, `history`, and `streamHistory` operations. Generated
-server, client, and test code is committed. After changing an endpoint or
-`.spy.yaml` model, run:
+typed submission, history, streaming, approval, and cancellation operations.
+Generated server, client, and test code is committed. After changing an
+endpoint or `.spy.yaml` model, run:
 
 ```sh
 make generate

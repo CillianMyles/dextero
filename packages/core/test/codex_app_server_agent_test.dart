@@ -150,6 +150,38 @@ void main() {
     );
   });
 
+  test('waits for approval before calling a gated dynamic tool', () async {
+    final transport = _ScriptedTransport(
+      toolName: 'edit_file',
+      arguments: const {'path': 'README.md'},
+    );
+    final tool = _CountingEditTool();
+    final requested = Completer<ToolApprovalRequest>();
+    final approval = Completer<bool>();
+
+    final future = CodexAppServerAgent(transportFactory: () async => transport)
+        .run(
+          'edit it',
+          tools: [tool],
+          approvalRequiredTools: const {'edit_file'},
+          onApprovalRequest: (request) {
+            requested.complete(request);
+            return approval.future;
+          },
+        );
+    final request = await requested.future;
+
+    expect(request.toolCallId, 'call-1');
+    expect(request.summary.text, 'edit_file started for README.md');
+    expect(tool.calls, 0);
+
+    approval.complete(true);
+    final run = await future;
+
+    expect(run.output, 'The tool said hello.');
+    expect(tool.calls, 1);
+  });
+
   test('records a complete command and its bounded output', () async {
     final transport = _ScriptedTransport(
       toolName: 'run_command',
@@ -336,6 +368,27 @@ final class _CommandTool implements Tool {
     'stderr': 'warning\n',
     'truncated': false,
   };
+}
+
+final class _CountingEditTool implements Tool {
+  var calls = 0;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'edit_file',
+    description: 'Edit a file.',
+    inputSchema: {'type': 'object'},
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) {
+    calls++;
+    return {'path': arguments['path']};
+  }
 }
 
 base class _FakeTransport implements CodexAppServerTransport {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dextero_core/dextero_core.dart';
 import 'package:test/test.dart';
 
@@ -87,6 +89,48 @@ void main() {
     ]);
   });
 
+  test('waits for approval before executing a gated tool', () async {
+    final approval = Completer<bool>();
+    final requested = Completer<ToolApprovalRequest>();
+    final tool = _CountingTool();
+    final model = _QueueModel([
+      const ModelTurn(
+        toolCalls: [
+          ToolCall(
+            id: 'call-edit-1',
+            name: 'edit_file',
+            arguments: {'path': 'README.md'},
+          ),
+        ],
+      ),
+      const ModelTurn(content: 'edited'),
+    ]);
+
+    final future =
+        AgentLoop(
+          model: model,
+          tools: [tool],
+          approvalRequiredTools: const {'edit_file'},
+        ).run(
+          'edit',
+          onApprovalRequest: (request) {
+            requested.complete(request);
+            return approval.future;
+          },
+        );
+    final request = await requested.future;
+
+    expect(request.toolCallId, 'call-edit-1');
+    expect(request.summary.text, 'edit_file started for README.md');
+    expect(tool.calls, 0);
+
+    approval.complete(true);
+    final run = await future;
+
+    expect(run.output, 'edited');
+    expect(tool.calls, 1);
+  });
+
   test('rejects duplicate tool names', () {
     expect(
       () =>
@@ -171,6 +215,27 @@ final class _FailingTool implements Tool {
     CancellationToken? cancellationToken,
     ToolOutputSink? onOutput,
   }) => throw StateError('exploded');
+}
+
+final class _CountingTool implements Tool {
+  var calls = 0;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'edit_file',
+    description: 'Edit a file.',
+    inputSchema: {'type': 'object'},
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) {
+    calls++;
+    return {'path': arguments['path']};
+  }
 }
 
 final class _QueueModel implements AgentModel {

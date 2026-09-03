@@ -12,6 +12,7 @@ CONTROL_URL_SOURCE := $(origin CONTROL_URL)
 CONTROL_URL ?= http://localhost:8080/
 ANDROID_CONTROL_URL := $(if $(filter undefined,$(CONTROL_URL_SOURCE)),http://10.0.2.2:8080/,$(CONTROL_URL))
 SERVER_READY_URL ?= http://localhost:8080/
+BIND_ADDRESS ?= 127.0.0.1
 WORKSPACE ?= $(CURDIR)
 APP_DEVICE ?= chrome
 DEV_TOKEN_FILE := .dart_tool/dev-token
@@ -96,6 +97,7 @@ check: format-check analyze test ## Run the same quality gate expected before re
 
 server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and Codex-backed core.
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
+	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \
 	 DEXTERO_WORKSPACE="$(WORKSPACE)" \
 	 $(DART) run packages/server/bin/server.dart
 
@@ -162,6 +164,7 @@ dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default
 	 cleanup() { kill $$server_pid 2>/dev/null || true; }; \
 	 trap cleanup EXIT INT TERM; \
 	 DEXTERO_CONTROL_TOKEN="$$token" DEXTERO_WORKSPACE="$(WORKSPACE)" \
+	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \
 	   $(DART) run packages/server/bin/server.dart & server_pid=$$!; \
 	 until curl --silent --output /dev/null "$(SERVER_READY_URL)"; do \
 	   kill -0 $$server_pid 2>/dev/null || { echo "Server exited before becoming ready"; exit 1; }; \

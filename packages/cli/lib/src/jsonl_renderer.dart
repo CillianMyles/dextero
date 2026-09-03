@@ -26,6 +26,7 @@ final class JsonlRenderer {
     if (entry.runId != null) 'run_id': entry.runId,
     if (entry.toolCallId != null) 'tool_call_id': entry.toolCallId,
     if (entry.toolName != null) 'tool_name': entry.toolName,
+    if (entry.approvalId != null) 'approval_id': entry.approvalId,
   });
 
   String error(Object error) => jsonEncode({

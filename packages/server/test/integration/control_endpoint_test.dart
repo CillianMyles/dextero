@@ -202,7 +202,106 @@ void main() {
           );
       expect(terminal.content, 'Response cancelled');
     });
+
+    test('approves a pending action through the typed endpoint', () async {
+      final agent = _ApprovalConversationAgent();
+      service = core.ChatService(store: store, agent: agent);
+      conversationId = (await service.createConversation()).id;
+      ChatRuntime.configure(
+        chatService: service,
+        defaultConversationId: conversationId,
+      );
+      final submission = await endpoints.control.submitMessage(
+        authenticatedSession,
+        ChatSubmitRequest(
+          conversationId: conversationId,
+          message: 'Edit README.md',
+        ),
+      );
+      final pending = await store
+          .watch(conversationId)
+          .firstWhere(
+            (entry) =>
+                entry.kind == core.ChatEntryKind.approval &&
+                entry.status == core.ChatEntryStatus.pending,
+          );
+
+      expect(agent.executed, isFalse);
+      expect(
+        await endpoints.control.approveWork(
+          authenticatedSession,
+          conversationId,
+          submission.runId,
+          pending.approvalId!,
+        ),
+        isTrue,
+      );
+      await store
+          .watch(conversationId)
+          .firstWhere(
+            (entry) =>
+                entry.runId == submission.runId &&
+                entry.kind == core.ChatEntryKind.lifecycle &&
+                entry.status == core.ChatEntryStatus.completed,
+          );
+
+      expect(agent.executed, isTrue);
+      final history = await endpoints.control.history(
+        authenticatedSession,
+        conversationId,
+      );
+      expect(
+        history
+            .where((entry) => entry.approvalId == pending.approvalId)
+            .map((entry) => entry.status),
+        [ChatEntryStatus.pending, ChatEntryStatus.approved],
+      );
+      expect(
+        await endpoints.control.approveWork(
+          authenticatedSession,
+          conversationId,
+          submission.runId,
+          pending.approvalId!,
+        ),
+        isFalse,
+      );
+    });
   }, configOverride: useEphemeralApiPort);
+}
+
+final class _ApprovalConversationAgent
+    implements core.ConversationAgent, core.ApprovalAwareConversationAgent {
+  var executed = false;
+
+  @override
+  Future<core.ConversationAgentResult> run(
+    String prompt, {
+    required core.ConversationAgentEventSink onEvent,
+    required core.CancellationToken cancellationToken,
+  }) => runWithApproval(
+    prompt,
+    onEvent: onEvent,
+    cancellationToken: cancellationToken,
+  );
+
+  @override
+  Future<core.ConversationAgentResult> runWithApproval(
+    String prompt, {
+    required core.ConversationAgentEventSink onEvent,
+    required core.CancellationToken cancellationToken,
+    core.ToolApprovalRequester? onApprovalRequest,
+  }) async {
+    executed = await onApprovalRequest!(
+      core.ToolApprovalRequest(
+        toolCallId: 'endpoint-edit-1',
+        toolName: 'edit_file',
+        summary: core.SafeMetadata.toolCall('edit_file', const {
+          'path': 'README.md',
+        }),
+      ),
+    );
+    return const core.ConversationAgentResult(output: 'Edited README.md');
+  }
 }
 
 final class _CancellableGeminiTransport implements core.GeminiTransport {

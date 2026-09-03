@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'cancellation.dart';
+import 'approval.dart';
 import 'model.dart';
 import 'safe_metadata.dart';
 import 'tool.dart';
@@ -42,6 +43,7 @@ final class AgentLoop {
   AgentLoop({
     required AgentModel model,
     required List<Tool> tools,
+    this.approvalRequiredTools = const {},
     this.maxTurns = 12,
   }) : _model = model,
        _tools = {for (final tool in tools) tool.definition.name: tool} {
@@ -55,12 +57,14 @@ final class AgentLoop {
 
   final AgentModel _model;
   final Map<String, Tool> _tools;
+  final Set<String> approvalRequiredTools;
   final int maxTurns;
 
   Future<AgentRun> run(
     String prompt, {
     CancellationToken? cancellationToken,
     AgentLoopActivitySink? onActivity,
+    ToolApprovalRequester? onApprovalRequest,
   }) async {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
@@ -107,6 +111,7 @@ final class AgentLoop {
         final result = await _execute(
           call,
           cancellationToken: cancellationToken,
+          onApprovalRequest: onApprovalRequest,
           onOutput: (update) => onActivity?.call(
             AgentLoopActivity(
               kind: AgentLoopActivityKind.toolOutput,
@@ -142,6 +147,7 @@ final class AgentLoop {
     ToolCall call, {
     CancellationToken? cancellationToken,
     ToolOutputSink? onOutput,
+    ToolApprovalRequester? onApprovalRequest,
   }) async {
     cancellationToken?.throwIfCancellationRequested();
     final tool = _tools[call.name];
@@ -151,6 +157,31 @@ final class AgentLoop {
         content: 'Unknown tool: ${call.name}',
         isError: true,
       );
+    }
+
+    if (approvalRequiredTools.contains(call.name)) {
+      if (onApprovalRequest == null) {
+        return ToolResult(
+          callId: call.id,
+          content: 'Approval is unavailable for ${call.name}.',
+          isError: true,
+        );
+      }
+      final approved = await onApprovalRequest(
+        ToolApprovalRequest(
+          toolCallId: call.id,
+          toolName: call.name,
+          summary: SafeMetadata.toolCall(call.name, call.arguments),
+        ),
+      );
+      cancellationToken?.throwIfCancellationRequested();
+      if (!approved) {
+        return ToolResult(
+          callId: call.id,
+          content: '${call.name} was not approved.',
+          isError: true,
+        );
+      }
     }
 
     try {

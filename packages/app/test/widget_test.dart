@@ -407,6 +407,57 @@ void main() {
     expect(find.byKey(const Key('send-message')), findsOneWidget);
   });
 
+  testWidgets('approves a pending file edit and resumes the run', (
+    tester,
+  ) async {
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-approval-pending',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.pending,
+          content: 'edit_file started for README.md',
+          toolCallId: 'edit-call-1',
+          toolName: 'edit_file',
+          approvalId: 'approval-1',
+          family: ChatEventFamily.approval,
+        ),
+      ],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('approval-prompt')), findsOneWidget);
+    expect(find.text('Approval required'), findsNWidgets(2));
+    expect(find.text('edit_file started for README.md'), findsNWidgets(2));
+
+    await tester.tap(find.byKey(const Key('approve-work')));
+    await tester.pumpAndSettle();
+
+    expect(api.approvals, [('conversation-1', 'run-1', 'approval-1')]);
+    api.emit(
+      _entry(
+        sequence: 1,
+        entryId: 'entry-approval-approved',
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.approved,
+        content: 'edit_file approved',
+        toolCallId: 'edit-call-1',
+        toolName: 'edit_file',
+        approvalId: 'approval-1',
+        family: ChatEventFamily.approval,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(find.text('Action approved'), findsOneWidget);
+  });
+
   testWidgets('explains configuration and server failures', (tester) async {
     final unconfigured = DexteroController.fromEnvironment(const {});
     await tester.pumpWidget(DexteroApp(controller: unconfigured));
@@ -444,6 +495,7 @@ final class _FakeChatApi implements ChatApi {
   final List<ChatEntry> initialHistory;
   final submissions = <ChatSubmitRequest>[];
   final cancellations = <(String, String)>[];
+  final approvals = <(String, String, String)>[];
   final _stream = StreamController<ChatEntry>.broadcast();
 
   void emit(ChatEntry entry) => _stream.add(entry);
@@ -454,6 +506,16 @@ final class _FakeChatApi implements ChatApi {
   @override
   Future<bool> cancelRun(String conversationId, String runId) async {
     cancellations.add((conversationId, runId));
+    return true;
+  }
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async {
+    approvals.add((conversationId, runId, approvalId));
     return true;
   }
 
@@ -510,6 +572,7 @@ ChatEntry _entry({
   required String content,
   String? toolCallId,
   String? toolName,
+  String? approvalId,
   String correlationId = 'app-test-1',
   String? runId = 'run-1',
   bool truncated = false,
@@ -532,4 +595,5 @@ ChatEntry _entry({
   runId: runId,
   toolCallId: toolCallId,
   toolName: toolName,
+  approvalId: approvalId,
 );

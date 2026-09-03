@@ -48,6 +48,17 @@ class EndpointControl extends _i1.EndpointRef {
         'runId': runId,
       });
 
+  /// Approves one pending tool action for the matching active run.
+  _i2.Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) => caller.callServerEndpoint<bool>('control', 'approveWork', {
+    'conversationId': conversationId,
+    'runId': runId,
+    'approvalId': approvalId,
+  });
+
   /// Returns the complete process-local history for one conversation.
   _i2.Future<List<_i6.ChatEntry>> history(String conversationId) =>
       caller.callServerEndpoint<List<_i6.ChatEntry>>('control', 'history', {

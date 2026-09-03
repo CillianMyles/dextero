@@ -61,6 +61,14 @@ Future<int> run(
     io.error('Usage: dextero --cancel <run-id>');
     return 64;
   }
+  if (effectiveArguments case ['--approve', final runId, final approvalId]) {
+    return chat.run(approveRunId: runId, approvalId: approvalId);
+  }
+  if (effectiveArguments.isNotEmpty &&
+      effectiveArguments.first == '--approve') {
+    io.error('Usage: dextero --approve <run-id> <approval-id>');
+    return 64;
+  }
   return chat.run(
     initialMessage: effectiveArguments.isEmpty
         ? null

@@ -68,6 +68,33 @@ class Endpoints extends _i1.EndpointDispatch {
                 params['runId'],
               ),
         ),
+        'approveWork': _i1.MethodConnector(
+          name: 'approveWork',
+          params: {
+            'conversationId': _i1.ParameterDescription(
+              name: 'conversationId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'runId': _i1.ParameterDescription(
+              name: 'runId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'approvalId': _i1.ParameterDescription(
+              name: 'approvalId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['control'] as _i2.ControlEndpoint).approveWork(
+                session,
+                params['conversationId'],
+                params['runId'],
+                params['approvalId'],
+              ),
+        ),
         'history': _i1.MethodConnector(
           name: 'history',
           params: {

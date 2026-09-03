@@ -9,6 +9,12 @@ abstract interface class TerminalChatClient {
 
   Future<bool> cancelRun(String conversationId, String runId);
 
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  );
+
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence);
 
   Future<void> close();
@@ -40,6 +46,13 @@ final class ServerpodTerminalChatClient implements TerminalChatClient {
   @override
   Future<bool> cancelRun(String conversationId, String runId) =>
       _client.control.cancelRun(conversationId, runId);
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) => _client.control.approveWork(conversationId, runId, approvalId);
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>

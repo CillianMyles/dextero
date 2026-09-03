@@ -10,7 +10,6 @@ void main() {
       status: ChatEntryStatus.completed,
       content: 'Finished the work',
     );
-
     expect(
       const TerminalRenderer().plainEntryLine(entry),
       '[dextero] Finished the work',

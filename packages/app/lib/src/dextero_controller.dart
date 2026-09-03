@@ -14,6 +14,12 @@ abstract interface class ChatApi {
 
   Future<bool> cancelRun(String conversationId, String runId);
 
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  );
+
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence);
 
   Future<void> close();
@@ -42,6 +48,13 @@ final class ServerpodChatApi implements ChatApi {
   @override
   Future<bool> cancelRun(String conversationId, String runId) =>
       _client.control.cancelRun(conversationId, runId);
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) => _client.control.approveWork(conversationId, runId, approvalId);
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
@@ -89,6 +102,7 @@ final class DexteroController extends ChangeNotifier {
   String? _error;
   bool _submitting = false;
   bool _cancelling = false;
+  bool _approving = false;
   String? _activeRunId;
   bool _initialized = false;
 
@@ -97,9 +111,31 @@ final class DexteroController extends ChangeNotifier {
   String? get error => _error;
   bool get submitting => _submitting;
   bool get cancelling => _cancelling;
+  bool get approving => _approving;
   bool get busy => _submitting || _activeRunId != null;
   bool get canCancel => _activeRunId != null && !_cancelling;
   List<ChatEntry> get entries => List.unmodifiable(_entries);
+
+  ChatEntry? get pendingApproval {
+    final resolved = _entries
+        .where(
+          (entry) =>
+              entry.kind == ChatEntryKind.approval &&
+              entry.status != ChatEntryStatus.pending,
+        )
+        .map((entry) => entry.approvalId)
+        .whereType<String>()
+        .toSet();
+    for (final entry in _entries.reversed) {
+      if (entry.kind == ChatEntryKind.approval &&
+          entry.status == ChatEntryStatus.pending &&
+          entry.approvalId != null &&
+          !resolved.contains(entry.approvalId)) {
+        return entry;
+      }
+    }
+    return null;
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -149,6 +185,37 @@ final class DexteroController extends ChangeNotifier {
       return false;
     } finally {
       _cancelling = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> approvePendingWork() async {
+    final status = _hostStatus;
+    final approval = pendingApproval;
+    final runId = approval?.runId;
+    final approvalId = approval?.approvalId;
+    if (status == null || runId == null || approvalId == null || _approving) {
+      return false;
+    }
+
+    _approving = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final accepted = await _api.approveWork(
+        status.conversationId,
+        runId,
+        approvalId,
+      );
+      if (!accepted) {
+        _error = 'The action no longer needs approval.';
+      }
+      return accepted;
+    } on Object catch (error) {
+      _error = 'Approval failed: $error';
+      return false;
+    } finally {
+      _approving = false;
       notifyListeners();
     }
   }
@@ -291,6 +358,13 @@ final class _UnavailableChatApi implements ChatApi {
   @override
   Future<bool> cancelRun(String conversationId, String runId) async =>
       _unavailable();
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async => _unavailable();
 
   @override
   Future<HostStatus> status() async => _unavailable();
