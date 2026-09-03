@@ -142,7 +142,7 @@ HostStatus _status() => HostStatus(
   databaseRequired: false,
   streamingAvailable: true,
   modelProvider: 'gemini',
-  modelName: 'gemini-3.7-flash',
+  modelName: 'gemini-2.5-flash',
 );
 
 ChatEntry _entry({
