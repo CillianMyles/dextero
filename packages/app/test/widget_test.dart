@@ -482,6 +482,66 @@ void main() {
     expect(find.text('Action approved'), findsOneWidget);
   });
 
+  testWidgets('disables approval while cancellation is in flight', (
+    tester,
+  ) async {
+    final cancelled = Completer<bool>();
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      canceller: (_, _) => cancelled.future,
+      initialHistory: [_pendingApprovalEntry()],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('cancel-run')));
+    await tester.pump();
+
+    expect(controller.cancelling, isTrue);
+    expect(controller.canApprove, isFalse);
+    expect(
+      tester.widget<ShadButton>(find.byKey(const Key('approve-work'))).enabled,
+      isFalse,
+    );
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, isEmpty);
+
+    cancelled.complete(true);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('disables cancellation while approval is in flight', (
+    tester,
+  ) async {
+    final approved = Completer<bool>();
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      approver: (_, _, _) => approved.future,
+      initialHistory: [_pendingApprovalEntry()],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('approve-work')));
+    await tester.pump();
+
+    expect(controller.approving, isTrue);
+    expect(controller.canCancel, isFalse);
+    expect(
+      tester
+          .widget<ShadIconButton>(find.byKey(const Key('cancel-run')))
+          .enabled,
+      isFalse,
+    );
+    expect(await controller.cancelActiveRun(), isFalse);
+    expect(api.cancellations, isEmpty);
+
+    approved.complete(true);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('keeps a large approval preview bounded and scrollable', (
     tester,
   ) async {
@@ -552,11 +612,20 @@ final class _FakeChatApi implements ChatApi {
   _FakeChatApi({
     required Future<HostStatus> status,
     this.submitter,
+    this.canceller,
+    this.approver,
     this.initialHistory = const [],
   }) : statusFuture = status;
 
   final Future<HostStatus> statusFuture;
   final Future<ChatSubmission> Function(ChatSubmitRequest request)? submitter;
+  final Future<bool> Function(String conversationId, String runId)? canceller;
+  final Future<bool> Function(
+    String conversationId,
+    String runId,
+    String approvalId,
+  )?
+  approver;
   final List<ChatEntry> initialHistory;
   final submissions = <ChatSubmitRequest>[];
   final modelSelections = <String>[];
@@ -570,9 +639,9 @@ final class _FakeChatApi implements ChatApi {
   Future<void> close() async {}
 
   @override
-  Future<bool> cancelRun(String conversationId, String runId) async {
+  Future<bool> cancelRun(String conversationId, String runId) {
     cancellations.add((conversationId, runId));
-    return true;
+    return canceller?.call(conversationId, runId) ?? Future.value(true);
   }
 
   @override
@@ -580,9 +649,10 @@ final class _FakeChatApi implements ChatApi {
     String conversationId,
     String runId,
     String approvalId,
-  ) async {
+  ) {
     approvals.add((conversationId, runId, approvalId));
-    return true;
+    return approver?.call(conversationId, runId, approvalId) ??
+        Future.value(true);
   }
 
   @override
@@ -635,6 +705,18 @@ ChatSubmission _submission(String message) => ChatSubmission(
     status: ChatEntryStatus.submitted,
     content: message,
   ),
+);
+
+ChatEntry _pendingApprovalEntry() => _entry(
+  sequence: 0,
+  entryId: 'entry-approval-pending',
+  kind: ChatEntryKind.approval,
+  status: ChatEntryStatus.pending,
+  content: 'edit_file requires approval for README.md',
+  toolCallId: 'edit-call-1',
+  toolName: 'edit_file',
+  approvalId: 'approval-1',
+  family: ChatEventFamily.approval,
 );
 
 ChatEntry _entry({

@@ -136,6 +136,7 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                       const SizedBox(height: 12),
                       _ApprovalPrompt(
                         approval: approval,
+                        enabled: controller.canApprove,
                         approving: controller.approving,
                         onApprove: _approve,
                       ),
@@ -146,6 +147,7 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                       enabled: controller.canSubmit,
                       canSend: canSend,
                       submitting: controller.submitting,
+                      canCancel: controller.canCancel,
                       cancelling: controller.cancelling,
                       working: controller.busy && !controller.submitting,
                       onSend: _send,
@@ -821,11 +823,13 @@ class _ActivityRow extends StatelessWidget {
 class _ApprovalPrompt extends StatelessWidget {
   const _ApprovalPrompt({
     required this.approval,
+    required this.enabled,
     required this.approving,
     required this.onApprove,
   });
 
   final ChatEntry approval;
+  final bool enabled;
   final bool approving;
   final Future<void> Function() onApprove;
 
@@ -877,8 +881,8 @@ class _ApprovalPrompt extends StatelessWidget {
           const SizedBox(width: 12),
           ShadButton(
             key: const Key('approve-work'),
-            enabled: !approving,
-            onPressed: approving ? null : onApprove,
+            enabled: enabled,
+            onPressed: enabled ? onApprove : null,
             child: approving
                 ? const ShadSpinner(size: 14)
                 : const Text('Approve'),
@@ -951,6 +955,7 @@ class _Composer extends StatelessWidget {
     required this.enabled,
     required this.canSend,
     required this.submitting,
+    required this.canCancel,
     required this.cancelling,
     required this.working,
     required this.onSend,
@@ -961,6 +966,7 @@ class _Composer extends StatelessWidget {
   final bool enabled;
   final bool canSend;
   final bool submitting;
+  final bool canCancel;
   final bool cancelling;
   final bool working;
   final Future<void> Function() onSend;
@@ -1009,8 +1015,8 @@ class _Composer extends StatelessWidget {
                 child: ShadIconButton.destructive(
                   key: const Key('cancel-run'),
                   semanticLabel: 'Cancel run',
-                  enabled: !cancelling,
-                  onPressed: cancelling ? null : onCancel,
+                  enabled: canCancel,
+                  onPressed: canCancel ? onCancel : null,
                   icon: cancelling
                       ? const ShadSpinner(size: 16)
                       : const Icon(LucideIcons.square),

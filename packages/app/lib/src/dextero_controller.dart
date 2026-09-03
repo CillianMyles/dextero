@@ -121,7 +121,8 @@ final class DexteroController extends ChangeNotifier {
   bool get approving => _approving;
   bool get selectingModel => _selectingModel;
   bool get busy => _submitting || _activeRunId != null;
-  bool get canCancel => _activeRunId != null && !_cancelling;
+  bool get canCancel => _activeRunId != null && !_cancelling && !_approving;
+  bool get canApprove => pendingApproval != null && !_cancelling && !_approving;
   bool get canSubmit => _hostStatus != null && !busy && !_selectingModel;
   bool get canSelectModel =>
       _hostStatus != null && _entries.isEmpty && !busy && !_selectingModel;
@@ -180,7 +181,7 @@ final class DexteroController extends ChangeNotifier {
   Future<bool> cancelActiveRun() async {
     final status = _hostStatus;
     final runId = _activeRunId;
-    if (status == null || runId == null || _cancelling) return false;
+    if (status == null || runId == null || !canCancel) return false;
 
     _cancelling = true;
     _error = null;
@@ -205,7 +206,7 @@ final class DexteroController extends ChangeNotifier {
     final approval = pendingApproval;
     final runId = approval?.runId;
     final approvalId = approval?.approvalId;
-    if (status == null || runId == null || approvalId == null || _approving) {
+    if (status == null || runId == null || approvalId == null || !canApprove) {
       return false;
     }
 
