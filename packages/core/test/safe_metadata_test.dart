@@ -94,6 +94,18 @@ void main() {
     expect(summary.text, isNot(contains(RegExp('[\u2028\u2029]'))));
   });
 
+  test('makes zero-width join controls visible in approval previews', () {
+    final summary = SafeMetadata.approvalRequest('edit_file', {
+      'path': 'joiners.txt',
+      'oldText': 'joined\u200Cvalue',
+      'newText': 'joined\u200Dvalue',
+    });
+
+    expect(summary.text, contains(r'-joined\u200Cvalue'));
+    expect(summary.text, contains(r'+joined\u200Dvalue'));
+    expect(summary.text, isNot(contains(RegExp('[\u200C\u200D]'))));
+  });
+
   test('quotes and escapes the exact approval target path', () {
     final summary = SafeMetadata.approvalRequest('edit_file', {
       'path': ' leading\tname\n--- old text\x1b[2J\u202E.md\u00A0 ',

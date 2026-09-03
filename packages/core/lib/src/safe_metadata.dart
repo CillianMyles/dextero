@@ -327,7 +327,7 @@ abstract final class SafeMetadata {
   static bool _isInvisibleApprovalRune(int rune) =>
       rune == 0x00A0 ||
       rune == 0x1680 ||
-      (rune >= 0x2000 && rune <= 0x200B) ||
+      (rune >= 0x2000 && rune <= 0x200D) ||
       rune == 0x2028 ||
       rune == 0x2029 ||
       rune == 0x202F ||
