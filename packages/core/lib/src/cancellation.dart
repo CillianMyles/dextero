@@ -18,6 +18,15 @@ final class CancellationToken {
   Future<void> get whenCancelled => _cancelled;
   bool get isCancellationRequested => _isCancellationRequested;
 
+  /// Completes with [operation] unless cancellation is requested first.
+  Future<T> waitFor<T>(Future<T> operation) {
+    throwIfCancellationRequested();
+    return Future.any<T>([
+      operation,
+      whenCancelled.then<T>((_) => throw const RunCancelledException()),
+    ]);
+  }
+
   void throwIfCancellationRequested() {
     if (_isCancellationRequested) throw const RunCancelledException();
   }

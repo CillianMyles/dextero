@@ -168,13 +168,17 @@ final class AgentLoop {
           isError: true,
         );
       }
-      final approved = await onApprovalRequest(
+      final approval = onApprovalRequest(
         ToolApprovalRequest(
           toolCallId: call.id,
           toolName: call.name,
           summary: SafeMetadata.approvalRequest(call.name, call.arguments),
         ),
       );
+      final approved = await switch (cancellationToken) {
+        null => approval,
+        final token => token.waitFor(approval),
+      };
       cancellationToken?.throwIfCancellationRequested();
       if (!approved) {
         return ToolResult(

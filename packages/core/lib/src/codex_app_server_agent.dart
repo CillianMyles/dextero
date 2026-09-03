@@ -485,15 +485,20 @@ final class CodexAppServerAgent {
           content = 'Approval is unavailable for $name.';
         } else {
           try {
-            final approved =
-                !approvalRequiredTools.contains(name) ||
-                await onApprovalRequest!(
-                  ToolApprovalRequest(
-                    toolCallId: callId,
-                    toolName: name,
-                    summary: SafeMetadata.approvalRequest(name, arguments),
-                  ),
-                );
+            var approved = true;
+            if (approvalRequiredTools.contains(name)) {
+              final approval = onApprovalRequest!(
+                ToolApprovalRequest(
+                  toolCallId: callId,
+                  toolName: name,
+                  summary: SafeMetadata.approvalRequest(name, arguments),
+                ),
+              );
+              approved = await switch (cancellationToken) {
+                null => approval,
+                final token => token.waitFor(approval),
+              };
+            }
             cancellationToken?.throwIfCancellationRequested();
             if (!approved) {
               content = '$name was not approved.';

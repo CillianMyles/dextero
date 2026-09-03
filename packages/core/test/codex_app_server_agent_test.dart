@@ -187,6 +187,39 @@ void main() {
     expect(tool.calls, 1);
   });
 
+  test('cancellation interrupts a pending dynamic-tool approval', () async {
+    final transport = _ScriptedTransport(
+      toolName: 'edit_file',
+      arguments: const {
+        'path': 'README.md',
+        'oldText': 'old heading',
+        'newText': 'new heading',
+      },
+    );
+    final tool = _CountingEditTool();
+    final requested = Completer<void>();
+    final approval = Completer<bool>();
+    final cancellation = CancellationController();
+
+    final future = CodexAppServerAgent(transportFactory: () async => transport)
+        .run(
+          'edit it',
+          tools: [tool],
+          cancellationToken: cancellation.token,
+          onApprovalRequest: (_) {
+            requested.complete();
+            return approval.future;
+          },
+        );
+    await requested.future;
+
+    expect(cancellation.cancel(), isTrue);
+    await expectLater(future, throwsA(isA<RunCancelledException>()));
+    expect(tool.calls, 0);
+    expect(approval.isCompleted, isFalse);
+    expect(transport.closed, isTrue);
+  });
+
   test('records a complete command and its bounded output', () async {
     final transport = _ScriptedTransport(
       toolName: 'run_command',

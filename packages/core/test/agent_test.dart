@@ -132,6 +132,43 @@ void main() {
     expect(tool.calls, 1);
   });
 
+  test('cancellation interrupts a pending approval callback', () async {
+    final approval = Completer<bool>();
+    final requested = Completer<void>();
+    final cancellation = CancellationController();
+    final tool = _CountingTool();
+    final model = _QueueModel([
+      const ModelTurn(
+        toolCalls: [
+          ToolCall(
+            id: 'call-edit-1',
+            name: 'edit_file',
+            arguments: {
+              'path': 'README.md',
+              'oldText': 'old heading',
+              'newText': 'new heading',
+            },
+          ),
+        ],
+      ),
+    ]);
+
+    final future = AgentLoop(model: model, tools: [tool]).run(
+      'edit',
+      cancellationToken: cancellation.token,
+      onApprovalRequest: (_) {
+        requested.complete();
+        return approval.future;
+      },
+    );
+    await requested.future;
+
+    expect(cancellation.cancel(), isTrue);
+    await expectLater(future, throwsA(isA<RunCancelledException>()));
+    expect(tool.calls, 0);
+    expect(approval.isCompleted, isFalse);
+  });
+
   test('exported conversation agents gate edit_file by default', () {
     final modelAgent = ModelConversationAgent(
       model: _QueueModel([]),
