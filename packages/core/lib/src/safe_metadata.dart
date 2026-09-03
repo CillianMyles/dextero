@@ -206,7 +206,7 @@ abstract final class SafeMetadata {
         _
             when _isUnsafeControlRune(rune) ||
                 _isBidirectionalControlRune(rune) ||
-                _isInvisiblePathRune(rune) =>
+                _isInvisibleApprovalRune(rune) =>
           '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
         _ => String.fromCharCode(rune),
       };
@@ -291,6 +291,12 @@ abstract final class SafeMetadata {
         );
         continue;
       }
+      if (_isInvisibleApprovalRune(rune)) {
+        buffer.write(
+          '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
+        );
+        continue;
+      }
       switch (rune) {
         case 0x09:
           buffer.write(r'\t');
@@ -318,7 +324,7 @@ abstract final class SafeMetadata {
       (rune >= 0x202A && rune <= 0x202E) ||
       (rune >= 0x2066 && rune <= 0x2069);
 
-  static bool _isInvisiblePathRune(int rune) =>
+  static bool _isInvisibleApprovalRune(int rune) =>
       rune == 0x00A0 ||
       rune == 0x1680 ||
       (rune >= 0x2000 && rune <= 0x200B) ||

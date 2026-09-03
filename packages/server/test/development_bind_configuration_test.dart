@@ -59,6 +59,32 @@ void main() {
     );
   });
 
+  test('iOS validation accepts the derived IPv6 loopback URL', () async {
+    for (final bindAddress in ['::1', '::']) {
+      final result = await _validateIosControlUrl(bindAddress: bindAddress);
+
+      expect(
+        result.exitCode,
+        0,
+        reason: 'BIND_ADDRESS=$bindAddress\n${result.stderr}',
+      );
+    }
+  });
+
+  test('iOS validation still rejects a non-loopback HTTP IPv6 URL', () async {
+    final result = await _validateIosControlUrl(
+      controlUrl: 'http://[2001:db8::1]:8080/',
+    );
+
+    expect(result.exitCode, 2);
+    expect(
+      result.stdout,
+      contains(
+        'iOS CONTROL_URL must use HTTPS or an HTTP loopback host for the simulator.',
+      ),
+    );
+  });
+
   test('make dev preserves an explicit client URL override', () async {
     final result = await _dryRunDev(
       '192.0.2.10',
@@ -102,6 +128,19 @@ Future<ProcessResult> _dryRunDev(String bindAddress, {String? controlUrl}) {
     '--no-print-directory',
     'dev',
     'BIND_ADDRESS=$bindAddress',
+    if (controlUrl != null) 'CONTROL_URL=$controlUrl',
+  ], workingDirectory: workspace.path);
+}
+
+Future<ProcessResult> _validateIosControlUrl({
+  String? bindAddress,
+  String? controlUrl,
+}) {
+  final workspace = Directory.current.parent.parent;
+  return Process.run('make', [
+    '--no-print-directory',
+    'validate-ios-control-url',
+    if (bindAddress != null) 'BIND_ADDRESS=$bindAddress',
     if (controlUrl != null) 'CONTROL_URL=$controlUrl',
   ], workingDirectory: workspace.path);
 }

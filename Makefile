@@ -138,7 +138,8 @@ app-ios dev-ios: validate-ios-control-url
 validate-ios-control-url:
 	@url="$(CONTROL_URL)"; \
 	if [[ "$$url" =~ ^https:// ]] || \
-	   [[ "$$url" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$$ ]]; then \
+	   [[ "$$url" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$$ ]] || \
+	   [[ "$$url" =~ ^http://\[::1\](:[0-9]+)?(/.*)?$$ ]]; then \
 	  exit 0; \
 	fi; \
 	echo "iOS CONTROL_URL must use HTTPS or an HTTP loopback host for the simulator."; \
