@@ -3,19 +3,25 @@ SHELL := bash.exe
 else
 SHELL := /bin/bash
 endif
+
+ENV_FILE ?= .env
+-include $(ENV_FILE)
+export DEXTERO_MODEL_PROVIDER DEXTERO_CODEX_MODEL DEXTERO_CODEX_MODELS
+export GEMINI_API_KEY DEXTERO_GEMINI_MODEL DEXTERO_GEMINI_MODELS
+
 .DEFAULT_GOAL := help
 
 DART ?= dart
 FLUTTER ?= flutter
 SERVERPOD ?= serverpod
 CONTROL_URL_SOURCE := $(origin CONTROL_URL)
-CONTROL_URL ?= http://localhost:8080/
-ANDROID_CONTROL_URL := $(if $(filter undefined,$(CONTROL_URL_SOURCE)),http://10.0.2.2:8080/,$(CONTROL_URL))
 BIND_ADDRESS ?= 127.0.0.1
 BIND_ADDRESS_IS_IPV6 := $(findstring :,$(BIND_ADDRESS))
 BIND_ADDRESS_IS_WILDCARD := $(filter 0.0.0.0 ::,$(BIND_ADDRESS))
 LOOPBACK_READY_HOST := $(if $(BIND_ADDRESS_IS_IPV6),[::1],127.0.0.1)
 SERVER_READY_HOST := $(if $(BIND_ADDRESS_IS_WILDCARD),$(LOOPBACK_READY_HOST),$(if $(BIND_ADDRESS_IS_IPV6),[$(BIND_ADDRESS)],$(BIND_ADDRESS)))
+CONTROL_URL ?= http://$(SERVER_READY_HOST):8080/
+ANDROID_CONTROL_URL := $(if $(filter undefined,$(CONTROL_URL_SOURCE)),http://10.0.2.2:8080/,$(CONTROL_URL))
 SERVER_READY_URL ?= http://$(SERVER_READY_HOST):8080/
 WORKSPACE ?= $(CURDIR)
 APP_DEVICE ?= chrome
@@ -157,7 +163,8 @@ app-windows: ## Run the Flutter Windows client (start the server separately).
 cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
 	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
-	 $(DART) run packages/cli/bin/dextero.dart $(if $(PROMPT),"$(PROMPT)",)
+	 $(DART) run packages/cli/bin/dextero.dart \
+	 $(if $(MODEL),--model "$(MODEL)",) $(if $(PROMPT),"$(PROMPT)",)
 
 core: ## Run the core directly through the configured provider without Serverpod.
 	@$(DART) run packages/core/bin/dextero_core.dart $(if $(PROMPT),"$(PROMPT)",)

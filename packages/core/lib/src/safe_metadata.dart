@@ -85,14 +85,8 @@ abstract final class SafeMetadata {
     final oldText = arguments['oldText'];
     final newText = arguments['newText'];
     if (oldText is! String || newText is! String) return text(heading);
-    final oldPreview = message(
-      _prefixedLines(_escapeBidirectionalControls(oldText), '-'),
-      maxCharacters: maxApprovalEditSideCharacters,
-    );
-    final newPreview = message(
-      _prefixedLines(_escapeBidirectionalControls(newText), '+'),
-      maxCharacters: maxApprovalEditSideCharacters,
-    );
+    final oldPreview = _approvalEditPreview(oldText, '-');
+    final newPreview = _approvalEditPreview(newText, '+');
     final preview = message(
       <String>[
         heading,
@@ -216,6 +210,69 @@ abstract final class SafeMetadata {
       .split(RegExp(r'\r\n|\r|\n'))
       .map((line) => '$prefix$line')
       .join('\n');
+
+  static SafeSummary _approvalEditPreview(String value, String prefix) {
+    final whitespaceVisible = _escapeSignificantApprovalWhitespace(value);
+    final safe = _escapeBidirectionalControls(whitespaceVisible);
+    return _bounded(
+      _prefixedLines(safe, prefix),
+      maxCharacters: maxApprovalEditSideCharacters,
+    );
+  }
+
+  static String _escapeSignificantApprovalWhitespace(String value) {
+    final buffer = StringBuffer();
+    var pendingSpaces = 0;
+
+    void writePendingSpaces({required bool trailing}) {
+      if (pendingSpaces == 0) return;
+      for (var index = 0; index < pendingSpaces; index++) {
+        buffer.write(trailing ? r'\u0020' : ' ');
+      }
+      pendingSpaces = 0;
+    }
+
+    for (final rune in value.runes) {
+      if (rune == 0x20) {
+        pendingSpaces++;
+        continue;
+      }
+      if (rune == 0x0A) {
+        writePendingSpaces(trailing: true);
+        buffer.write('\n');
+        continue;
+      }
+      if (rune == 0x0D) {
+        writePendingSpaces(trailing: true);
+        buffer.write(r'\r');
+        continue;
+      }
+      writePendingSpaces(trailing: false);
+      if (_isUnsafeControlRune(rune)) {
+        buffer.write(
+          '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
+        );
+        continue;
+      }
+      switch (rune) {
+        case 0x09:
+          buffer.write(r'\t');
+        case 0x5C:
+          buffer.write(r'\\');
+        default:
+          buffer.writeCharCode(rune);
+      }
+    }
+    writePendingSpaces(trailing: true);
+    return buffer.toString();
+  }
+
+  static bool _isUnsafeControlRune(int rune) =>
+      rune <= 0x08 ||
+      rune == 0x0B ||
+      rune == 0x0C ||
+      (rune >= 0x0E && rune <= 0x1F) ||
+      (rune >= 0x7F && rune <= 0x9F);
 
   static String _escapeBidirectionalControls(
     String value,

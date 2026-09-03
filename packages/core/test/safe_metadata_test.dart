@@ -40,7 +40,7 @@ void main() {
     expect(summary.text, contains(r'README\u202E.md'));
     expect(
       summary.text,
-      contains('--- old text\n-Old heading\n-old body\\u2066'),
+      contains('--- old text\n-Old heading\n-old body\\u001B[2J\\u2066'),
     );
     expect(summary.text, contains('+++ new text\n+New heading\\u2069'));
     expect(summary.text, isNot(contains('\x1b')));
@@ -53,6 +53,33 @@ void main() {
       lessThanOrEqualTo(SafeMetadata.maxToolResultCharacters),
     );
     expect(summary.truncated, isTrue);
+  });
+
+  test('makes significant whitespace unambiguous in approval previews', () {
+    final summary = SafeMetadata.approvalRequest('edit_file', {
+      'path': 'spacing.txt',
+      'oldText': 'indent\tvalue  \r\nline\\t \n',
+      'newText': 'indent  value\nline\\t\n',
+    });
+
+    expect(
+      summary.text,
+      contains(
+        r'-indent\tvalue\u0020\u0020\r'
+        '\n'
+        r'-line\\t\u0020'
+        '\n-',
+      ),
+    );
+    expect(
+      summary.text,
+      contains(
+        r'+indent  value'
+        '\n'
+        r'+line\\t'
+        '\n+',
+      ),
+    );
   });
 
   test('includes the complete command and structured output', () {

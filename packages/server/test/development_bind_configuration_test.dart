@@ -11,6 +11,10 @@ void main() {
       result.stdout,
       contains('curl --silent --output /dev/null "http://192.0.2.10:8080/"'),
     );
+    expect(
+      result.stdout,
+      contains('--dart-define="DEXTERO_CONTROL_URL=http://192.0.2.10:8080/"'),
+    );
   });
 
   test('make dev probes loopback for a wildcard bind address', () async {
@@ -20,6 +24,10 @@ void main() {
     expect(
       result.stdout,
       contains('curl --silent --output /dev/null "http://127.0.0.1:8080/"'),
+    );
+    expect(
+      result.stdout,
+      contains('--dart-define="DEXTERO_CONTROL_URL=http://127.0.0.1:8080/"'),
     );
   });
 
@@ -31,6 +39,10 @@ void main() {
       result.stdout,
       contains('curl --silent --output /dev/null "http://[::1]:8080/"'),
     );
+    expect(
+      result.stdout,
+      contains('--dart-define="DEXTERO_CONTROL_URL=http://[::1]:8080/"'),
+    );
   });
 
   test('make dev probes IPv6 loopback for an IPv6 wildcard bind', () async {
@@ -41,15 +53,35 @@ void main() {
       result.stdout,
       contains('curl --silent --output /dev/null "http://[::1]:8080/"'),
     );
+    expect(
+      result.stdout,
+      contains('--dart-define="DEXTERO_CONTROL_URL=http://[::1]:8080/"'),
+    );
+  });
+
+  test('make dev preserves an explicit client URL override', () async {
+    final result = await _dryRunDev(
+      '192.0.2.10',
+      controlUrl: 'https://controller.example/',
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr.toString());
+    expect(
+      result.stdout,
+      contains(
+        '--dart-define="DEXTERO_CONTROL_URL=https://controller.example/"',
+      ),
+    );
   });
 }
 
-Future<ProcessResult> _dryRunDev(String bindAddress) {
+Future<ProcessResult> _dryRunDev(String bindAddress, {String? controlUrl}) {
   final workspace = Directory.current.parent.parent;
   return Process.run('make', [
     '--dry-run',
     '--no-print-directory',
     'dev',
     'BIND_ADDRESS=$bindAddress',
+    if (controlUrl != null) 'CONTROL_URL=$controlUrl',
   ], workingDirectory: workspace.path);
 }

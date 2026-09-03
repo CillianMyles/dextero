@@ -40,10 +40,14 @@ final class TerminalChat {
     String? cancelRunId,
     String? approveRunId,
     String? approvalId,
+    String? modelName,
   }) async {
     var failed = false;
     try {
       _status = await _client.status();
+      if (modelName != null && modelName != _status.modelName) {
+        _status = await _client.selectModel(modelName);
+      }
       if (cancelRunId != null) {
         final cancelled = await _client.cancelRun(
           _status.conversationId,
@@ -117,6 +121,7 @@ final class TerminalChat {
       ChatSubmitRequest(
         conversationId: _status.conversationId,
         message: normalized,
+        modelName: _status.modelName,
         correlationId: _correlationIdFactory(),
       ),
     );

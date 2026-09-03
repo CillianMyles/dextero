@@ -17,12 +17,14 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
   ChatSubmitRequest._({
     required this.conversationId,
     required this.message,
+    required this.modelName,
     this.correlationId,
   });
 
   factory ChatSubmitRequest({
     required String conversationId,
     required String message,
+    required String modelName,
     String? correlationId,
   }) = _ChatSubmitRequestImpl;
 
@@ -30,6 +32,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
     return ChatSubmitRequest(
       conversationId: jsonSerialization['conversationId'] as String,
       message: jsonSerialization['message'] as String,
+      modelName: jsonSerialization['modelName'] as String,
       correlationId: jsonSerialization['correlationId'] as String?,
     );
   }
@@ -37,6 +40,8 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
   String conversationId;
 
   String message;
+
+  String modelName;
 
   String? correlationId;
 
@@ -46,6 +51,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
   ChatSubmitRequest copyWith({
     String? conversationId,
     String? message,
+    String? modelName,
     String? correlationId,
   });
   @override
@@ -54,6 +60,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
       '__className__': 'ChatSubmitRequest',
       'conversationId': conversationId,
       'message': message,
+      'modelName': modelName,
       if (correlationId != null) 'correlationId': correlationId,
     };
   }
@@ -70,10 +77,12 @@ class _ChatSubmitRequestImpl extends ChatSubmitRequest {
   _ChatSubmitRequestImpl({
     required String conversationId,
     required String message,
+    required String modelName,
     String? correlationId,
   }) : super._(
          conversationId: conversationId,
          message: message,
+         modelName: modelName,
          correlationId: correlationId,
        );
 
@@ -84,11 +93,13 @@ class _ChatSubmitRequestImpl extends ChatSubmitRequest {
   ChatSubmitRequest copyWith({
     String? conversationId,
     String? message,
+    String? modelName,
     Object? correlationId = _Undefined,
   }) {
     return ChatSubmitRequest(
       conversationId: conversationId ?? this.conversationId,
       message: message ?? this.message,
+      modelName: modelName ?? this.modelName,
       correlationId: correlationId is String?
           ? correlationId
           : this.correlationId,

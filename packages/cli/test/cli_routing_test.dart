@@ -21,7 +21,7 @@ void main() {
           'DEXTERO_CONTROL_TOKEN': 'test-token-0123456789-0123456789',
         },
         clientFactory: ({required serverUrl, required token}) => client,
-        tuiRunner: ({required client}) async {
+        tuiRunner: ({required client, modelName}) async {
           tuiRuns++;
           return 0;
         },
@@ -60,19 +60,49 @@ void main() {
       'status': 'approved',
     });
   });
+
+  test('passes a startup model selection into the Nocterm TUI', () async {
+    final io = _FakeIo(
+      lines: const [],
+      hasInputTerminal: true,
+      hasOutputTerminal: true,
+    );
+    final client = _FakeClient();
+    String? selectedModel;
+
+    final result = await cli.run(
+      const ['--model', 'gemini-pro'],
+      io: io,
+      environment: const {
+        'DEXTERO_CONTROL_TOKEN': 'test-token-0123456789-0123456789',
+      },
+      clientFactory: ({required serverUrl, required token}) => client,
+      tuiRunner: ({required client, modelName}) async {
+        selectedModel = modelName;
+        return 0;
+      },
+    );
+
+    expect(result, 0);
+    expect(selectedModel, 'gemini-pro');
+  });
 }
 
 final class _FakeIo implements TerminalIo {
-  _FakeIo({required List<String> lines}) : _lines = List.of(lines);
+  _FakeIo({
+    required List<String> lines,
+    this.hasInputTerminal = false,
+    this.hasOutputTerminal = true,
+  }) : _lines = List.of(lines);
 
   final List<String> _lines;
   final output = <String>[];
 
   @override
-  bool get hasInputTerminal => false;
+  final bool hasInputTerminal;
 
   @override
-  bool get hasOutputTerminal => true;
+  final bool hasOutputTerminal;
 
   @override
   void error(String value) {}
@@ -123,7 +153,11 @@ final class _FakeClient implements TerminalChatClient {
     streamingAvailable: true,
     modelProvider: 'gemini',
     modelName: 'gemini-2.5-flash',
+    availableModels: const ['gemini-2.5-flash'],
   );
+
+  @override
+  Future<HostStatus> selectModel(String modelName) async => status();
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>

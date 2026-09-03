@@ -29,8 +29,24 @@ void main() {
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
     expect(find.text('Gemini · gemini-2.5-flash'), findsOneWidget);
     expect(find.byType(ShadEmpty), findsOneWidget);
-    expect(find.byType(ShadBadge), findsNWidgets(3));
+    expect(find.byType(ShadBadge), findsNWidgets(2));
     expect(find.byType(ShadInput), findsOneWidget);
+  });
+
+  testWidgets('selects a model before the first message', (tester) async {
+    final api = _FakeChatApi(status: Future.value(_status()));
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('model-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('gemini-pro').last);
+    await tester.pumpAndSettle();
+
+    expect(api.modelSelections, ['gemini-pro']);
+    expect(controller.hostStatus!.modelName, 'gemini-pro');
+    expect(find.text('Gemini · gemini-pro'), findsOneWidget);
   });
 
   testWidgets('keeps the connected chat controls usable at phone width', (
@@ -543,6 +559,7 @@ final class _FakeChatApi implements ChatApi {
   final Future<ChatSubmission> Function(ChatSubmitRequest request)? submitter;
   final List<ChatEntry> initialHistory;
   final submissions = <ChatSubmitRequest>[];
+  final modelSelections = <String>[];
   final cancellations = <(String, String)>[];
   final approvals = <(String, String, String)>[];
   final _stream = StreamController<ChatEntry>.broadcast();
@@ -576,6 +593,12 @@ final class _FakeChatApi implements ChatApi {
   Future<HostStatus> status() => statusFuture;
 
   @override
+  Future<HostStatus> selectModel(String modelName) async {
+    modelSelections.add(modelName);
+    return _status(modelName: modelName);
+  }
+
+  @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
       _stream.stream;
 
@@ -587,7 +610,7 @@ final class _FakeChatApi implements ChatApi {
   }
 }
 
-HostStatus _status() => HostStatus(
+HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
   startedAt: DateTime.utc(2026),
@@ -597,7 +620,8 @@ HostStatus _status() => HostStatus(
   databaseRequired: false,
   streamingAvailable: true,
   modelProvider: 'gemini',
-  modelName: 'gemini-2.5-flash',
+  modelName: modelName,
+  availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
 );
 
 ChatSubmission _submission(String message) => ChatSubmission(

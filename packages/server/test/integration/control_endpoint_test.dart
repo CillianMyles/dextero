@@ -13,14 +13,24 @@ void main() {
   late core.InMemoryChatHistoryStore store;
   late core.ChatService service;
   late String conversationId;
+  late String selectedModel;
 
   setUp(() async {
     store = core.InMemoryChatHistoryStore();
     service = core.ChatService(store: store, agent: _FakeConversationAgent());
     conversationId = (await service.createConversation()).id;
+    selectedModel = 'default';
     ChatRuntime.configure(
       chatService: service,
       defaultConversationId: conversationId,
+      availableModels: const ['default', core.codexSparkModel],
+      modelSelector: (modelName) async {
+        await service.selectAgent(
+          conversationId: conversationId,
+          agent: _FakeConversationAgent(modelName: modelName),
+        );
+        selectedModel = modelName;
+      },
     );
   });
 
@@ -64,7 +74,71 @@ void main() {
       expect(status.streamingAvailable, isTrue);
       expect(status.modelProvider, 'codex');
       expect(status.modelName, 'default');
+      expect(status.availableModels, ['default', core.codexSparkModel]);
       expect(status.startedAt.isUtc, isTrue);
+    });
+
+    test('selects an advertised model before the first message', () async {
+      final status = await endpoints.control.selectModel(
+        authenticatedSession,
+        core.codexSparkModel,
+      );
+
+      expect(status.modelName, core.codexSparkModel);
+      expect(selectedModel, core.codexSparkModel);
+    });
+
+    test('rejects a stale client model before accepting its message', () async {
+      await endpoints.control.selectModel(
+        authenticatedSession,
+        core.codexSparkModel,
+      );
+
+      await expectLater(
+        endpoints.control.submitMessage(
+          authenticatedSession,
+          ChatSubmitRequest(
+            conversationId: conversationId,
+            message: 'Use the stale choice',
+            modelName: 'default',
+          ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains(core.codexSparkModel),
+          ),
+        ),
+      );
+      expect(await store.history(conversationId), isEmpty);
+    });
+
+    test('rejects model changes after the first message', () async {
+      final submission = await endpoints.control.submitMessage(
+        authenticatedSession,
+        ChatSubmitRequest(
+          conversationId: conversationId,
+          message: 'Start',
+          modelName: 'default',
+        ),
+      );
+      await store
+          .watch(conversationId)
+          .firstWhere(
+            (entry) =>
+                entry.runId == submission.runId &&
+                entry.kind == core.ChatEntryKind.lifecycle &&
+                entry.status == core.ChatEntryStatus.completed,
+          );
+
+      await expectLater(
+        endpoints.control.selectModel(
+          authenticatedSession,
+          core.codexSparkModel,
+        ),
+        throwsStateError,
+      );
     });
 
     test(
@@ -75,6 +149,7 @@ void main() {
           ChatSubmitRequest(
             conversationId: conversationId,
             message: 'Inspect the workspace',
+            modelName: 'default',
             correlationId: 'client-1',
           ),
         );
@@ -146,7 +221,11 @@ void main() {
       await expectLater(
         endpoints.control.submitMessage(
           authenticatedSession,
-          ChatSubmitRequest(conversationId: conversationId, message: '   '),
+          ChatSubmitRequest(
+            conversationId: conversationId,
+            message: '   ',
+            modelName: 'default',
+          ),
         ),
         throwsArgumentError,
       );
@@ -180,7 +259,11 @@ void main() {
       );
       final submission = await endpoints.control.submitMessage(
         authenticatedSession,
-        ChatSubmitRequest(conversationId: conversationId, message: 'Long task'),
+        ChatSubmitRequest(
+          conversationId: conversationId,
+          message: 'Long task',
+          modelName: 'default',
+        ),
       );
       await transport.started.future;
 
@@ -216,6 +299,7 @@ void main() {
         ChatSubmitRequest(
           conversationId: conversationId,
           message: 'Edit README.md',
+          modelName: 'default',
         ),
       );
       final pending = await store
@@ -323,6 +407,10 @@ final class _CancellableGeminiTransport implements core.GeminiTransport {
 }
 
 final class _FakeConversationAgent implements core.ConversationAgent {
+  const _FakeConversationAgent({this.modelName = 'default'});
+
+  final String modelName;
+
   @override
   Future<core.ConversationAgentResult> run(
     String prompt, {
@@ -332,7 +420,7 @@ final class _FakeConversationAgent implements core.ConversationAgent {
     await onEvent(
       core.ConversationAgentEvent(
         kind: core.ConversationAgentEventKind.lifecycle,
-        summary: core.SafeMetadata.text('Codex is working'),
+        summary: core.SafeMetadata.text('$modelName is working'),
       ),
     );
     await onEvent(

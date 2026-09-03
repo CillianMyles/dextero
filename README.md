@@ -47,22 +47,27 @@ Requirements:
 Start the server and web app:
 
 ```sh
+cp .env.example .env
 make bootstrap
 make dev
 ```
 
-To use Gemini instead of Codex, provide the key when starting the host. A
-non-empty key selects Gemini automatically:
+Make loads local provider settings and credentials from the ignored `.env`
+file. Keep values unquoted because the file uses Make assignment syntax. To use
+Gemini instead of Codex, set `DEXTERO_MODEL_PROVIDER=gemini` and add the key:
 
 ```sh
-GEMINI_API_KEY="your-key" make dev
+GEMINI_API_KEY=your-key
 ```
 
-The default model is `gemini-2.5-flash`. Set `DEXTERO_GEMINI_MODEL` to use a
-different Gemini model. `DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the
-automatic provider choice; explicitly choosing Gemini requires
-`GEMINI_API_KEY`. The Flutter app and CLI show the active provider and model
-reported by the server.
+`DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the automatic provider choice;
+without an explicit provider, a non-empty Gemini key selects Gemini. The
+initial models come from `DEXTERO_CODEX_MODEL` and `DEXTERO_GEMINI_MODEL`.
+Comma-separated `DEXTERO_CODEX_MODELS` and `DEXTERO_GEMINI_MODELS` values
+control the choices clients may select before the first message. The defaults
+offer Codex's configured default and `gpt-5.3-codex-spark`; Gemini defaults to
+`gemini-2.5-flash`. Spark requires a ChatGPT Pro-authenticated Codex CLI and is
+not an API-key model.
 
 Use the native client for the current desktop platform:
 
@@ -111,8 +116,19 @@ make cli PROMPT="Inspect this workspace and summarize its architecture"
 ```
 
 One-shot prompts, cancellation, and JSONL remain non-interactive so they can be
-used safely from scripts. Pass `--jsonl` directly to the CLI for schema-v1
-line-oriented event output:
+used safely from scripts.
+
+Select an advertised model when starting the CLI conversation:
+
+```sh
+make cli MODEL=gpt-5.3-codex-spark PROMPT="Run the focused tests"
+```
+
+The Flutter header provides the same model chooser. In the interactive TUI,
+use `/model <name>` before the first message. Model selection is locked after
+the first message so one in-memory conversation uses one model.
+
+Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
 
 ```sh
 dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"
@@ -141,6 +157,9 @@ only when a protected local-network controller or tunnel needs direct access:
 make server BIND_ADDRESS=192.168.1.20
 ```
 
+`make dev` points its client at that bind address unless `CONTROL_URL` is set
+explicitly.
+
 The bearer token does not encrypt traffic. Keep non-loopback port 8080
 firewalled from untrusted networks and use an authenticated HTTPS proxy or
 protected tunnel for physical devices.
@@ -158,7 +177,8 @@ history, or tool subprocess environments.
 ## Serverpod changes
 
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
-typed submission, history, streaming, approval, and cancellation operations.
+typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
+and `cancelRun` operations.
 Generated server, client, and test code is committed. After changing an
 endpoint or `.spy.yaml` model, run:
 

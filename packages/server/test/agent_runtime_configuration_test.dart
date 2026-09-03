@@ -7,7 +7,8 @@ void main() {
 
     expect(configuration.provider, AgentProvider.codex);
     expect(configuration.providerName, 'codex');
-    expect(configuration.modelName, 'default');
+    expect(configuration.modelName, defaultCodexModel);
+    expect(configuration.availableModels, [defaultCodexModel, codexSparkModel]);
   });
 
   test('selects Gemini when an API key is plugged in', () {

@@ -142,6 +142,90 @@ void main() {
     await _waitForTerminal(store, conversation.id, first.runId);
   });
 
+  test('selects a different agent before the first message', () async {
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final service = ChatService(store: store, agent: _StaticAgent('initial'));
+    final conversation = await service.createConversation();
+
+    await service.selectAgent(
+      conversationId: conversation.id,
+      agent: _StaticAgent('selected'),
+    );
+    final submission = await service.submit(
+      conversationId: conversation.id,
+      message: 'go',
+    );
+    await _waitForTerminal(store, conversation.id, submission.runId);
+
+    final assistant = (await store.history(
+      conversation.id,
+    )).singleWhere((entry) => entry.kind == ChatEntryKind.assistantMessage);
+    expect(assistant.content, 'selected');
+  });
+
+  test('rejects agent changes after the first message', () async {
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final agent = _ControlledAgent();
+    final service = ChatService(store: store, agent: agent);
+    final conversation = await service.createConversation();
+    final submission = await service.submit(
+      conversationId: conversation.id,
+      message: 'go',
+    );
+
+    await expectLater(
+      service.selectAgent(
+        conversationId: conversation.id,
+        agent: _StaticAgent('too late'),
+      ),
+      throwsStateError,
+    );
+    agent.release.complete();
+    await _waitForTerminal(store, conversation.id, submission.runId);
+  });
+
+  test('scopes selected agents to their conversation', () async {
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final service = ChatService(store: store, agent: _StaticAgent('initial'));
+    final firstConversation = await service.createConversation();
+    final secondConversation = await service.createConversation();
+
+    final firstSubmission = await service.submit(
+      conversationId: firstConversation.id,
+      message: 'first',
+    );
+    await _waitForTerminal(store, firstConversation.id, firstSubmission.runId);
+    await service.selectAgent(
+      conversationId: secondConversation.id,
+      agent: _StaticAgent('selected'),
+    );
+
+    final nextFirstSubmission = await service.submit(
+      conversationId: firstConversation.id,
+      message: 'first again',
+    );
+    final secondSubmission = await service.submit(
+      conversationId: secondConversation.id,
+      message: 'second',
+    );
+    await Future.wait([
+      _waitForTerminal(store, firstConversation.id, nextFirstSubmission.runId),
+      _waitForTerminal(store, secondConversation.id, secondSubmission.runId),
+    ]);
+
+    final firstOutputs = (await store.history(firstConversation.id))
+        .where((entry) => entry.kind == ChatEntryKind.assistantMessage)
+        .map((entry) => entry.content);
+    final secondOutput = (await store.history(
+      secondConversation.id,
+    )).singleWhere((entry) => entry.kind == ChatEntryKind.assistantMessage);
+    expect(firstOutputs, ['initial', 'initial']);
+    expect(secondOutput.content, 'selected');
+  });
+
   test(
     'cancels the active run and records a clean terminal lifecycle',
     () async {
@@ -468,6 +552,19 @@ final class _MultilineAgent implements ConversationAgent {
   }) async => const ConversationAgentResult(
     output: 'First paragraph\n\n```dart\nprint(1);\n```\x1b[2J',
   );
+}
+
+final class _StaticAgent implements ConversationAgent {
+  const _StaticAgent(this.output);
+
+  final String output;
+
+  @override
+  Future<ConversationAgentResult> run(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+  }) async => ConversationAgentResult(output: output);
 }
 
 final class _SequenceIdentifiers implements IdentifierGenerator {

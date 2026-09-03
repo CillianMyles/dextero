@@ -10,6 +10,7 @@ typedef TuiExit = void Function(int exitCode);
 
 Future<int> runNoctermChat({
   required TerminalChatClient client,
+  String? modelName,
   String Function()? correlationIdFactory,
 }) async {
   var exitCode = 0;
@@ -17,6 +18,7 @@ Future<int> runNoctermChat({
     await runApp(
       DexteroTui(
         client: client,
+        modelName: modelName,
         correlationIdFactory: correlationIdFactory,
         onExit: (code) {
           exitCode = code;
@@ -35,6 +37,7 @@ final class DexteroTui extends StatefulComponent {
   DexteroTui({
     required this.client,
     required this.onExit,
+    this.modelName,
     String Function()? correlationIdFactory,
     super.key,
   }) : correlationIdFactory =
@@ -44,6 +47,7 @@ final class DexteroTui extends StatefulComponent {
 
   final TerminalChatClient client;
   final TuiExit onExit;
+  final String? modelName;
   final String Function() correlationIdFactory;
 
   @override
@@ -81,7 +85,11 @@ final class _DexteroTuiState extends State<DexteroTui> {
 
   Future<void> _load() async {
     try {
-      final status = await component.client.status();
+      var status = await component.client.status();
+      final requestedModel = component.modelName;
+      if (requestedModel != null && requestedModel != status.modelName) {
+        status = await component.client.selectModel(requestedModel);
+      }
       final history = await component.client.history(status.conversationId);
       history.sort((left, right) => left.sequence.compareTo(right.sequence));
       if (!mounted) return;
@@ -105,6 +113,14 @@ final class _DexteroTuiState extends State<DexteroTui> {
     }
     if (message.isEmpty || _sending || _status == null) return;
 
+    if (message == '/models' ||
+        message == '/model' ||
+        message.startsWith('/model ')) {
+      _inputController.clear();
+      await _selectModel(message);
+      return;
+    }
+
     _inputController.clear();
     setState(() {
       _sending = true;
@@ -117,6 +133,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
         ChatSubmitRequest(
           conversationId: status.conversationId,
           message: message,
+          modelName: status.modelName,
           correlationId: component.correlationIdFactory(),
         ),
       );
@@ -162,6 +179,50 @@ final class _DexteroTuiState extends State<DexteroTui> {
     } on Object catch (error) {
       _showError('Request failed: $error');
     }
+  }
+
+  Future<void> _selectModel(String command) async {
+    final status = _status!;
+    if (_entries.isNotEmpty) {
+      _showNotice('Model selection is locked after the first message.');
+      return;
+    }
+    final parts = command.split(RegExp(r'\s+'));
+    if (parts.length != 2 || command == '/models') {
+      _showNotice('Models: ${status.availableModels.join(', ')}');
+      return;
+    }
+    final modelName = parts[1];
+    if (!status.availableModels.contains(modelName)) {
+      _showNotice(
+        'Unknown model. Choose: ${status.availableModels.join(', ')}',
+      );
+      return;
+    }
+    if (modelName == status.modelName) {
+      _showNotice('Already using $modelName');
+      return;
+    }
+    setState(() {
+      _sending = true;
+      _notice = 'Selecting $modelName…';
+    });
+    try {
+      final selected = await component.client.selectModel(modelName);
+      if (!mounted) return;
+      setState(() {
+        _status = selected;
+        _sending = false;
+        _notice = 'Using ${selected.modelName}';
+      });
+    } on Object catch (error) {
+      _showError('Model selection failed: $error');
+    }
+  }
+
+  void _showNotice(String message) {
+    if (!mounted) return;
+    setState(() => _notice = message);
   }
 
   void _add(ChatEntry entry) {
@@ -247,7 +308,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
                       child: Text(
                         status == null
                             ? 'Connecting…'
-                            : 'No messages yet. Type a message below.',
+                            : 'No messages yet. Use /model <name> or type a message.',
                         style: TextStyle(color: _muted),
                       ),
                     )
@@ -314,7 +375,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
                     ),
                   ),
                   Text(
-                    'Enter send  ·  /exit or Ctrl+C quit',
+                    'Enter send  ·  /models list  ·  /exit or Ctrl+C quit',
                     style: TextStyle(color: _muted),
                   ),
                 ],

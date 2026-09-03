@@ -3,6 +3,8 @@ import 'package:dextero_server/dextero_client.dart';
 abstract interface class TerminalChatClient {
   Future<HostStatus> status();
 
+  Future<HostStatus> selectModel(String modelName);
+
   Future<List<ChatEntry>> history(String conversationId);
 
   Future<ChatSubmission> submit(ChatSubmitRequest request);
@@ -34,6 +36,10 @@ final class ServerpodTerminalChatClient implements TerminalChatClient {
 
   @override
   Future<HostStatus> status() => _client.control.status();
+
+  @override
+  Future<HostStatus> selectModel(String modelName) =>
+      _client.control.selectModel(modelName);
 
   @override
   Future<List<ChatEntry>> history(String conversationId) =>

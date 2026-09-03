@@ -8,6 +8,8 @@ enum ChatLoadState { loading, empty, ready, error }
 abstract interface class ChatApi {
   Future<HostStatus> status();
 
+  Future<HostStatus> selectModel(String modelName);
+
   Future<List<ChatEntry>> history(String conversationId);
 
   Future<ChatSubmission> submit(ChatSubmitRequest request);
@@ -36,6 +38,10 @@ final class ServerpodChatApi implements ChatApi {
 
   @override
   Future<HostStatus> status() => _client.control.status();
+
+  @override
+  Future<HostStatus> selectModel(String modelName) =>
+      _client.control.selectModel(modelName);
 
   @override
   Future<List<ChatEntry>> history(String conversationId) =>
@@ -103,6 +109,7 @@ final class DexteroController extends ChangeNotifier {
   bool _submitting = false;
   bool _cancelling = false;
   bool _approving = false;
+  bool _selectingModel = false;
   String? _activeRunId;
   bool _initialized = false;
 
@@ -112,8 +119,12 @@ final class DexteroController extends ChangeNotifier {
   bool get submitting => _submitting;
   bool get cancelling => _cancelling;
   bool get approving => _approving;
+  bool get selectingModel => _selectingModel;
   bool get busy => _submitting || _activeRunId != null;
   bool get canCancel => _activeRunId != null && !_cancelling;
+  bool get canSubmit => _hostStatus != null && !busy && !_selectingModel;
+  bool get canSelectModel =>
+      _hostStatus != null && _entries.isEmpty && !busy && !_selectingModel;
   List<ChatEntry> get entries => List.unmodifiable(_entries);
 
   ChatEntry? get pendingApproval {
@@ -220,10 +231,35 @@ final class DexteroController extends ChangeNotifier {
     }
   }
 
+  Future<bool> selectModel(String modelName) async {
+    final status = _hostStatus;
+    final normalized = modelName.trim();
+    if (status == null ||
+        normalized.isEmpty ||
+        normalized == status.modelName ||
+        !canSelectModel) {
+      return false;
+    }
+
+    _selectingModel = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _hostStatus = await _api.selectModel(normalized);
+      return true;
+    } on Object catch (error) {
+      _error = 'Model selection failed: $error';
+      return false;
+    } finally {
+      _selectingModel = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> submitMessage(String message) async {
     final status = _hostStatus;
     final normalized = message.trim();
-    if (status == null || normalized.isEmpty || busy) return false;
+    if (status == null || normalized.isEmpty || !canSubmit) return false;
 
     _submitting = true;
     _error = null;
@@ -233,6 +269,7 @@ final class DexteroController extends ChangeNotifier {
         ChatSubmitRequest(
           conversationId: status.conversationId,
           message: normalized,
+          modelName: status.modelName,
           correlationId: _correlationIdFactory(),
         ),
       );
@@ -368,6 +405,9 @@ final class _UnavailableChatApi implements ChatApi {
 
   @override
   Future<HostStatus> status() async => _unavailable();
+
+  @override
+  Future<HostStatus> selectModel(String modelName) async => _unavailable();
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>

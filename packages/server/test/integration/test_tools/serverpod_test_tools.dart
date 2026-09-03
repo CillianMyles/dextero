@@ -162,6 +162,37 @@ class _ControlEndpoint {
     });
   }
 
+  _i3.Future<_i4.HostStatus> selectModel(
+    _i1.TestSessionBuilder sessionBuilder,
+    String modelName,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'control',
+            method: 'selectModel',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'control',
+          methodName: 'selectModel',
+          parameters: _i1.testObjectToJson({'modelName': modelName}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i4.HostStatus>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
   _i3.Future<_i5.ChatSubmission> submitMessage(
     _i1.TestSessionBuilder sessionBuilder,
     _i6.ChatSubmitRequest request,
