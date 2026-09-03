@@ -13,6 +13,7 @@ final class SafeSummary {
 abstract final class SafeMetadata {
   static const maxDisplayCharacters = 480;
   static const maxToolResultCharacters = 4000;
+  static const maxApprovalEditSideCharacters = 1800;
   static const maxMessageCharacters = 16000;
 
   static final _summaryWhitespace = RegExp(r'[\r\n\t]+');
@@ -67,6 +68,41 @@ abstract final class SafeMetadata {
       if (command != null) detail = ': $command';
     }
     return text('${_safeToolName(toolName)} started$detail');
+  }
+
+  /// Describes the exact operation awaiting approval without exposing raw
+  /// protocol payloads. File edits include a bounded old/new text preview.
+  static SafeSummary approvalRequest(String toolName, JsonMap arguments) {
+    if (toolName != 'edit_file') return toolCall(toolName, arguments);
+    final path = _safePath(arguments['path']);
+    final detail = path == null ? '' : ' for $path';
+    final heading = '${_safeToolName(toolName)} requires approval$detail';
+    final oldText = arguments['oldText'];
+    final newText = arguments['newText'];
+    if (oldText is! String || newText is! String) return text(heading);
+    final oldPreview = message(
+      _prefixedLines(oldText, '-'),
+      maxCharacters: maxApprovalEditSideCharacters,
+    );
+    final newPreview = message(
+      _prefixedLines(newText, '+'),
+      maxCharacters: maxApprovalEditSideCharacters,
+    );
+    final preview = message(
+      <String>[
+        heading,
+        '--- old text',
+        oldPreview.text,
+        '+++ new text',
+        newPreview.text,
+      ].join('\n'),
+      maxCharacters: maxToolResultCharacters,
+    );
+    return SafeSummary(
+      preview.text,
+      truncated:
+          preview.truncated || oldPreview.truncated || newPreview.truncated,
+    );
   }
 
   static String toolName(String value) {

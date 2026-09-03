@@ -50,7 +50,13 @@ final class TerminalChat {
           cancelRunId,
         );
         _io.writeln(
-          cancelled
+          outputMode == TerminalOutputMode.jsonl
+              ? _jsonlRenderer.cancellationResult(
+                  conversationId: _status.conversationId,
+                  runId: cancelRunId,
+                  accepted: cancelled,
+                )
+              : cancelled
               ? 'Cancellation requested for $cancelRunId.'
               : 'Run $cancelRunId is not active.',
         );
@@ -63,7 +69,14 @@ final class TerminalChat {
           approvalId,
         );
         _io.writeln(
-          approved
+          outputMode == TerminalOutputMode.jsonl
+              ? _jsonlRenderer.approvalResult(
+                  conversationId: _status.conversationId,
+                  runId: approveRunId,
+                  approvalId: approvalId,
+                  accepted: approved,
+                )
+              : approved
               ? 'Approved $approvalId for $approveRunId.'
               : 'Approval $approvalId is not pending for $approveRunId.',
         );

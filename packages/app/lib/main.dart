@@ -818,10 +818,17 @@ class _ApprovalPrompt extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  approval.content,
-                  style: theme.textTheme.small.copyWith(
-                    color: theme.colorScheme.mutedForeground,
+                ConstrainedBox(
+                  key: const Key('approval-preview'),
+                  constraints: const BoxConstraints(maxHeight: 144),
+                  child: SingleChildScrollView(
+                    primary: false,
+                    child: SelectableText(
+                      approval.content,
+                      style: theme.textTheme.small.copyWith(
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
                   ),
                 ),
               ],

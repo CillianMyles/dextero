@@ -101,6 +101,30 @@ void main() {
     expect(io.output.join(), contains('Approved approval-7'));
   });
 
+  test('emits accepted and rejected approvals as JSONL', () async {
+    for (final accepted in [true, false]) {
+      final client = _FakeClient(approvalAccepted: accepted);
+      final io = _FakeIo(lines: const []);
+
+      final result = await TerminalChat(
+        client: client,
+        io: io,
+        outputMode: TerminalOutputMode.jsonl,
+      ).run(approveRunId: 'run-42', approvalId: 'approval-7');
+
+      expect(result, accepted ? 0 : 1);
+      expect(jsonDecode(io.output.single), {
+        'schema_version': 1,
+        'type': 'approval_result',
+        'conversation_id': 'conversation-1',
+        'run_id': 'run-42',
+        'approval_id': 'approval-7',
+        'accepted': accepted,
+        'status': accepted ? 'approved' : 'not_pending',
+      });
+    }
+  });
+
   test('emits only stable JSONL events in automation mode', () async {
     final client = _FakeClient();
     final io = _FakeIo(lines: const []);
@@ -127,11 +151,13 @@ final class _FakeClient implements TerminalChatClient {
     this.fail = false,
     this.endBeforeTerminal = false,
     this.statusError,
+    this.approvalAccepted = true,
   });
 
   final bool fail;
   final bool endBeforeTerminal;
   final Object? statusError;
+  final bool approvalAccepted;
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
   bool closed = false;
@@ -156,7 +182,7 @@ final class _FakeClient implements TerminalChatClient {
     String approvalId,
   ) async {
     approvals.add((conversationId, runId, approvalId));
-    return true;
+    return approvalAccepted;
   }
 
   @override

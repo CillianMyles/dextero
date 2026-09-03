@@ -29,6 +29,24 @@ void main() {
     expect(summary.text, 'run_command failed: password=hunter2 and raw stderr');
   });
 
+  test('shows a bounded, sanitized edit preview for approval', () {
+    final summary = SafeMetadata.approvalRequest('edit_file', {
+      'path': 'README.md',
+      'oldText': 'Old heading\nold body\x1b[2J\n${'o' * 5000}',
+      'newText': 'New heading\n${'n' * 5000}',
+    });
+
+    expect(summary.text, startsWith('edit_file requires approval'));
+    expect(summary.text, contains('--- old text\n-Old heading\n-old body'));
+    expect(summary.text, contains('+++ new text\n+New heading'));
+    expect(summary.text, isNot(contains('\x1b')));
+    expect(
+      summary.text.length,
+      lessThanOrEqualTo(SafeMetadata.maxToolResultCharacters),
+    );
+    expect(summary.truncated, isTrue);
+  });
+
   test('includes the complete command and structured output', () {
     final started = SafeMetadata.toolCall('run_command', const {
       'command': '/usr/bin/sed',

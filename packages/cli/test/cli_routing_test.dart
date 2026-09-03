@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_server/dextero_client.dart';
 import 'package:test/test.dart';
@@ -32,6 +34,32 @@ void main() {
       expect(client.closed, isTrue);
     },
   );
+
+  test('routes --jsonl approval results as machine-readable output', () async {
+    final io = _FakeIo(lines: const []);
+    final client = _FakeClient();
+
+    final result = await cli.run(
+      const ['--jsonl', '--approve', 'run-42', 'approval-7'],
+      io: io,
+      environment: const {
+        'DEXTERO_CONTROL_TOKEN': 'test-token-0123456789-0123456789',
+      },
+      clientFactory: ({required serverUrl, required token}) => client,
+    );
+
+    expect(result, 0);
+    expect(client.approvals, [('conversation-1', 'run-42', 'approval-7')]);
+    expect(jsonDecode(io.output.single), {
+      'schema_version': 1,
+      'type': 'approval_result',
+      'conversation_id': 'conversation-1',
+      'run_id': 'run-42',
+      'approval_id': 'approval-7',
+      'accepted': true,
+      'status': 'approved',
+    });
+  });
 }
 
 final class _FakeIo implements TerminalIo {
@@ -61,10 +89,21 @@ final class _FakeIo implements TerminalIo {
 
 final class _FakeClient implements TerminalChatClient {
   final requests = <ChatSubmitRequest>[];
+  final approvals = <(String, String, String)>[];
   bool closed = false;
 
   @override
   Future<bool> cancelRun(String conversationId, String runId) async => true;
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async {
+    approvals.add((conversationId, runId, approvalId));
+    return true;
+  }
 
   @override
   Future<void> close() async => closed = true;

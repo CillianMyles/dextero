@@ -458,6 +458,47 @@ void main() {
     expect(find.text('Action approved'), findsOneWidget);
   });
 
+  testWidgets('keeps a large approval preview bounded and scrollable', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-large-approval',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.pending,
+          content: List.generate(300, (index) => '-line $index').join('\n'),
+          toolCallId: 'edit-call-large',
+          toolName: 'edit_file',
+          approvalId: 'approval-large',
+          family: ChatEventFamily.approval,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    final preview = find.byKey(const Key('approval-preview'));
+    expect(preview, findsOneWidget);
+    expect(
+      find.descendant(
+        of: preview,
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.getSize(preview).height, lessThanOrEqualTo(144));
+    expect(find.byKey(const Key('approve-work')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('explains configuration and server failures', (tester) async {
     final unconfigured = DexteroController.fromEnvironment(const {});
     await tester.pumpWidget(DexteroApp(controller: unconfigured));
