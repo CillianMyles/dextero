@@ -69,38 +69,41 @@ retention, export, and deletion. The implementation requires:
 
 ## Architecture
 
-Dextero has three roles:
+Dextero separates responsibilities into three layers:
 
-1. **Control plane:** permissions, approvals, task state, capabilities, and
-   audit records.
-2. **Orchestrator:** model and specialist selection, tool execution, progress,
-   failure handling, and result assembly.
-3. **Product surfaces:** app, CLI/TUI, and trusted channels.
+1. **Core orchestrator:** owns memory, model routing, policy, delegation, and
+   audit.
+2. **Control plane:** runs a web server that exposes the core's capabilities
+   over HTTP.
+3. **Product surfaces:** the app and CLI/TUI today, plus trusted channels such
+   as messaging services in the future.
 
 Coding is a specialist capability. Dextero should supervise Codex, Pi, or
 another coding agent rather than reproduce a weaker coding harness.
 
 ```text
 ┌───────────────────────────────────────────────────────┐
-│ App • CLI/TUI • trusted channels                      │
+│ Product surfaces                                      │
+│ app • CLI/TUI • trusted channels (future)             │
 └──────────────────────────┬────────────────────────────┘
-                           │ generated typed client
+                           │
+                           │ requests • events • streams
+                           │
 ┌──────────────────────────▼────────────────────────────┐
-│ Local Serverpod control plane                         │
+│ Control plane                                         │
 │ pairing • authorization • commands • streams          │
 └──────────────────────────┬────────────────────────────┘
-                           │ shared contracts
+                           │
+                           │ capability invocation
+                           │
 ┌──────────────────────────▼────────────────────────────┐
-│ Orchestration core                                    │
+│ Core orchestrator                                     │
 │ memory • model routing • policy • delegation • audit  │
 └────────────┬─────────────────┬─────────────────┬──────┘
              │                 │                 │
-       Dart tools        MCP/process       native adapters
+             ▼                 ▼                 ▼
+           tools        specialist agents       system access
 ```
-
-Serverpod carries commands, approvals, logs, presence, task events, and WebRTC
-signalling. WebRTC carries low-latency screen, audio, pointer, and keyboard
-traffic.
 
 ## Deployment
 
