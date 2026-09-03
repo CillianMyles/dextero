@@ -62,8 +62,9 @@ Prove the product architecture with the smallest useful remote controller.
 
 Current security boundary: control endpoints require a bootstrap bearer token,
 the host binds to IPv4 loopback by default, and `edit_file` requires explicit
-approval. Non-loopback binding is opt-in and must remain firewalled until
-device pairing is available.
+approval for every invocation. Approval decisions are not remembered.
+Non-loopback binding is opt-in and must remain firewalled until device pairing
+is available.
 
 **Exit condition:** a Flutter client can continue the local conversation,
 observe typed activity, approve a gated action, cancel it, and receive the
@@ -73,23 +74,36 @@ result from a local Dextero host.
 
 Turn current guardrails into enforceable product boundaries.
 
-- [ ] Define capability grants scoped by task, resource, operation, and
-  duration.
+- [ ] Establish stable controller/device and project/workspace identities
+  before allowing remembered grants.
+- [ ] Define capability grants scoped by principal, task, project or global
+  context, resource, operation, constraints, and duration.
+- [ ] Offer explicit approve-once, task, project, and global choices while
+  keeping one-shot approval as the default.
+- [ ] Evaluate grants locally with deterministic precedence, default-deny
+  behaviour, and an explanation of the rule that allowed or blocked an action.
 - [ ] Classify actions by risk and map them to configurable approval policies.
+- [ ] Persist grants, approval decisions, revocations, and security audit events
+  in a minimal SQLite/Drift policy store with migrations and recovery tests.
 - [ ] Record immutable, structured audit events for grants, actions, results,
   and denials.
+- [ ] Expose active grants for inspection and immediate revocation through the
+  typed contract, Flutter app, and CLI/TUI.
 - [ ] Separate the user task timeline from an operator diagnostics view that
   preserves model, message, tool, result, and response events in order.
 - [ ] Introduce network egress policy and platform sandbox adapter interfaces.
-- [ ] Add approval expiry, denial, cancellation, and reconnect behaviour.
+- [ ] Add approval expiry, denial, cancellation, reconnect, restart, and
+  revocation behaviour.
 - [ ] Ensure remote controllers cannot bypass local policy.
 
 **Exit condition:** every consequential action is denied, pre-authorized by a
-specific capability, or paused for an explicit approval with an audit record.
+specific inspectable and revocable capability, or paused for an explicit
+approval with a durable audit record. Remembered permissions survive restart
+and remain attributable to stable controller and project identities.
 
 ## Milestone 4 — durable memory and sessions
 
-- [ ] Persist tasks, events, approvals, and checkpoints with SQLite/Drift.
+- [ ] Persist tasks, task events, and checkpoints with SQLite/Drift.
 - [ ] Persist conversations, messages, artifacts, and their provenance as a
   durable source record.
 - [ ] Add full-text search and semantic/vector search over messages and
@@ -106,8 +120,8 @@ specific capability, or paused for an explicit approval with an audit record.
 - [ ] Add schema migrations and recovery tests.
 
 **Exit condition:** a host restart or controller disconnect does not erase task
-history, approvals, conversation continuity, or the ability to find and
-understand what happened later.
+history, conversation continuity, or the ability to find and understand what
+happened later.
 
 ## Milestone 5 — specialist delegation
 

@@ -131,7 +131,8 @@ Run `make help` for other commands.
 The MVP uses a bootstrap bearer token; it does not yet provide device pairing
 or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. File edits pause for explicit approval, but process tools
-do not yet have the policy coverage planned for Milestone 3.
+do not yet have the policy coverage planned for Milestone 3. Every `edit_file`
+invocation requests a fresh approval; decisions are not currently remembered.
 
 The host binds to `127.0.0.1` by default. Set `BIND_ADDRESS` to a numeric IP
 only when a protected local-network controller or tunnel needs direct access:
