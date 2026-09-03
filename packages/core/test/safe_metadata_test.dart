@@ -31,15 +31,23 @@ void main() {
 
   test('shows a bounded, sanitized edit preview for approval', () {
     final summary = SafeMetadata.approvalRequest('edit_file', {
-      'path': 'README.md',
-      'oldText': 'Old heading\nold body\x1b[2J\n${'o' * 5000}',
-      'newText': 'New heading\n${'n' * 5000}',
+      'path': 'README\u202E.md',
+      'oldText': 'Old heading\nold body\x1b[2J\u2066\n${'o' * 5000}',
+      'newText': 'New heading\u2069\n${'n' * 5000}',
     });
 
     expect(summary.text, startsWith('edit_file requires approval'));
-    expect(summary.text, contains('--- old text\n-Old heading\n-old body'));
-    expect(summary.text, contains('+++ new text\n+New heading'));
+    expect(summary.text, contains(r'README\u202E.md'));
+    expect(
+      summary.text,
+      contains('--- old text\n-Old heading\n-old body\\u2066'),
+    );
+    expect(summary.text, contains('+++ new text\n+New heading\\u2069'));
     expect(summary.text, isNot(contains('\x1b')));
+    expect(
+      summary.text,
+      isNot(contains(RegExp('[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]'))),
+    );
     expect(
       summary.text.length,
       lessThanOrEqualTo(SafeMetadata.maxToolResultCharacters),

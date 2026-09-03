@@ -22,6 +22,9 @@ abstract final class SafeMetadata {
   static final _unsafeToolNameCharacters = RegExp(r'[^a-zA-Z0-9_.-]');
   static final _safeCommandArgument = RegExp(r'^[a-zA-Z0-9_./:=+,@%-]+$');
   static final _ansiControlSequence = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
+  static final _bidirectionalControls = RegExp(
+    '[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]',
+  );
   static final _unsafeControlCharacters = RegExp(
     r'[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]',
   );
@@ -76,16 +79,18 @@ abstract final class SafeMetadata {
     if (toolName != 'edit_file') return toolCall(toolName, arguments);
     final path = _safePath(arguments['path']);
     final detail = path == null ? '' : ' for $path';
-    final heading = '${_safeToolName(toolName)} requires approval$detail';
+    final heading = _escapeBidirectionalControls(
+      '${_safeToolName(toolName)} requires approval$detail',
+    );
     final oldText = arguments['oldText'];
     final newText = arguments['newText'];
     if (oldText is! String || newText is! String) return text(heading);
     final oldPreview = message(
-      _prefixedLines(oldText, '-'),
+      _prefixedLines(_escapeBidirectionalControls(oldText), '-'),
       maxCharacters: maxApprovalEditSideCharacters,
     );
     final newPreview = message(
-      _prefixedLines(newText, '+'),
+      _prefixedLines(_escapeBidirectionalControls(newText), '+'),
       maxCharacters: maxApprovalEditSideCharacters,
     );
     final preview = message(
@@ -206,6 +211,18 @@ abstract final class SafeMetadata {
     }
     return jsonEncode(value);
   }
+
+  static String _prefixedLines(String value, String prefix) => value
+      .split(RegExp(r'\r\n|\r|\n'))
+      .map((line) => '$prefix$line')
+      .join('\n');
+
+  static String _escapeBidirectionalControls(
+    String value,
+  ) => value.replaceAllMapped(_bidirectionalControls, (match) {
+    final codePoint = match[0]!.codeUnitAt(0);
+    return '\\u${codePoint.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+  });
 
   static String _stripUnsafeControls(String value) => value
       .replaceAll(_ansiControlSequence, '')
