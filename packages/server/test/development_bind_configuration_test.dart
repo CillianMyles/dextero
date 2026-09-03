@@ -85,6 +85,47 @@ void main() {
     );
   });
 
+  test(
+    'Android defaults to the emulator alias only for compatible binds',
+    () async {
+      for (final bindAddress in ['127.0.0.1', '0.0.0.0']) {
+        final result = await _validateAndroidControlUrl(
+          bindAddress: bindAddress,
+        );
+
+        expect(
+          result.exitCode,
+          0,
+          reason: 'BIND_ADDRESS=$bindAddress\n${result.stderr}',
+        );
+      }
+    },
+  );
+
+  test('Android requires an explicit safe URL for other binds', () async {
+    for (final bindAddress in ['192.0.2.10', '::1', '::']) {
+      final result = await _validateAndroidControlUrl(bindAddress: bindAddress);
+
+      expect(
+        result.exitCode,
+        2,
+        reason: 'BIND_ADDRESS=$bindAddress unexpectedly passed',
+      );
+      expect(
+        result.stdout,
+        contains(
+          'Android CONTROL_URL must use HTTPS or the 10.0.2.2 emulator host.',
+        ),
+      );
+    }
+
+    final explicit = await _validateAndroidControlUrl(
+      bindAddress: '192.0.2.10',
+      controlUrl: 'https://controller.example/',
+    );
+    expect(explicit.exitCode, 0, reason: explicit.stderr.toString());
+  });
+
   test('make dev preserves an explicit client URL override', () async {
     final result = await _dryRunDev(
       '192.0.2.10',
@@ -141,6 +182,19 @@ Future<ProcessResult> _validateIosControlUrl({
     '--no-print-directory',
     'validate-ios-control-url',
     if (bindAddress != null) 'BIND_ADDRESS=$bindAddress',
+    if (controlUrl != null) 'CONTROL_URL=$controlUrl',
+  ], workingDirectory: workspace.path);
+}
+
+Future<ProcessResult> _validateAndroidControlUrl({
+  required String bindAddress,
+  String? controlUrl,
+}) {
+  final workspace = Directory.current.parent.parent;
+  return Process.run('make', [
+    '--no-print-directory',
+    'validate-android-control-url',
+    'BIND_ADDRESS=$bindAddress',
     if (controlUrl != null) 'CONTROL_URL=$controlUrl',
   ], workingDirectory: workspace.path);
 }
