@@ -233,7 +233,10 @@ final class _FakeIo implements TerminalIo {
   final errors = <String>[];
 
   @override
-  bool get hasTerminal => false;
+  bool get hasInputTerminal => false;
+
+  @override
+  bool get hasOutputTerminal => false;
 
   @override
   void error(String value) => errors.add(value);

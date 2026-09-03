@@ -1,7 +1,9 @@
 import 'dart:io';
 
 abstract interface class TerminalIo {
-  bool get hasTerminal;
+  bool get hasInputTerminal;
+
+  bool get hasOutputTerminal;
 
   void write(String value);
 
@@ -16,7 +18,10 @@ final class SystemTerminalIo implements TerminalIo {
   const SystemTerminalIo();
 
   @override
-  bool get hasTerminal => stdout.hasTerminal;
+  bool get hasInputTerminal => stdin.hasTerminal;
+
+  @override
+  bool get hasOutputTerminal => stdout.hasTerminal;
 
   @override
   void write(String value) => stdout.write(value);

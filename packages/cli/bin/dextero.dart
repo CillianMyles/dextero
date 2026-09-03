@@ -6,9 +6,31 @@ Future<void> main(List<String> arguments) async {
   exitCode = await run(arguments);
 }
 
-Future<int> run(List<String> arguments) async {
-  const io = SystemTerminalIo();
-  final token = Platform.environment['DEXTERO_CONTROL_TOKEN'];
+typedef TerminalClientFactory =
+    TerminalChatClient Function({
+      required String serverUrl,
+      required String token,
+    });
+
+typedef TuiRunner = Future<int> Function({required TerminalChatClient client});
+
+TerminalChatClient _createClient({
+  required String serverUrl,
+  required String token,
+}) => ServerpodTerminalChatClient(serverUrl: serverUrl, token: token);
+
+Future<int> _runTui({required TerminalChatClient client}) =>
+    runNoctermChat(client: client);
+
+Future<int> run(
+  List<String> arguments, {
+  TerminalIo io = const SystemTerminalIo(),
+  Map<String, String>? environment,
+  TerminalClientFactory clientFactory = _createClient,
+  TuiRunner tuiRunner = _runTui,
+}) async {
+  final effectiveEnvironment = environment ?? Platform.environment;
+  final token = effectiveEnvironment['DEXTERO_CONTROL_TOKEN'];
   if (token == null || token.length < 32) {
     io.error(
       'DEXTERO_CONTROL_TOKEN is missing. Run the client with `make cli`.',
@@ -17,12 +39,15 @@ Future<int> run(List<String> arguments) async {
   }
 
   final rawUrl =
-      Platform.environment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/';
+      effectiveEnvironment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/';
   final jsonl = arguments.isNotEmpty && arguments.first == '--jsonl';
   final effectiveArguments = jsonl ? arguments.skip(1).toList() : arguments;
-  final client = ServerpodTerminalChatClient(serverUrl: rawUrl, token: token);
-  if (io.hasTerminal && !jsonl && effectiveArguments.isEmpty) {
-    return runNoctermChat(client: client);
+  final client = clientFactory(serverUrl: rawUrl, token: token);
+  if (io.hasInputTerminal &&
+      io.hasOutputTerminal &&
+      !jsonl &&
+      effectiveArguments.isEmpty) {
+    return tuiRunner(client: client);
   }
   final chat = TerminalChat(
     client: client,
