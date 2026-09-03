@@ -75,8 +75,8 @@ Dextero separates responsibilities into three layers:
    audit.
 2. **Control plane:** runs a web server that exposes the core's capabilities
    over HTTP.
-3. **Product surfaces:** the app and CLI/TUI today, plus trusted channels such
-   as messaging services in the future.
+3. **Product surfaces:** the app, CLI/TUI, and trusted channels like messaging
+   services (future feature).
 
 Coding is a specialist capability. Dextero should supervise Codex, Pi, or
 another coding agent rather than reproduce a weaker coding harness.
@@ -84,17 +84,17 @@ another coding agent rather than reproduce a weaker coding harness.
 ```text
 ┌───────────────────────────────────────────────────────┐
 │ Product surfaces                                      │
-│ app • CLI/TUI • trusted channels (future)             │
+│ app • CLI/TUI • trusted channels                      │
 └──────────────────────────┬────────────────────────────┘
                            │
-                           │ requests • events • streams
+                           │ http • rest • sockets
                            │
 ┌──────────────────────────▼────────────────────────────┐
 │ Control plane                                         │
 │ pairing • authorization • commands • streams          │
 └──────────────────────────┬────────────────────────────┘
                            │
-                           │ capability invocation
+                           │ direct invocation
                            │
 ┌──────────────────────────▼────────────────────────────┐
 │ Core orchestrator                                     │
@@ -102,7 +102,7 @@ another coding agent rather than reproduce a weaker coding harness.
 └────────────┬─────────────────┬─────────────────┬──────┘
              │                 │                 │
              ▼                 ▼                 ▼
-           tools        specialist agents       system access
+        Dart tools      MCP/CLIs/skills    native adapters
 ```
 
 ## Deployment
