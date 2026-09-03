@@ -87,8 +87,9 @@ command to start only the client. The bearer token and control URL are passed
 to Flutter as compile-time defines so every platform uses the same entrypoint.
 Desktop targets must be run on their matching host operating system.
 
-Start an interactive terminal chat in a second terminal while the server is
-running. Use `/exit` to leave:
+Start the Nocterm-based interactive TUI in a second terminal while the server
+is running. It provides a scrollable activity timeline, Markdown assistant
+output, and a focused message editor. Use `/exit` or Ctrl+C to leave:
 
 ```sh
 make server
@@ -104,7 +105,9 @@ Send one message non-interactively:
 make cli PROMPT="Inspect this workspace and summarize its architecture"
 ```
 
-Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
+One-shot prompts, cancellation, and JSONL remain non-interactive so they can be
+used safely from scripts. Pass `--jsonl` directly to the CLI for schema-v1
+line-oriented event output:
 
 ```sh
 dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"

@@ -53,7 +53,7 @@ final class TerminalChat {
       }
       _entries.addAll(await _client.history(_status.conversationId));
       _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
-      _render(notice: initialMessage == null ? 'Type /exit to leave.' : null);
+      _render();
 
       if (initialMessage != null) {
         return await _send(initialMessage) ? 0 : 1;
@@ -76,7 +76,6 @@ final class TerminalChat {
       return 1;
     } finally {
       await _client.close();
-      if (_io.hasTerminal) _io.write('\x1b[?25h\n');
     }
   }
 
@@ -91,7 +90,7 @@ final class TerminalChat {
       ),
     );
     _add(submission.userEntry);
-    _render(notice: 'Dextero is working…');
+    _render();
 
     var succeeded = true;
     var terminalSeen = false;
@@ -113,7 +112,7 @@ final class TerminalChat {
             ChatEntryStatus.failed,
             ChatEntryStatus.cancelled,
           }.contains(entry.status);
-      _render(notice: terminal ? null : 'Dextero is working…');
+      _render();
       if (terminal) {
         terminalSeen = true;
         succeeded &= entry.status == ChatEntryStatus.completed;
@@ -133,18 +132,12 @@ final class TerminalChat {
     _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
   }
 
-  void _render({String? notice}) {
+  void _render() {
     if (outputMode == TerminalOutputMode.jsonl) {
       for (final entry in _entries) {
         if (!_plainRenderedEntryIds.add(entry.entryId)) continue;
         _io.writeln(_jsonlRenderer.entry(entry));
       }
-      return;
-    }
-    if (_io.hasTerminal) {
-      _io.write(
-        _renderer.frame(status: _status, entries: _entries, notice: notice),
-      );
       return;
     }
     if (!_plainHeaderRendered) {
