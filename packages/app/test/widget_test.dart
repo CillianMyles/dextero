@@ -487,7 +487,7 @@ void main() {
     expect(find.text('Action approved'), findsOneWidget);
   });
 
-  testWidgets('disables approval while cancellation is in flight', (
+  testWidgets('keeps approval disabled through accepted cancellation', (
     tester,
   ) async {
     final cancelled = Completer<bool>();
@@ -514,6 +514,28 @@ void main() {
 
     cancelled.complete(true);
     await tester.pumpAndSettle();
+
+    expect(controller.pendingApproval, isNull);
+    expect(controller.canApprove, isFalse);
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, isEmpty);
+
+    api.emit(
+      _entry(
+        sequence: 1,
+        entryId: 'entry-approval-cancelled',
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.cancelled,
+        content: 'edit_file approval cancelled',
+        toolCallId: 'edit-call-1',
+        toolName: 'edit_file',
+        approvalId: 'approval-1',
+        family: ChatEventFamily.approval,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.pendingApproval, isNull);
   });
 
   testWidgets('disables cancellation while approval is in flight', (

@@ -81,14 +81,20 @@ final class AgentLoop {
         cancellationToken: cancellationToken,
       );
       cancellationToken?.throwIfCancellationRequested();
+      final toolCalls = [
+        for (final call in response.toolCalls)
+          ToolCall(
+            id: call.id,
+            name: call.name,
+            arguments: snapshotJsonMap(call.arguments),
+            providerMetadata: snapshotJsonMap(call.providerMetadata),
+          ),
+      ];
       messages.add(
-        AgentMessage.assistant(
-          content: response.content,
-          toolCalls: response.toolCalls,
-        ),
+        AgentMessage.assistant(content: response.content, toolCalls: toolCalls),
       );
 
-      if (response.toolCalls.isEmpty) {
+      if (toolCalls.isEmpty) {
         final output = response.content?.trim();
         if (output == null || output.isEmpty) {
           throw StateError('Model returned neither tool calls nor final text.');
@@ -100,7 +106,7 @@ final class AgentLoop {
         );
       }
 
-      for (final call in response.toolCalls) {
+      for (final call in toolCalls) {
         await onActivity?.call(
           AgentLoopActivity(
             kind: AgentLoopActivityKind.toolCallStarted,
@@ -160,6 +166,7 @@ final class AgentLoop {
       );
     }
 
+    var arguments = call.arguments;
     if (approvalRequiredTools.contains(call.name)) {
       if (onApprovalRequest == null) {
         return ToolResult(
@@ -168,11 +175,12 @@ final class AgentLoop {
           isError: true,
         );
       }
+      arguments = snapshotJsonMap(call.arguments);
       final approval = onApprovalRequest(
         ToolApprovalRequest(
           toolCallId: call.id,
           toolName: call.name,
-          summary: SafeMetadata.approvalRequest(call.name, call.arguments),
+          summary: SafeMetadata.approvalRequest(call.name, arguments),
         ),
       );
       final approved = await switch (cancellationToken) {
@@ -191,7 +199,7 @@ final class AgentLoop {
 
     try {
       final content = await tool.call(
-        call.arguments,
+        arguments,
         cancellationToken: cancellationToken,
         onOutput: onOutput,
       );

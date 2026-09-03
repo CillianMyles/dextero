@@ -480,7 +480,7 @@ final class CodexAppServerAgent {
       } else if (rawArguments is! Map) {
         content = 'Tool arguments must be a JSON object.';
       } else {
-        arguments = rawArguments.cast<String, Object?>();
+        arguments = snapshotJsonMap(rawArguments.cast<String, Object?>());
         if (approvalRequiredTools.contains(name) && onApprovalRequest == null) {
           content = 'Approval is unavailable for $name.';
         } else {

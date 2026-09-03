@@ -132,6 +132,54 @@ void main() {
     expect(tool.calls, 1);
   });
 
+  test('executes the exact argument snapshot shown for approval', () async {
+    final nested = <String, Object?>{'value': 'before'};
+    final arguments = <String, Object?>{
+      'path': 'README.md',
+      'oldText': 'old heading',
+      'newText': 'new heading',
+      'metadata': nested,
+    };
+    final approval = Completer<bool>();
+    final requested = Completer<ToolApprovalRequest>();
+    final tool = _CountingTool();
+    final model = _QueueModel([
+      ModelTurn(
+        toolCalls: [
+          ToolCall(id: 'call-edit-1', name: 'edit_file', arguments: arguments),
+        ],
+      ),
+      const ModelTurn(content: 'edited'),
+    ]);
+
+    final future = AgentLoop(model: model, tools: [tool]).run(
+      'edit',
+      onApprovalRequest: (request) {
+        requested.complete(request);
+        return approval.future;
+      },
+    );
+    final request = await requested.future;
+    expect(request.summary.text, contains('"README.md"'));
+    expect(request.summary.text, contains('+new heading'));
+
+    arguments['path'] = 'pubspec.yaml';
+    arguments['newText'] = 'swapped after approval';
+    nested['value'] = 'after';
+    approval.complete(true);
+    final run = await future;
+
+    expect(tool.arguments?['path'], 'README.md');
+    expect(tool.arguments?['newText'], 'new heading');
+    expect(tool.arguments?['metadata'], {'value': 'before'});
+    final recordedCall = run.messages
+        .singleWhere((message) => message.toolCalls.isNotEmpty)
+        .toolCalls
+        .single;
+    expect(recordedCall.arguments['path'], 'README.md');
+    expect(recordedCall.arguments['metadata'], {'value': 'before'});
+  });
+
   test('cancellation interrupts a pending approval callback', () async {
     final approval = Completer<bool>();
     final requested = Completer<void>();
@@ -274,6 +322,7 @@ final class _FailingTool implements Tool {
 
 final class _CountingTool implements Tool {
   var calls = 0;
+  JsonMap? arguments;
 
   @override
   ToolDefinition get definition => const ToolDefinition(
@@ -289,6 +338,7 @@ final class _CountingTool implements Tool {
     ToolOutputSink? onOutput,
   }) {
     calls++;
+    this.arguments = arguments;
     return {'path': arguments['path']};
   }
 }

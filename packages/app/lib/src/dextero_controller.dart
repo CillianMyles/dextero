@@ -193,6 +193,28 @@ final class DexteroController extends ChangeNotifier {
       final accepted = await _api.cancelRun(status.conversationId, runId);
       if (!accepted) {
         _error = 'The run had already finished before cancellation.';
+      } else {
+        final resolvedApprovalIds = _entries
+            .where(
+              (entry) =>
+                  entry.kind == ChatEntryKind.approval &&
+                  entry.status != ChatEntryStatus.pending,
+            )
+            .map((entry) => entry.approvalId)
+            .whereType<String>()
+            .toSet();
+        _locallyResolvedApprovalIds.addAll(
+          _entries
+              .where(
+                (entry) =>
+                    entry.runId == runId &&
+                    entry.kind == ChatEntryKind.approval &&
+                    entry.status == ChatEntryStatus.pending &&
+                    entry.approvalId != null &&
+                    !resolvedApprovalIds.contains(entry.approvalId),
+              )
+              .map((entry) => entry.approvalId!),
+        );
       }
       return accepted;
     } on Object catch (error) {

@@ -187,6 +187,49 @@ void main() {
     expect(tool.calls, 1);
   });
 
+  test(
+    'executes the dynamic-tool argument snapshot shown for approval',
+    () async {
+      final nested = <String, Object?>{'value': 'before'};
+      final arguments = <String, Object?>{
+        'path': 'README.md',
+        'oldText': 'old heading',
+        'newText': 'new heading',
+        'metadata': nested,
+      };
+      final transport = _ScriptedTransport(
+        toolName: 'edit_file',
+        arguments: arguments,
+      );
+      final tool = _CountingEditTool();
+      final requested = Completer<ToolApprovalRequest>();
+      final approval = Completer<bool>();
+
+      final future =
+          CodexAppServerAgent(transportFactory: () async => transport).run(
+            'edit it',
+            tools: [tool],
+            onApprovalRequest: (request) {
+              requested.complete(request);
+              return approval.future;
+            },
+          );
+      final request = await requested.future;
+      expect(request.summary.text, contains('"README.md"'));
+      expect(request.summary.text, contains('+new heading'));
+
+      arguments['path'] = 'pubspec.yaml';
+      arguments['newText'] = 'swapped after approval';
+      nested['value'] = 'after';
+      approval.complete(true);
+      await future;
+
+      expect(tool.arguments?['path'], 'README.md');
+      expect(tool.arguments?['newText'], 'new heading');
+      expect(tool.arguments?['metadata'], {'value': 'before'});
+    },
+  );
+
   test('cancellation interrupts a pending dynamic-tool approval', () async {
     final transport = _ScriptedTransport(
       toolName: 'edit_file',
@@ -410,6 +453,7 @@ final class _CommandTool implements Tool {
 
 final class _CountingEditTool implements Tool {
   var calls = 0;
+  JsonMap? arguments;
 
   @override
   ToolDefinition get definition => const ToolDefinition(
@@ -425,6 +469,7 @@ final class _CountingEditTool implements Tool {
     ToolOutputSink? onOutput,
   }) {
     calls++;
+    this.arguments = arguments;
     return {'path': arguments['path']};
   }
 }
