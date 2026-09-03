@@ -36,7 +36,7 @@ void main() {
     expect(frame, contains('list_files started'));
     expect(frame, contains('Finished the work'));
     expect(frame, contains('server restarts'));
-    expect(frame, contains('gemini · gemini-3.7-flash'));
+    expect(frame, contains('gemini · gemini-2.5-flash'));
     expect(
       const TerminalRenderer().plainEntryLine(entries.last),
       '[dextero] Finished the work',
@@ -68,7 +68,7 @@ HostStatus _status() => HostStatus(
   databaseRequired: false,
   streamingAvailable: true,
   modelProvider: 'gemini',
-  modelName: 'gemini-3.7-flash',
+  modelName: 'gemini-2.5-flash',
 );
 
 ChatEntry _entry({

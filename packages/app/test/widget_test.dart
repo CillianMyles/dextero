@@ -27,7 +27,7 @@ void main() {
     expect(find.byKey(const Key('empty-history')), findsOneWidget);
     expect(find.text('Until restart'), findsOneWidget);
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
-    expect(find.text('Gemini · gemini-3.7-flash'), findsOneWidget);
+    expect(find.text('Gemini · gemini-2.5-flash'), findsOneWidget);
     expect(find.byType(ShadEmpty), findsOneWidget);
     expect(find.byType(ShadBadge), findsNWidgets(3));
     expect(find.byType(ShadInput), findsOneWidget);
@@ -486,7 +486,7 @@ HostStatus _status() => HostStatus(
   databaseRequired: false,
   streamingAvailable: true,
   modelProvider: 'gemini',
-  modelName: 'gemini-3.7-flash',
+  modelName: 'gemini-2.5-flash',
 );
 
 ChatSubmission _submission(String message) => ChatSubmission(

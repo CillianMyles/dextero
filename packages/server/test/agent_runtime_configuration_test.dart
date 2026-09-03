@@ -17,7 +17,7 @@ void main() {
 
     expect(configuration.provider, AgentProvider.gemini);
     expect(configuration.providerName, 'gemini');
-    expect(configuration.modelName, 'gemini-3.7-flash');
+    expect(configuration.modelName, 'gemini-2.5-flash');
   });
 
   test('supports explicit provider and model overrides', () {

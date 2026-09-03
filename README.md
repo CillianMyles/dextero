@@ -58,7 +58,7 @@ non-empty key selects Gemini automatically:
 GEMINI_API_KEY="your-key" make dev
 ```
 
-The default model is `gemini-3.7-flash`. Set `DEXTERO_GEMINI_MODEL` to use a
+The default model is `gemini-2.5-flash`. Set `DEXTERO_GEMINI_MODEL` to use a
 different Gemini model. `DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the
 automatic provider choice; explicitly choosing Gemini requires
 `GEMINI_API_KEY`. The Flutter app and CLI show the active provider and model
