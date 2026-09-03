@@ -106,6 +106,58 @@ void main() {
     expect(summary.text, isNot(contains(RegExp('[\u200C\u200D]'))));
   });
 
+  test('makes every default-ignorable approval range visible', () {
+    const runes = <int>[
+      0x00AD,
+      0x034F,
+      0x061C,
+      0x115F,
+      0x1160,
+      0x17B4,
+      0x17B5,
+      0x180B,
+      0x180F,
+      0x200B,
+      0x200F,
+      0x202A,
+      0x202E,
+      0x2060,
+      0x2061,
+      0x2062,
+      0x2063,
+      0x2064,
+      0x206F,
+      0x3164,
+      0xFE00,
+      0xFE0F,
+      0xFEFF,
+      0xFFA0,
+      0xFFF0,
+      0xFFF8,
+      0x1BCA0,
+      0x1BCA3,
+      0x1D173,
+      0x1D17A,
+      0xE0000,
+      0xE0FFF,
+    ];
+    final raw = String.fromCharCodes(runes);
+    final summary = SafeMetadata.approvalRequest('edit_file', {
+      'path': 'ignorable.txt',
+      'oldText': raw,
+      'newText': raw,
+    });
+
+    for (final rune in runes) {
+      final digits = rune.toRadixString(16).toUpperCase();
+      final visible = rune <= 0xFFFF
+          ? '\\u${digits.padLeft(4, '0')}'
+          : '\\u{$digits}';
+      expect(summary.text, contains(visible), reason: 'U+$digits was hidden');
+      expect(summary.text.runes, isNot(contains(rune)));
+    }
+  });
+
   test('quotes and escapes the exact approval target path', () {
     final summary = SafeMetadata.approvalRequest('edit_file', {
       'path': ' leading\tname\n--- old text\x1b[2J\u202E.md\u00A0 ',

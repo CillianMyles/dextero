@@ -207,7 +207,7 @@ abstract final class SafeMetadata {
             when _isUnsafeControlRune(rune) ||
                 _isBidirectionalControlRune(rune) ||
                 _isInvisibleApprovalRune(rune) =>
-          '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
+          _visibleUnicodeEscape(rune),
         _ => String.fromCharCode(rune),
       };
       if (buffer.length + encoded.length > maxApprovalPathCharacters - 2) {
@@ -286,15 +286,11 @@ abstract final class SafeMetadata {
       }
       writePendingSpaces(trailing: false);
       if (_isUnsafeControlRune(rune)) {
-        buffer.write(
-          '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
-        );
+        buffer.write(_visibleUnicodeEscape(rune));
         continue;
       }
       if (_isInvisibleApprovalRune(rune)) {
-        buffer.write(
-          '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
-        );
+        buffer.write(_visibleUnicodeEscape(rune));
         continue;
       }
       switch (rune) {
@@ -324,17 +320,35 @@ abstract final class SafeMetadata {
       (rune >= 0x202A && rune <= 0x202E) ||
       (rune >= 0x2066 && rune <= 0x2069);
 
+  // Unicode Default_Ignorable_Code_Point plus separator-like whitespace that
+  // can otherwise make two distinct approval payloads render identically.
   static bool _isInvisibleApprovalRune(int rune) =>
       rune == 0x00A0 ||
+      rune == 0x00AD ||
+      rune == 0x034F ||
+      rune == 0x061C ||
+      (rune >= 0x115F && rune <= 0x1160) ||
       rune == 0x1680 ||
-      (rune >= 0x2000 && rune <= 0x200D) ||
-      rune == 0x2028 ||
-      rune == 0x2029 ||
-      rune == 0x202F ||
+      (rune >= 0x17B4 && rune <= 0x17B5) ||
+      (rune >= 0x180B && rune <= 0x180F) ||
+      (rune >= 0x2000 && rune <= 0x200F) ||
+      (rune >= 0x2028 && rune <= 0x202F) ||
       rune == 0x205F ||
-      rune == 0x2060 ||
+      (rune >= 0x2060 && rune <= 0x206F) ||
       rune == 0x3000 ||
-      rune == 0xFEFF;
+      rune == 0x3164 ||
+      (rune >= 0xFE00 && rune <= 0xFE0F) ||
+      rune == 0xFEFF ||
+      rune == 0xFFA0 ||
+      (rune >= 0xFFF0 && rune <= 0xFFF8) ||
+      (rune >= 0x1BCA0 && rune <= 0x1BCA3) ||
+      (rune >= 0x1D173 && rune <= 0x1D17A) ||
+      (rune >= 0xE0000 && rune <= 0xE0FFF);
+
+  static String _visibleUnicodeEscape(int rune) {
+    final digits = rune.toRadixString(16).toUpperCase();
+    return rune <= 0xFFFF ? '\\u${digits.padLeft(4, '0')}' : '\\u{$digits}';
+  }
 
   static String _escapeBidirectionalControls(
     String value,
