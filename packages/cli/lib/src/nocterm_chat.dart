@@ -186,7 +186,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
 
   void _quit() => component.onExit(_failed ? 1 : 0);
 
-  bool _handleInputKey(KeyboardEvent event) {
+  bool _handleGlobalKey(KeyboardEvent event) {
     if (event.isControlPressed &&
         {LogicalKey.keyC, LogicalKey.keyD}.contains(event.logicalKey)) {
       _quit();
@@ -198,124 +198,130 @@ final class _DexteroTuiState extends State<DexteroTui> {
   @override
   Component build(BuildContext context) {
     final status = _status;
-    return Container(
-      color: _background,
-      child: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-            decoration: BoxDecoration(
-              color: _panel,
-              border: BoxBorder(bottom: BorderSide(color: _accent)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      status == null
-                          ? 'DEXTERO'
-                          : 'DEXTERO  ${_renderer.safeText(status.name)} ${_renderer.safeText(status.version)}',
-                      style: TextStyle(
-                        color: Colors.brightWhite,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (status != null)
+    return Focusable(
+      focused: true,
+      onKeyEvent: _handleGlobalKey,
+      child: Container(
+        color: _background,
+        child: Column(
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+              decoration: BoxDecoration(
+                color: _panel,
+                border: BoxBorder(bottom: BorderSide(color: _accent)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
                       Text(
-                        '${_renderer.safeText(status.modelProvider)} · ${_renderer.safeText(status.modelName)}',
-                        style: TextStyle(color: _muted),
+                        status == null
+                            ? 'DEXTERO'
+                            : 'DEXTERO  ${_renderer.safeText(status.name)} ${_renderer.safeText(status.version)}',
+                        style: TextStyle(
+                          color: Colors.brightWhite,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                  ],
-                ),
-                if (status != null)
-                  Text(
-                    _renderer.safeText(status.retentionNotice),
-                    style: TextStyle(color: _muted),
+                      if (status != null)
+                        Text(
+                          '${_renderer.safeText(status.modelProvider)} · ${_renderer.safeText(status.modelName)}',
+                          style: TextStyle(color: _muted),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: _entries.isEmpty
-                ? Center(
-                    child: Text(
-                      status == null
-                          ? 'Connecting…'
-                          : 'No messages yet. Type a message below.',
+                  if (status != null)
+                    Text(
+                      _renderer.safeText(status.retentionNotice),
                       style: TextStyle(color: _muted),
                     ),
-                  )
-                : Scrollbar(
-                    controller: _scrollController,
-                    thumbVisibility: true,
-                    child: ListView.builder(
+                ],
+              ),
+            ),
+            Expanded(
+              child: _entries.isEmpty
+                  ? Center(
+                      child: Text(
+                        status == null
+                            ? 'Connecting…'
+                            : 'No messages yet. Type a message below.',
+                        style: TextStyle(color: _muted),
+                      ),
+                    )
+                  : Scrollbar(
                       controller: _scrollController,
-                      padding: EdgeInsets.symmetric(horizontal: 1, vertical: 1),
-                      itemCount: _entries.length,
-                      itemBuilder: (context, index) => _EntryView(
-                        entry: _entries[index],
-                        renderer: _renderer,
+                      thumbVisibility: true,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 1,
+                          vertical: 1,
+                        ),
+                        itemCount: _entries.length,
+                        itemBuilder: (context, index) => _EntryView(
+                          entry: _entries[index],
+                          renderer: _renderer,
+                        ),
                       ),
                     ),
-                  ),
-          ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 1, vertical: 1),
-            decoration: BoxDecoration(
-              color: _panel,
-              border: BoxBorder(top: BorderSide(color: Colors.brightBlack)),
             ),
-            child: Row(
-              children: [
-                Text('you › ', style: TextStyle(color: Colors.brightMagenta)),
-                Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    focused: !_sending,
-                    enabled: !_sending,
-                    placeholder: status == null
-                        ? _failed
-                              ? 'Type /exit to leave'
-                              : 'Waiting for host…'
-                        : _sending
-                        ? 'Waiting for Dextero…'
-                        : 'Ask Dextero…',
-                    style: TextStyle(color: Colors.brightWhite),
-                    placeholderStyle: TextStyle(color: _muted),
-                    onSubmitted: _submit,
-                    onKeyEvent: _handleInputKey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 2),
-            color: _failed ? Color.fromRGB(82, 32, 36) : _panel,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    _renderer.safeText(_notice),
-                    style: TextStyle(
-                      color: _failed ? Colors.brightRed : _muted,
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 1, vertical: 1),
+              decoration: BoxDecoration(
+                color: _panel,
+                border: BoxBorder(top: BorderSide(color: Colors.brightBlack)),
+              ),
+              child: Row(
+                children: [
+                  Text('you › ', style: TextStyle(color: Colors.brightMagenta)),
+                  Expanded(
+                    child: TextField(
+                      controller: _inputController,
+                      focused: !_sending,
+                      enabled: !_sending,
+                      placeholder: status == null
+                          ? _failed
+                                ? 'Type /exit to leave'
+                                : 'Waiting for host…'
+                          : _sending
+                          ? 'Waiting for Dextero…'
+                          : 'Ask Dextero…',
+                      style: TextStyle(color: Colors.brightWhite),
+                      placeholderStyle: TextStyle(color: _muted),
+                      onSubmitted: _submit,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
                   ),
-                ),
-                Text(
-                  'Enter send  ·  /exit or Ctrl+C quit',
-                  style: TextStyle(color: _muted),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 2),
+              color: _failed ? Color.fromRGB(82, 32, 36) : _panel,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _renderer.safeText(_notice),
+                      style: TextStyle(
+                        color: _failed ? Colors.brightRed : _muted,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                  Text(
+                    'Enter send  ·  /exit or Ctrl+C quit',
+                    style: TextStyle(color: _muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
