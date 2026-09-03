@@ -351,11 +351,16 @@ final class ChatService {
   }) async {
     cancellationToken.throwIfCancellationRequested();
     final approvalId = _identifiers.next('approval');
+    final normalizedRequest = ToolApprovalRequest(
+      toolCallId: SafeMetadata.identifier(request.toolCallId),
+      toolName: SafeMetadata.toolName(request.toolName),
+      summary: request.summary,
+    );
     final pending = _PendingApproval(
       conversationId: conversationId,
       runId: runId,
       correlationId: correlationId,
-      request: request,
+      request: normalizedRequest,
     );
     await _withSubmissionLock(() async {
       cancellationToken.throwIfCancellationRequested();
@@ -366,11 +371,11 @@ final class ChatService {
         correlationId,
         kind: ChatEntryKind.approval,
         status: ChatEntryStatus.pending,
-        content: request.summary.text,
+        content: normalizedRequest.summary.text,
         source: ChatEntrySource.dextero,
-        truncated: request.summary.truncated,
-        toolCallId: request.toolCallId,
-        toolName: request.toolName,
+        truncated: normalizedRequest.summary.truncated,
+        toolCallId: normalizedRequest.toolCallId,
+        toolName: normalizedRequest.toolName,
         approvalId: approvalId,
       );
     });
@@ -390,10 +395,10 @@ final class ChatService {
             correlationId,
             kind: ChatEntryKind.approval,
             status: ChatEntryStatus.cancelled,
-            content: '${request.toolName} approval cancelled',
+            content: '${normalizedRequest.toolName} approval cancelled',
             source: ChatEntrySource.dextero,
-            toolCallId: request.toolCallId,
-            toolName: request.toolName,
+            toolCallId: normalizedRequest.toolCallId,
+            toolName: normalizedRequest.toolName,
             approvalId: approvalId,
           );
         }

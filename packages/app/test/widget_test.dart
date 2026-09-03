@@ -423,7 +423,7 @@ void main() {
     expect(find.byKey(const Key('send-message')), findsOneWidget);
   });
 
-  testWidgets('approves a pending file edit and resumes the run', (
+  testWidgets('keeps an accepted approval resolved while history catches up', (
     tester,
   ) async {
     final api = _FakeChatApi(
@@ -463,6 +463,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.approvals, [('conversation-1', 'run-1', 'approval-1')]);
+    expect(controller.pendingApproval, isNull);
+    expect(controller.canApprove, isFalse);
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, hasLength(1));
     api.emit(
       _entry(
         sequence: 1,

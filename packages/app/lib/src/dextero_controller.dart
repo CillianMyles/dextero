@@ -102,6 +102,7 @@ final class DexteroController extends ChangeNotifier {
   final bool configured;
   final List<ChatEntry> _entries = [];
   final Set<String> _terminalRunIds = {};
+  final Set<String> _locallyResolvedApprovalIds = {};
   StreamSubscription<ChatEntry>? _historySubscription;
   HostStatus? _hostStatus;
   ChatLoadState _loadState = ChatLoadState.loading;
@@ -129,15 +130,17 @@ final class DexteroController extends ChangeNotifier {
   List<ChatEntry> get entries => List.unmodifiable(_entries);
 
   ChatEntry? get pendingApproval {
-    final resolved = _entries
-        .where(
-          (entry) =>
-              entry.kind == ChatEntryKind.approval &&
-              entry.status != ChatEntryStatus.pending,
-        )
-        .map((entry) => entry.approvalId)
-        .whereType<String>()
-        .toSet();
+    final resolved =
+        _entries
+            .where(
+              (entry) =>
+                  entry.kind == ChatEntryKind.approval &&
+                  entry.status != ChatEntryStatus.pending,
+            )
+            .map((entry) => entry.approvalId)
+            .whereType<String>()
+            .toSet()
+          ..addAll(_locallyResolvedApprovalIds);
     for (final entry in _entries.reversed) {
       if (entry.kind == ChatEntryKind.approval &&
           entry.status == ChatEntryStatus.pending &&
@@ -221,6 +224,13 @@ final class DexteroController extends ChangeNotifier {
       );
       if (!accepted) {
         _error = 'The action no longer needs approval.';
+      } else if (!_entries.any(
+        (entry) =>
+            entry.kind == ChatEntryKind.approval &&
+            entry.status != ChatEntryStatus.pending &&
+            entry.approvalId == approvalId,
+      )) {
+        _locallyResolvedApprovalIds.add(approvalId);
       }
       return accepted;
     } on Object catch (error) {
@@ -363,6 +373,12 @@ final class DexteroController extends ChangeNotifier {
   void _addEntry(ChatEntry entry) {
     if (_entries.any((existing) => existing.entryId == entry.entryId)) return;
     _entries.add(entry);
+    final approvalId = entry.approvalId;
+    if (entry.kind == ChatEntryKind.approval &&
+        entry.status != ChatEntryStatus.pending &&
+        approvalId != null) {
+      _locallyResolvedApprovalIds.remove(approvalId);
+    }
     _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
     _loadState = ChatLoadState.ready;
   }
