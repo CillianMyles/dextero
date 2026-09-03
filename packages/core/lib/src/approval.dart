@@ -1,5 +1,9 @@
 import 'safe_metadata.dart';
 
+/// Tools that require one-shot approval unless a caller supplies another
+/// explicit policy.
+const Set<String> defaultApprovalRequiredTools = {'edit_file'};
+
 /// A concrete tool action that must be approved before it can execute.
 final class ToolApprovalRequest {
   const ToolApprovalRequest({

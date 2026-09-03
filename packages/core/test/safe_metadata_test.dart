@@ -82,6 +82,40 @@ void main() {
     );
   });
 
+  test('quotes and escapes the exact approval target path', () {
+    final summary = SafeMetadata.approvalRequest('edit_file', {
+      'path': ' leading\tname\n--- old text\x1b[2J\u202E.md\u00A0 ',
+      'oldText': 'old',
+      'newText': 'new',
+    });
+
+    expect(
+      summary.text,
+      contains(r'for " leading\tname\n--- old text\u001B[2J\u202E.md\u00A0 "'),
+    );
+    expect(summary.text, isNot(contains('\n--- old text\n--- old text')));
+    expect(summary.text, isNot(contains('\x1b')));
+  });
+
+  test('keeps a truncated approval path quoted and bounded', () {
+    final summary = SafeMetadata.approvalRequest('edit_file', {
+      'path': '\u202E' * 100,
+      'oldText': 'old',
+      'newText': 'new',
+    });
+    final heading = summary.text.split('\n').first;
+
+    expect(heading, endsWith('…"'));
+    expect(
+      heading.length,
+      lessThanOrEqualTo(
+        'edit_file requires approval for '.length +
+            SafeMetadata.maxApprovalPathCharacters,
+      ),
+    );
+    expect(summary.truncated, isTrue);
+  });
+
   test('includes the complete command and structured output', () {
     final started = SafeMetadata.toolCall('run_command', const {
       'command': '/usr/bin/sed',

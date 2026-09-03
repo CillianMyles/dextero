@@ -154,7 +154,7 @@ final class CodexAppServerAgent {
   Future<CodexAgentRun> run(
     String prompt, {
     required List<Tool> tools,
-    Set<String> approvalRequiredTools = const {},
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
     ToolApprovalRequester? onApprovalRequest,
     CodexAgentActivitySink? onActivity,
     CancellationToken? cancellationToken,
@@ -166,6 +166,7 @@ final class CodexAppServerAgent {
     if (toolsByName.length != tools.length) {
       throw ArgumentError('Tool names must be unique.');
     }
+    final gatedTools = Set<String>.unmodifiable(approvalRequiredTools);
 
     final transport = await _transportFactory();
     final messages = StreamIterator(transport.messages);
@@ -283,7 +284,7 @@ final class CodexAppServerAgent {
             requestId: message['id'],
             params: params,
             tools: toolsByName,
-            approvalRequiredTools: approvalRequiredTools,
+            approvalRequiredTools: gatedTools,
             onApprovalRequest: onApprovalRequest,
             cancellationToken: cancellationToken,
             onActivity: onActivity,
@@ -668,9 +669,10 @@ final class CodexConversationAgent
   CodexConversationAgent({
     required CodexAppServerAgent agent,
     required List<Tool> tools,
-    this.approvalRequiredTools = const {},
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
   }) : _agent = agent,
-       _tools = List.unmodifiable(tools);
+       _tools = List.unmodifiable(tools),
+       approvalRequiredTools = Set.unmodifiable(approvalRequiredTools);
 
   final CodexAppServerAgent _agent;
   final List<Tool> _tools;

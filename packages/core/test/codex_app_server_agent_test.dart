@@ -167,7 +167,6 @@ void main() {
         .run(
           'edit it',
           tools: [tool],
-          approvalRequiredTools: const {'edit_file'},
           onApprovalRequest: (request) {
             requested.complete(request);
             return approval.future;

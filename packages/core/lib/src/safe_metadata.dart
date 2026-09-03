@@ -14,6 +14,7 @@ abstract final class SafeMetadata {
   static const maxDisplayCharacters = 480;
   static const maxToolResultCharacters = 4000;
   static const maxApprovalEditSideCharacters = 1800;
+  static const maxApprovalPathCharacters = 240;
   static const maxMessageCharacters = 16000;
 
   static final _summaryWhitespace = RegExp(r'[\r\n\t]+');
@@ -77,14 +78,18 @@ abstract final class SafeMetadata {
   /// protocol payloads. File edits include a bounded old/new text preview.
   static SafeSummary approvalRequest(String toolName, JsonMap arguments) {
     if (toolName != 'edit_file') return toolCall(toolName, arguments);
-    final path = _safePath(arguments['path']);
-    final detail = path == null ? '' : ' for $path';
-    final heading = _escapeBidirectionalControls(
-      '${_safeToolName(toolName)} requires approval$detail',
-    );
+    final path = _approvalPath(arguments['path']);
+    final detail = path == null ? '' : ' for ${path.text}';
+    final heading = '${_safeToolName(toolName)} requires approval$detail';
     final oldText = arguments['oldText'];
     final newText = arguments['newText'];
-    if (oldText is! String || newText is! String) return text(heading);
+    if (oldText is! String || newText is! String) {
+      final summary = text(heading);
+      return SafeSummary(
+        summary.text,
+        truncated: summary.truncated || path?.truncated == true,
+      );
+    }
     final oldPreview = _approvalEditPreview(oldText, '-');
     final newPreview = _approvalEditPreview(newText, '+');
     final preview = message(
@@ -100,7 +105,10 @@ abstract final class SafeMetadata {
     return SafeSummary(
       preview.text,
       truncated:
-          preview.truncated || oldPreview.truncated || newPreview.truncated,
+          preview.truncated ||
+          oldPreview.truncated ||
+          newPreview.truncated ||
+          path?.truncated == true,
     );
   }
 
@@ -182,6 +190,35 @@ abstract final class SafeMetadata {
     if (value is! String || value.trim().isEmpty) return null;
     final path = value.trim();
     return path.length <= 160 ? path : '${path.substring(0, 159)}…';
+  }
+
+  static ({String text, bool truncated})? _approvalPath(Object? value) {
+    if (value is! String || value.isEmpty) return null;
+    final buffer = StringBuffer('"');
+    var truncated = false;
+    for (final rune in value.runes) {
+      final encoded = switch (rune) {
+        0x09 => r'\t',
+        0x0A => r'\n',
+        0x0D => r'\r',
+        0x22 => r'\"',
+        0x5C => r'\\',
+        _
+            when _isUnsafeControlRune(rune) ||
+                _isBidirectionalControlRune(rune) ||
+                _isInvisiblePathRune(rune) =>
+          '\\u${rune.toRadixString(16).padLeft(4, '0').toUpperCase()}',
+        _ => String.fromCharCode(rune),
+      };
+      if (buffer.length + encoded.length > maxApprovalPathCharacters - 2) {
+        buffer.write('…');
+        truncated = true;
+        break;
+      }
+      buffer.write(encoded);
+    }
+    buffer.write('"');
+    return (text: buffer.toString(), truncated: truncated);
   }
 
   static String? _displayCommand(String toolName, JsonMap arguments) {
@@ -273,6 +310,25 @@ abstract final class SafeMetadata {
       rune == 0x0C ||
       (rune >= 0x0E && rune <= 0x1F) ||
       (rune >= 0x7F && rune <= 0x9F);
+
+  static bool _isBidirectionalControlRune(int rune) =>
+      rune == 0x061C ||
+      rune == 0x200E ||
+      rune == 0x200F ||
+      (rune >= 0x202A && rune <= 0x202E) ||
+      (rune >= 0x2066 && rune <= 0x2069);
+
+  static bool _isInvisiblePathRune(int rune) =>
+      rune == 0x00A0 ||
+      rune == 0x1680 ||
+      (rune >= 0x2000 && rune <= 0x200B) ||
+      rune == 0x2028 ||
+      rune == 0x2029 ||
+      rune == 0x202F ||
+      rune == 0x205F ||
+      rune == 0x2060 ||
+      rune == 0x3000 ||
+      rune == 0xFEFF;
 
   static String _escapeBidirectionalControls(
     String value,

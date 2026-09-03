@@ -13,10 +13,11 @@ final class ModelConversationAgent
     required AgentModel model,
     required List<Tool> tools,
     required this.providerName,
-    this.approvalRequiredTools = const {},
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
     this.maxTurns = 12,
   }) : _model = model,
-       _tools = List.unmodifiable(tools);
+       _tools = List.unmodifiable(tools),
+       approvalRequiredTools = Set.unmodifiable(approvalRequiredTools);
 
   final AgentModel _model;
   final List<Tool> _tools;

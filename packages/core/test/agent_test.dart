@@ -110,18 +110,13 @@ void main() {
       const ModelTurn(content: 'edited'),
     ]);
 
-    final future =
-        AgentLoop(
-          model: model,
-          tools: [tool],
-          approvalRequiredTools: const {'edit_file'},
-        ).run(
-          'edit',
-          onApprovalRequest: (request) {
-            requested.complete(request);
-            return approval.future;
-          },
-        );
+    final future = AgentLoop(model: model, tools: [tool]).run(
+      'edit',
+      onApprovalRequest: (request) {
+        requested.complete(request);
+        return approval.future;
+      },
+    );
     final request = await requested.future;
 
     expect(request.toolCallId, 'call-edit-1');
@@ -135,6 +130,23 @@ void main() {
 
     expect(run.output, 'edited');
     expect(tool.calls, 1);
+  });
+
+  test('exported conversation agents gate edit_file by default', () {
+    final modelAgent = ModelConversationAgent(
+      model: _QueueModel([]),
+      tools: const [],
+      providerName: 'test',
+    );
+    final codexAgent = CodexConversationAgent(
+      agent: CodexAppServerAgent(
+        transportFactory: () async => throw StateError('not started'),
+      ),
+      tools: const [],
+    );
+
+    expect(modelAgent.approvalRequiredTools, defaultApprovalRequiredTools);
+    expect(codexAgent.approvalRequiredTools, defaultApprovalRequiredTools);
   });
 
   test('rejects duplicate tool names', () {

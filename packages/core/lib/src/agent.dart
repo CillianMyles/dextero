@@ -43,10 +43,11 @@ final class AgentLoop {
   AgentLoop({
     required AgentModel model,
     required List<Tool> tools,
-    this.approvalRequiredTools = const {},
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
     this.maxTurns = 12,
   }) : _model = model,
-       _tools = {for (final tool in tools) tool.definition.name: tool} {
+       _tools = {for (final tool in tools) tool.definition.name: tool},
+       approvalRequiredTools = Set.unmodifiable(approvalRequiredTools) {
     if (_tools.length != tools.length) {
       throw ArgumentError('Tool names must be unique.');
     }

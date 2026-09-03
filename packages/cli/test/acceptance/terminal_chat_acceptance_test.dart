@@ -139,7 +139,7 @@ void main() {
       expect(io.output.join(), contains('[dextero] Workspace\nready'));
       expect(
         io.output.join(),
-        contains('[approval] edit_file requires approval for README.md'),
+        contains('[approval] edit_file requires approval for "README.md"'),
       );
       expect(io.output.join(), contains('--- old text\n-old'));
       expect(io.output.join(), contains('+++ new text\n+new'));
