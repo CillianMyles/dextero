@@ -455,13 +455,24 @@ final class _EntryView extends StatelessComponent {
             ? Colors.brightRed
             : Colors.brightGreen,
       ),
-      ChatEntryKind.approval => (
-        symbol: entry.status == ChatEntryStatus.pending ? '?' : '✓',
-        label: 'approval',
-        color: entry.status == ChatEntryStatus.pending
-            ? Colors.brightYellow
-            : Colors.brightGreen,
-      ),
+      ChatEntryKind.approval => switch (entry.status) {
+        ChatEntryStatus.pending => (
+          symbol: '?',
+          label: 'approval',
+          color: Colors.brightYellow,
+        ),
+        ChatEntryStatus.approved => (
+          symbol: '✓',
+          label: 'approved',
+          color: Colors.brightGreen,
+        ),
+        ChatEntryStatus.cancelled => (
+          symbol: '×',
+          label: 'cancelled',
+          color: Colors.brightYellow,
+        ),
+        _ => (symbol: '!', label: 'approval', color: Colors.brightYellow),
+      },
       ChatEntryKind.lifecycle => (
         symbol: '·',
         label: entry.status.name,

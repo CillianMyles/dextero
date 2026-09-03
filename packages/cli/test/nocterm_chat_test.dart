@@ -115,6 +115,40 @@ void main() {
     );
   });
 
+  test('distinguishes approved and cancelled approval history', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(100, 24),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient(
+      historyEntries: [
+        _entry(
+          sequence: 0,
+          id: 'approval-approved',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.approved,
+          content: 'edit_file approved',
+          approvalId: 'approval-1',
+        ),
+        _entry(
+          sequence: 1,
+          id: 'approval-cancelled',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.cancelled,
+          content: 'edit_file approval cancelled',
+          approvalId: 'approval-2',
+        ),
+      ],
+    );
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.terminalState.containsText('✓ approved'), isTrue);
+    expect(tester.terminalState.containsText('× cancelled'), isTrue);
+  });
+
   test('selects a model before the first message', () async {
     final tester = await nocterm.NoctermTester.create();
     addTearDown(tester.dispose);

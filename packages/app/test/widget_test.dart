@@ -510,6 +510,44 @@ void main() {
     expect(find.text('Action approved'), findsOneWidget);
   });
 
+  testWidgets('distinguishes approved and cancelled approval history', (
+    tester,
+  ) async {
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-approval-approved',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.approved,
+          content: 'edit_file approved',
+          approvalId: 'approval-1',
+          family: ChatEventFamily.approval,
+        ),
+        _entry(
+          sequence: 1,
+          entryId: 'entry-approval-cancelled',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.cancelled,
+          content: 'edit_file approval cancelled',
+          approvalId: 'approval-2',
+          family: ChatEventFamily.approval,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Action approved'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.shieldCheck), findsOneWidget);
+    expect(find.text('Approval cancelled'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.circleStop), findsOneWidget);
+  });
+
   testWidgets('keeps approval disabled through accepted cancellation', (
     tester,
   ) async {

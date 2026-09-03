@@ -577,7 +577,10 @@ class _ActivityRow extends StatelessWidget {
     final isError =
         entry.kind == ChatEntryKind.error ||
         entry.status == ChatEntryStatus.failed;
-    final isWarning = entry.status == ChatEntryStatus.warning;
+    final isWarning =
+        entry.status == ChatEntryStatus.warning ||
+        (entry.kind == ChatEntryKind.approval &&
+            entry.status == ChatEntryStatus.cancelled);
     final background = isError
         ? scheme.destructive.withValues(alpha: 0.08)
         : isWarning
@@ -804,10 +807,12 @@ class _ActivityRow extends StatelessWidget {
       entry.status == ChatEntryStatus.failed
           ? LucideIcons.circleAlert
           : LucideIcons.checkCircle2,
-    ChatEntryKind.approval =>
-      entry.status == ChatEntryStatus.pending
-          ? LucideIcons.shieldAlert
-          : LucideIcons.shieldCheck,
+    ChatEntryKind.approval => switch (entry.status) {
+      ChatEntryStatus.pending => LucideIcons.shieldAlert,
+      ChatEntryStatus.approved => LucideIcons.shieldCheck,
+      ChatEntryStatus.cancelled => LucideIcons.circleStop,
+      _ => LucideIcons.info,
+    },
     ChatEntryKind.error => LucideIcons.circleAlert,
     _ => switch (entry.status) {
       ChatEntryStatus.queued => LucideIcons.clock3,
