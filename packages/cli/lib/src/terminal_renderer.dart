@@ -31,8 +31,7 @@ final class TerminalRenderer {
     return '$content\n'
         'Run ID: $runId\n'
         'Approval ID: $approvalId\n'
-        'Approve: dart run packages/cli/bin/dextero.dart '
-        '--approve $runId $approvalId';
+        'Approve: make approve RUN_ID=$runId APPROVAL_ID=$approvalId';
   }
 
   String safeText(String value) => value

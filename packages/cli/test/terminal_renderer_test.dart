@@ -31,10 +31,7 @@ void main() {
     expect(rendered, contains('Approval ID: approval-7'));
     expect(
       rendered,
-      contains(
-        'dart run packages/cli/bin/dextero.dart '
-        '--approve run-1 approval-7',
-      ),
+      contains('make approve RUN_ID=run-1 APPROVAL_ID=approval-7'),
     );
   });
 

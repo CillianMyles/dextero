@@ -29,7 +29,8 @@ DEV_TOKEN_FILE := .dart_tool/dev-token
 
 .PHONY: help doctor bootstrap tools token generate format format-check analyze \
 	test test-core test-server test-app test-app-web test-cli check server app \
-	app-web app-android app-ios app-linux app-macos app-windows cli core dev \
+	app-web app-android app-ios app-linux app-macos app-windows cli cancel \
+	approve core dev \
 	dev-web dev-android dev-ios dev-linux dev-macos dev-windows \
 	validate-android-control-url validate-ios-control-url
 
@@ -165,6 +166,20 @@ cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
 	 $(DART) run packages/cli/bin/dextero.dart \
 	 $(if $(MODEL),--model "$(MODEL)",) $(if $(PROMPT),"$(PROMPT)",)
+
+cancel: $(DEV_TOKEN_FILE) ## Cancel a run (set RUN_ID).
+	@test -n "$(RUN_ID)" || { echo "Set RUN_ID to the run identifier."; exit 2; }
+	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
+	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
+	 $(DART) run packages/cli/bin/dextero.dart --cancel "$(RUN_ID)"
+
+approve: $(DEV_TOKEN_FILE) ## Approve a pending edit (set RUN_ID and APPROVAL_ID).
+	@test -n "$(RUN_ID)" || { echo "Set RUN_ID to the run identifier."; exit 2; }
+	@test -n "$(APPROVAL_ID)" || { echo "Set APPROVAL_ID to the approval identifier."; exit 2; }
+	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
+	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
+	 $(DART) run packages/cli/bin/dextero.dart \
+	 --approve "$(RUN_ID)" "$(APPROVAL_ID)"
 
 core: ## Run the core directly through the configured provider without Serverpod.
 	@$(DART) run packages/core/bin/dextero_core.dart $(if $(PROMPT),"$(PROMPT)",)

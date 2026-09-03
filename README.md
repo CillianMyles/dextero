@@ -101,13 +101,15 @@ make server
 make cli
 ```
 
-Cancel a known run from another terminal with
-`dart run packages/cli/bin/dextero.dart --cancel <run-id>`.
+Cancel a known run from another terminal with `make cancel RUN_ID=<run-id>`.
 Approve a pending file edit with the run and approval IDs shown in history:
 
 ```sh
-dart run packages/cli/bin/dextero.dart --approve <run-id> <approval-id>
+make approve RUN_ID=<run-id> APPROVAL_ID=<approval-id>
 ```
+
+These targets reuse the development token and `CONTROL_URL`; pass the same
+connection overrides used to start the client when they are not in `.env`.
 
 Send one message non-interactively:
 

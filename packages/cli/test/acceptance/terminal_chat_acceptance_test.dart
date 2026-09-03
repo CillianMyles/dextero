@@ -147,7 +147,10 @@ void main() {
       expect(io.output.join(), contains('Approval ID: ${pending.approvalId}'));
       expect(
         io.output.join(),
-        contains('--approve ${pending.runId} ${pending.approvalId}'),
+        contains(
+          'make approve RUN_ID=${pending.runId} '
+          'APPROVAL_ID=${pending.approvalId}',
+        ),
       );
       expect(io.output.join(), contains('[approval] edit_file approved'));
       expect(editTool.calls, 1);

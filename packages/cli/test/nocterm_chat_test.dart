@@ -101,7 +101,9 @@ void main() {
       isTrue,
     );
     expect(
-      tester.terminalState.containsText('--approve run-1 approval-7'),
+      tester.terminalState.containsText(
+        'make approve RUN_ID=run-1 APPROVAL_ID=approval-7',
+      ),
       isTrue,
     );
   });

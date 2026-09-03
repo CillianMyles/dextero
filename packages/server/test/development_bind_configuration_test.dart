@@ -73,6 +73,26 @@ void main() {
       ),
     );
   });
+
+  test('make approve injects connection settings and identifiers', () async {
+    final workspace = Directory.current.parent.parent;
+    final result = await Process.run('make', [
+      '--dry-run',
+      '--no-print-directory',
+      'approve',
+      'RUN_ID=run-42',
+      'APPROVAL_ID=approval-7',
+      'CONTROL_URL=https://controller.example/',
+    ], workingDirectory: workspace.path);
+
+    expect(result.exitCode, 0, reason: result.stderr.toString());
+    expect(result.stdout, contains('DEXTERO_CONTROL_TOKEN='));
+    expect(
+      result.stdout,
+      contains('DEXTERO_CONTROL_URL="https://controller.example/"'),
+    );
+    expect(result.stdout, contains('--approve "run-42" "approval-7"'));
+  });
 }
 
 Future<ProcessResult> _dryRunDev(String bindAddress, {String? controlUrl}) {
