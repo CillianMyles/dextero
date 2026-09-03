@@ -93,6 +93,7 @@ final class TerminalChat {
       ChatSubmitRequest(
         conversationId: _status.conversationId,
         message: normalized,
+        modelName: _status.modelName,
         correlationId: _correlationIdFactory(),
       ),
     );

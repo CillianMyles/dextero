@@ -2,4 +2,5 @@ class: ChatSubmitRequest
 fields:
   conversationId: String
   message: String
+  modelName: String
   correlationId: String?

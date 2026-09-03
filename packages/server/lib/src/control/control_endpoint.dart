@@ -41,9 +41,10 @@ final class ControlEndpoint extends Endpoint {
     Session session,
     ChatSubmitRequest request,
   ) async {
-    final submission = await ChatRuntime.service.submit(
+    final submission = await ChatRuntime.submit(
       conversationId: request.conversationId,
       message: request.message,
+      modelName: request.modelName,
       correlationId: request.correlationId,
     );
     return ChatSubmission(

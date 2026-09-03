@@ -42,6 +42,7 @@ void main() {
           ChatSubmitRequest(
             conversationId: status.conversationId,
             message: 'Hello Dextero',
+            modelName: status.modelName,
             correlationId: 'acceptance-1',
           ),
         );

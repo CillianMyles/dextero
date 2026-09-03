@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dextero_core/dextero_core.dart';
 
 typedef ModelSelector = Future<void> Function(String modelName);
@@ -10,6 +12,7 @@ abstract final class ChatRuntime {
   static String? _modelName;
   static List<String>? _availableModels;
   static ModelSelector? _modelSelector;
+  static Future<void> _operationLock = Future.value();
 
   static ChatService get service =>
       _service ?? (throw StateError('The chat runtime is not initialized.'));
@@ -70,23 +73,56 @@ abstract final class ChatRuntime {
     _modelName = modelName;
     _availableModels = models;
     _modelSelector = modelSelector;
+    _operationLock = Future.value();
   }
 
-  static Future<void> selectModel(String modelName) async {
-    final normalized = modelName.trim();
-    if (!availableModels.contains(normalized)) {
-      throw ArgumentError.value(
-        modelName,
-        'modelName',
-        'must be one of ${availableModels.join(', ')}',
+  static Future<void> selectModel(String modelName) =>
+      _withOperationLock(() async {
+        final normalized = modelName.trim();
+        if (!availableModels.contains(normalized)) {
+          throw ArgumentError.value(
+            modelName,
+            'modelName',
+            'must be one of ${availableModels.join(', ')}',
+          );
+        }
+        if (normalized == ChatRuntime.modelName) return;
+        final selector = _modelSelector;
+        if (selector == null) {
+          throw StateError('Model selection is not available on this host.');
+        }
+        await selector(normalized);
+        _modelName = normalized;
+      });
+
+  static Future<ChatSubmission> submit({
+    required String conversationId,
+    required String message,
+    required String modelName,
+    String? correlationId,
+  }) => _withOperationLock(() async {
+    if (modelName != ChatRuntime.modelName) {
+      throw StateError(
+        'The selected model changed to ${ChatRuntime.modelName}. '
+        'Refresh the conversation before submitting.',
       );
     }
-    if (normalized == ChatRuntime.modelName) return;
-    final selector = _modelSelector;
-    if (selector == null) {
-      throw StateError('Model selection is not available on this host.');
+    return service.submit(
+      conversationId: conversationId,
+      message: message,
+      correlationId: correlationId,
+    );
+  });
+
+  static Future<T> _withOperationLock<T>(Future<T> Function() action) async {
+    final previous = _operationLock;
+    final completer = Completer<void>();
+    _operationLock = completer.future;
+    await previous;
+    try {
+      return await action();
+    } finally {
+      completer.complete();
     }
-    await selector(normalized);
-    _modelName = normalized;
   }
 }

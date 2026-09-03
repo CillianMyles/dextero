@@ -88,10 +88,40 @@ void main() {
       expect(selectedModel, core.codexSparkModel);
     });
 
+    test('rejects a stale client model before accepting its message', () async {
+      await endpoints.control.selectModel(
+        authenticatedSession,
+        core.codexSparkModel,
+      );
+
+      await expectLater(
+        endpoints.control.submitMessage(
+          authenticatedSession,
+          ChatSubmitRequest(
+            conversationId: conversationId,
+            message: 'Use the stale choice',
+            modelName: 'default',
+          ),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains(core.codexSparkModel),
+          ),
+        ),
+      );
+      expect(await store.history(conversationId), isEmpty);
+    });
+
     test('rejects model changes after the first message', () async {
       final submission = await endpoints.control.submitMessage(
         authenticatedSession,
-        ChatSubmitRequest(conversationId: conversationId, message: 'Start'),
+        ChatSubmitRequest(
+          conversationId: conversationId,
+          message: 'Start',
+          modelName: 'default',
+        ),
       );
       await store
           .watch(conversationId)
@@ -119,6 +149,7 @@ void main() {
           ChatSubmitRequest(
             conversationId: conversationId,
             message: 'Inspect the workspace',
+            modelName: 'default',
             correlationId: 'client-1',
           ),
         );
@@ -190,7 +221,11 @@ void main() {
       await expectLater(
         endpoints.control.submitMessage(
           authenticatedSession,
-          ChatSubmitRequest(conversationId: conversationId, message: '   '),
+          ChatSubmitRequest(
+            conversationId: conversationId,
+            message: '   ',
+            modelName: 'default',
+          ),
         ),
         throwsArgumentError,
       );
@@ -224,7 +259,11 @@ void main() {
       );
       final submission = await endpoints.control.submitMessage(
         authenticatedSession,
-        ChatSubmitRequest(conversationId: conversationId, message: 'Long task'),
+        ChatSubmitRequest(
+          conversationId: conversationId,
+          message: 'Long task',
+          modelName: 'default',
+        ),
       );
       await transport.started.future;
 
