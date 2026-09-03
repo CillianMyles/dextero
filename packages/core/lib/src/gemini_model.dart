@@ -6,7 +6,7 @@ import 'cancellation.dart';
 import 'model.dart';
 import 'tool.dart';
 
-const defaultGeminiModel = 'gemini-3.7-flash';
+const defaultGeminiModel = 'gemini-2.5-flash';
 
 abstract interface class GeminiTransport {
   Future<JsonMap> generateContent({

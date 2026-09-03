@@ -53,7 +53,7 @@ void main() {
 
       expect(exitCode, 0);
       expect(io.errors, isEmpty);
-      expect(io.output.join(), contains('gemini · gemini-3.7-flash'));
+      expect(io.output.join(), contains('gemini · gemini-2.5-flash'));
       expect(io.output.join(), contains('[you] Inspect the workspace'));
       expect(
         io.output.join(),
