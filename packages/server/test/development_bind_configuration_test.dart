@@ -22,6 +22,26 @@ void main() {
       contains('curl --silent --output /dev/null "http://127.0.0.1:8080/"'),
     );
   });
+
+  test('make dev brackets a concrete IPv6 readiness address', () async {
+    final result = await _dryRunDev('::1');
+
+    expect(result.exitCode, 0, reason: result.stderr.toString());
+    expect(
+      result.stdout,
+      contains('curl --silent --output /dev/null "http://[::1]:8080/"'),
+    );
+  });
+
+  test('make dev probes IPv6 loopback for an IPv6 wildcard bind', () async {
+    final result = await _dryRunDev('::');
+
+    expect(result.exitCode, 0, reason: result.stderr.toString());
+    expect(
+      result.stdout,
+      contains('curl --silent --output /dev/null "http://[::1]:8080/"'),
+    );
+  });
 }
 
 Future<ProcessResult> _dryRunDev(String bindAddress) {
