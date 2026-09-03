@@ -124,9 +124,10 @@ final class AgentRuntimeConfiguration {
     required List<String> fallback,
     required String selected,
   }) {
-    final values = configured == null
+    final normalizedConfigured = _nonEmpty(configured);
+    final values = normalizedConfigured == null
         ? fallback
-        : configured.split(',').map((value) => value.trim());
+        : normalizedConfigured.split(',').map((value) => value.trim());
     final models = <String>[];
     for (final value in values) {
       if (value.isNotEmpty && !models.contains(value)) models.add(value);
