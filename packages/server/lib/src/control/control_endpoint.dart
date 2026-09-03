@@ -14,7 +14,15 @@ final class ControlEndpoint extends Endpoint {
   bool get requireLogin => true;
 
   /// Describes the local host and its intentionally volatile MVP storage.
-  Future<HostStatus> status(Session session) async => HostStatus(
+  Future<HostStatus> status(Session session) async => _status();
+
+  /// Selects the model before this process-local conversation has started.
+  Future<HostStatus> selectModel(Session session, String modelName) async {
+    await ChatRuntime.selectModel(modelName);
+    return _status();
+  }
+
+  HostStatus _status() => HostStatus(
     name: 'Dextero',
     version: '0.0.1',
     startedAt: _startedAt,
@@ -25,6 +33,7 @@ final class ControlEndpoint extends Endpoint {
     streamingAvailable: true,
     modelProvider: ChatRuntime.modelProvider,
     modelName: ChatRuntime.modelName,
+    availableModels: ChatRuntime.availableModels,
   );
 
   /// Canonically accepts a user message before starting assistant work.

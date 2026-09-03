@@ -33,6 +33,12 @@ class EndpointControl extends _i1.EndpointRef {
   _i2.Future<_i3.HostStatus> status() =>
       caller.callServerEndpoint<_i3.HostStatus>('control', 'status', {});
 
+  /// Selects the model before this process-local conversation has started.
+  _i2.Future<_i3.HostStatus> selectModel(String modelName) =>
+      caller.callServerEndpoint<_i3.HostStatus>('control', 'selectModel', {
+        'modelName': modelName,
+      });
+
   /// Canonically accepts a user message before starting assistant work.
   _i2.Future<_i4.ChatSubmission> submitMessage(_i5.ChatSubmitRequest request) =>
       caller.callServerEndpoint<_i4.ChatSubmission>(

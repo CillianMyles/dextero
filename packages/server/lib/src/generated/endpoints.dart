@@ -32,6 +32,21 @@ class Endpoints extends _i1.EndpointDispatch {
           call: (_i1.Session session, Map<String, dynamic> params) async =>
               (endpoints['control'] as _i2.ControlEndpoint).status(session),
         ),
+        'selectModel': _i1.MethodConnector(
+          name: 'selectModel',
+          params: {
+            'modelName': _i1.ParameterDescription(
+              name: 'modelName',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['control'] as _i2.ControlEndpoint).selectModel(
+                session,
+                params['modelName'],
+              ),
+        ),
         'submitMessage': _i1.MethodConnector(
           name: 'submitMessage',
           params: {

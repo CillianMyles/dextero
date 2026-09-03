@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dextero_server/dextero_client.dart';
 import 'package:flutter/material.dart' show SelectableText, ThemeMode;
 import 'package:flutter/services.dart' show LogicalKeyboardKey, TextInputAction;
@@ -99,9 +101,7 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
     final controller = widget.controller;
     final theme = ShadTheme.of(context);
     final canSend =
-        controller.hostStatus != null &&
-        !controller.busy &&
-        _messageController.text.trim().isNotEmpty;
+        controller.canSubmit && _messageController.text.trim().isNotEmpty;
 
     return ColoredBox(
       color: theme.colorScheme.background,
@@ -133,8 +133,7 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                     const SizedBox(height: 12),
                     _Composer(
                       messageController: _messageController,
-                      enabled:
-                          controller.hostStatus != null && !controller.busy,
+                      enabled: controller.canSubmit,
                       canSend: canSend,
                       submitting: controller.submitting,
                       cancelling: controller.cancelling,
@@ -162,12 +161,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = controller.hostStatus;
     final badges = <Widget>[
-      if (status != null)
-        _StatusBadge(
-          key: const Key('model-provider'),
-          icon: LucideIcons.bot,
-          label: '${_displayName(status.modelProvider)} · ${status.modelName}',
-        ),
+      if (status != null) _ModelSelector(controller: controller),
       if (status != null)
         ShadTooltip(
           builder: (context) => Text(status.retentionNotice),
@@ -208,9 +202,55 @@ class _Header extends StatelessWidget {
       },
     );
   }
+}
+
+class _ModelSelector extends StatelessWidget {
+  const _ModelSelector({required this.controller});
+
+  final DexteroController controller;
 
   String _displayName(String value) =>
       value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final status = controller.hostStatus!;
+    if (status.availableModels.length < 2) {
+      return _StatusBadge(
+        key: const Key('model-provider'),
+        icon: LucideIcons.bot,
+        label: '${_displayName(status.modelProvider)} · ${status.modelName}',
+      );
+    }
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 210, maxWidth: 290),
+      child: ShadSelect<String>(
+        key: const Key('model-selector'),
+        initialValue: status.modelName,
+        enabled: controller.canSelectModel,
+        options: [
+          for (final model in status.availableModels)
+            ShadOption(value: model, child: Text(model)),
+        ],
+        selectedOptionBuilder: (context, model) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.bot, size: 15),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                '${_displayName(status.modelProvider)} · $model',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        onChanged: (model) {
+          if (model != null) unawaited(controller.selectModel(model));
+        },
+      ),
+    );
+  }
 }
 
 class _Brand extends StatelessWidget {

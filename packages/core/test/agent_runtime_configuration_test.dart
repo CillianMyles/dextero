@@ -7,7 +7,8 @@ void main() {
 
     expect(configuration.provider, AgentProvider.codex);
     expect(configuration.providerName, 'codex');
-    expect(configuration.modelName, 'default');
+    expect(configuration.modelName, defaultCodexModel);
+    expect(configuration.availableModels, [defaultCodexModel, codexSparkModel]);
   });
 
   test('selects Gemini when an API key is plugged in', () {
@@ -36,10 +37,29 @@ void main() {
       'DEXTERO_MODEL_PROVIDER': ' gemini ',
       'GEMINI_API_KEY': 'secret-key',
       'DEXTERO_GEMINI_MODEL': 'gemini-custom',
+      'DEXTERO_GEMINI_MODELS': 'gemini-fast, gemini-custom, gemini-fast',
     });
 
     expect(configuration.provider, AgentProvider.gemini);
     expect(configuration.modelName, 'gemini-custom');
+    expect(configuration.availableModels, ['gemini-fast', 'gemini-custom']);
+  });
+
+  test('adds a selected model to a configured allowlist', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'DEXTERO_CODEX_MODEL': 'codex-custom',
+      'DEXTERO_CODEX_MODELS': 'default,gpt-5.3-codex-spark',
+    });
+
+    expect(configuration.availableModels, [
+      'codex-custom',
+      defaultCodexModel,
+      codexSparkModel,
+    ]);
+    expect(
+      () => configuration.createAgent(workspace: '.', modelName: 'not-allowed'),
+      throwsArgumentError,
+    );
   });
 
   test('rejects explicit Gemini selection without an API key', () {

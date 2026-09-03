@@ -8,9 +8,13 @@ import 'src/control/chat_runtime.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 
-export 'src/control/chat_runtime.dart' show ChatRuntime;
+export 'src/control/chat_runtime.dart' show ChatRuntime, ModelSelector;
 export 'src/control/agent_runtime_configuration.dart'
-    show AgentProvider, AgentRuntimeConfiguration;
+    show
+        AgentProvider,
+        AgentRuntimeConfiguration,
+        codexSparkModel,
+        defaultCodexModel;
 
 /// Starts the database-free local control plane.
 Future<void> run(List<String> arguments) async {
@@ -41,6 +45,14 @@ Future<void> run(List<String> arguments) async {
     defaultConversationId: conversation.id,
     modelProvider: agentConfiguration.providerName,
     modelName: agentConfiguration.modelName,
+    availableModels: agentConfiguration.availableModels,
+    modelSelector: (modelName) => service.selectAgent(
+      conversationId: conversation.id,
+      agent: agentConfiguration.createAgent(
+        workspace: workspace,
+        modelName: modelName,
+      ),
+    ),
   );
 }
 
@@ -57,6 +69,8 @@ Future<Serverpod> startControlServer({
   bool runInGuardedZone = true,
   String modelProvider = 'codex',
   String modelName = 'default',
+  List<String>? availableModels,
+  ModelSelector? modelSelector,
 }) async {
   if (token.length < 32) {
     throw ArgumentError.value(
@@ -70,6 +84,8 @@ Future<Serverpod> startControlServer({
     defaultConversationId: defaultConversationId,
     modelProvider: modelProvider,
     modelName: modelName,
+    availableModels: availableModels,
+    modelSelector: modelSelector,
   );
   final config = apiPort == null
       ? null

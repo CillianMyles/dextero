@@ -35,10 +35,17 @@ final class TerminalChat {
   var _plainHeaderRendered = false;
   late HostStatus _status;
 
-  Future<int> run({String? initialMessage, String? cancelRunId}) async {
+  Future<int> run({
+    String? initialMessage,
+    String? cancelRunId,
+    String? modelName,
+  }) async {
     var failed = false;
     try {
       _status = await _client.status();
+      if (modelName != null && modelName != _status.modelName) {
+        _status = await _client.selectModel(modelName);
+      }
       if (cancelRunId != null) {
         final cancelled = await _client.cancelRun(
           _status.conversationId,

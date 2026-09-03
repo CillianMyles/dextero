@@ -73,6 +73,24 @@ void main() {
     expect(client.requests, isEmpty);
   });
 
+  test('selects a model before the first message', () async {
+    final tester = await nocterm.NoctermTester.create();
+    addTearDown(tester.dispose);
+    final client = _FakeClient();
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText('/model gemini-pro');
+    await tester.sendEnter();
+    await tester.pump();
+    await tester.pump();
+
+    expect(client.modelSelections, ['gemini-pro']);
+    expect(tester.terminalState.containsText('gemini · gemini-pro'), isTrue);
+    expect(tester.terminalState.containsText('Using gemini-pro'), isTrue);
+  });
+
   test('keeps Ctrl+C active while a response stream is pending', () async {
     final tester = await nocterm.NoctermTester.create();
     addTearDown(tester.dispose);
@@ -111,6 +129,7 @@ final class _FakeClient implements TerminalChatClient {
   final Stream<ChatEntry>? responseStream;
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
+  final modelSelections = <String>[];
 
   @override
   Future<void> close() async {}
@@ -125,6 +144,12 @@ final class _FakeClient implements TerminalChatClient {
 
   @override
   Future<HostStatus> status() async => _status();
+
+  @override
+  Future<HostStatus> selectModel(String modelName) async {
+    modelSelections.add(modelName);
+    return _status(modelName: modelName);
+  }
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) {
@@ -166,7 +191,7 @@ final class _FakeClient implements TerminalChatClient {
   }
 }
 
-HostStatus _status() => HostStatus(
+HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
   startedAt: DateTime.utc(2026),
@@ -176,7 +201,8 @@ HostStatus _status() => HostStatus(
   databaseRequired: false,
   streamingAvailable: true,
   modelProvider: 'gemini',
-  modelName: 'gemini-2.5-flash',
+  modelName: modelName,
+  availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
 );
 
 ChatEntry _entry({

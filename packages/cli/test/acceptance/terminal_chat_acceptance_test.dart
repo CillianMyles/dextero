@@ -14,12 +14,15 @@ void main() {
       final service = ChatService(
         store: store,
         agent: ModelConversationAgent(
-          model: GeminiModel(transport: _AcceptanceGeminiTransport()),
+          model: GeminiModel(
+            transport: _AcceptanceGeminiTransport(defaultGeminiModel),
+          ),
           tools: [_AcceptanceRunCommandTool(), _AcceptanceReadFileTool()],
           providerName: 'Gemini',
         ),
       );
       final conversation = await service.createConversation();
+      var selectedModel = defaultGeminiModel;
       final portProbe = await ServerSocket.bind(
         InternetAddress.loopbackIPv4,
         0,
@@ -32,6 +35,21 @@ void main() {
         defaultConversationId: conversation.id,
         modelProvider: 'gemini',
         modelName: defaultGeminiModel,
+        availableModels: const [defaultGeminiModel, 'gemini-selected'],
+        modelSelector: (modelName) async {
+          await service.selectAgent(
+            conversationId: conversation.id,
+            agent: ModelConversationAgent(
+              model: GeminiModel(
+                model: modelName,
+                transport: _AcceptanceGeminiTransport(modelName),
+              ),
+              tools: [_AcceptanceRunCommandTool(), _AcceptanceReadFileTool()],
+              providerName: 'Gemini',
+            ),
+          );
+          selectedModel = modelName;
+        },
         apiPort: apiPort,
         runInGuardedZone: false,
       );
@@ -49,11 +67,15 @@ void main() {
         correlationIdFactory: () => 'acceptance-cli-1',
       );
 
-      final exitCode = await chat.run(initialMessage: 'Inspect the workspace');
+      final exitCode = await chat.run(
+        initialMessage: 'Inspect the workspace',
+        modelName: 'gemini-selected',
+      );
 
       expect(exitCode, 0);
+      expect(selectedModel, 'gemini-selected');
       expect(io.errors, isEmpty);
-      expect(io.output.join(), contains('gemini · gemini-2.5-flash'));
+      expect(io.output.join(), contains('gemini · gemini-selected'));
       expect(io.output.join(), contains('[you] Inspect the workspace'));
       expect(
         io.output.join(),
@@ -103,6 +125,9 @@ void main() {
 }
 
 final class _AcceptanceGeminiTransport implements GeminiTransport {
+  _AcceptanceGeminiTransport(this.expectedModel);
+
+  final String expectedModel;
   var _turn = 0;
 
   @override
@@ -111,6 +136,7 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
     required JsonMap request,
     CancellationToken? cancellationToken,
   }) async {
+    expect(model, expectedModel);
     final turn = _turn++;
     if (turn == 0) {
       return {

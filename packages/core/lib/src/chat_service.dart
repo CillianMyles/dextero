@@ -74,7 +74,7 @@ final class ChatService {
        _identifiers = identifiers ?? SecureIdentifierGenerator();
 
   final ChatHistoryStore _store;
-  final ConversationAgent _agent;
+  ConversationAgent _agent;
   final IdentifierGenerator _identifiers;
   final Map<String, _ActiveRun> _activeRuns = {};
   Future<void> _submissionLock = Future.value();
@@ -82,6 +82,23 @@ final class ChatService {
   ChatHistoryStore get store => _store;
 
   Future<ChatConversation> createConversation() => _store.createConversation();
+
+  /// Replaces the conversation agent before the first message is accepted.
+  Future<void> selectAgent({
+    required String conversationId,
+    required ConversationAgent agent,
+  }) => _withSubmissionLock(() async {
+    if (await _store.conversation(conversationId) == null) {
+      throw StateError('Unknown conversation: $conversationId');
+    }
+    if (_activeRuns.containsKey(conversationId) ||
+        (await _store.history(conversationId)).isNotEmpty) {
+      throw StateError(
+        'The model can only be changed before the first message.',
+      );
+    }
+    _agent = agent;
+  });
 
   Future<ChatSubmission> submit({
     required String conversationId,
