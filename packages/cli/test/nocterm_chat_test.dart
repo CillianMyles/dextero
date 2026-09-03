@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_server/dextero_client.dart';
 import 'package:nocterm/nocterm.dart' as nocterm;
@@ -70,12 +72,43 @@ void main() {
     expect(exitCode, 0);
     expect(client.requests, isEmpty);
   });
+
+  test('keeps Ctrl+C active while a response stream is pending', () async {
+    final tester = await nocterm.NoctermTester.create();
+    addTearDown(tester.dispose);
+    final response = StreamController<ChatEntry>();
+    addTearDown(response.close);
+    final client = _FakeClient(responseStream: response.stream);
+    int? exitCode;
+
+    await tester.pumpComponent(
+      DexteroTui(client: client, onExit: (code) => exitCode = code),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText('Wait for the result');
+    await tester.sendEnter();
+    await tester.pump();
+
+    expect(client.requests.single.message, 'Wait for the result');
+    expect(tester.terminalState.containsText('Dextero is working…'), isTrue);
+
+    await tester.sendKeyEvent(
+      const nocterm.KeyboardEvent(
+        logicalKey: nocterm.LogicalKey.keyC,
+        modifiers: nocterm.ModifierKeys(ctrl: true),
+      ),
+    );
+
+    expect(exitCode, 0);
+  });
 }
 
 final class _FakeClient implements TerminalChatClient {
-  _FakeClient({this.historyEntries = const []});
+  _FakeClient({this.historyEntries = const [], this.responseStream});
 
   final List<ChatEntry> historyEntries;
+  final Stream<ChatEntry>? responseStream;
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
 
@@ -96,6 +129,7 @@ final class _FakeClient implements TerminalChatClient {
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) {
     cursors.add(afterSequence);
+    if (responseStream case final stream?) return stream;
     return Stream.fromIterable([
       _entry(
         sequence: afterSequence + 1,
