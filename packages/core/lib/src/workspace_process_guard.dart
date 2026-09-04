@@ -35,14 +35,8 @@ Future<void> main(List<String> arguments) async {
     executable,
     commandArguments,
     runInShell: false,
+    mode: ProcessStartMode.inheritStdio,
   );
-  final input = stdin.listen(
-    process.stdin.add,
-    onError: process.stdin.addError,
-    onDone: () => unawaited(process.stdin.close()),
-  );
-  final output = stdout.addStream(process.stdout);
-  final errors = stderr.addStream(process.stderr);
   final signalSubscriptions = <StreamSubscription<ProcessSignal>>[];
   if (!Platform.isWindows) {
     for (final signal in [ProcessSignal.sigint, ProcessSignal.sigterm]) {
@@ -53,8 +47,6 @@ Future<void> main(List<String> arguments) async {
   }
 
   final result = await process.exitCode;
-  await input.cancel();
-  await Future.wait([output, errors]);
   for (final subscription in signalSubscriptions) {
     await subscription.cancel();
   }
