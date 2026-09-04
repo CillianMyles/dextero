@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -37,17 +38,20 @@ void main() {
         Uri.parse('package:dextero_core/src/workspace_process_guard.dart'),
       ))!,
     );
+    final startup = File('${sandbox.path}/startup.json');
 
     final result = await Process.run(Platform.resolvedExecutable, [
       guard.path,
       expectedFilesystemIdentity,
       expectedRepositoryTopology,
+      startup.path,
       Platform.resolvedExecutable,
       command.path,
     ], workingDirectory: workspace.path);
 
     expect(result.exitCode, 126, reason: result.stderr as String);
     expect(result.stderr, contains('Configured workspace changed'));
+    expect(jsonDecode(await startup.readAsString()), {'status': 'rejected'});
     expect(await launched.exists(), isFalse);
   }, timeout: const Timeout(Duration(minutes: 2)));
 }

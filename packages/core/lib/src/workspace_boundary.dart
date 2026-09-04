@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -68,21 +70,91 @@ final class WorkspaceBoundary {
     if (guardUri == null || guardUri.scheme != 'file') {
       throw StateError('Cannot resolve the workspace process guard');
     }
-    return Process.start(
-      Platform.resolvedExecutable,
-      [
-        guardUri.toFilePath(),
-        _identity,
-        _repositoryTopologyIdentity,
-        executable,
-        ...arguments,
-      ],
-      workingDirectory: root,
-      runInShell: false,
-      includeParentEnvironment: false,
-      environment: environment,
+    final startupDirectory = await Directory.systemTemp.createTemp(
+      'dextero-process-start-',
     );
+    final startupFile = File('${startupDirectory.path}/status.json');
+    try {
+      final guard = await Process.start(
+        Platform.resolvedExecutable,
+        [
+          guardUri.toFilePath(),
+          _identity,
+          _repositoryTopologyIdentity,
+          startupFile.path,
+          executable,
+          ...arguments,
+        ],
+        workingDirectory: root,
+        runInShell: false,
+        includeParentEnvironment: false,
+        environment: environment,
+      );
+      final startup = await _waitForGuardStartup(guard, startupFile);
+      if (startup.status == 'launchError') {
+        await guard.exitCode;
+        throw ProcessException(
+          executable,
+          arguments,
+          startup.message ?? 'Failed to start guarded process',
+          startup.errorCode ?? 0,
+        );
+      }
+      return guard;
+    } finally {
+      await startupDirectory.delete(recursive: true);
+    }
   }
+}
+
+Future<_GuardStartup> _waitForGuardStartup(
+  Process guard,
+  File startupFile,
+) async {
+  var exited = false;
+  unawaited(guard.exitCode.then((_) => exited = true));
+  final deadline = DateTime.now().add(const Duration(seconds: 10));
+  while (DateTime.now().isBefore(deadline)) {
+    if (await startupFile.exists()) {
+      final decoded = jsonDecode(await startupFile.readAsString());
+      if (decoded is! Map<String, Object?> || decoded['status'] is! String) {
+        throw const FormatException('Invalid workspace guard startup status');
+      }
+      return _GuardStartup(
+        status: decoded['status']! as String,
+        message: decoded['message'] as String?,
+        errorCode: decoded['errorCode'] as int?,
+      );
+    }
+    if (exited) {
+      throw ProcessException(
+        Platform.resolvedExecutable,
+        const [],
+        'Workspace process guard exited before reporting startup',
+        await guard.exitCode,
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  guard.kill();
+  await guard.exitCode;
+  throw ProcessException(
+    Platform.resolvedExecutable,
+    const [],
+    'Workspace process guard did not report startup',
+  );
+}
+
+final class _GuardStartup {
+  const _GuardStartup({
+    required this.status,
+    required this.message,
+    required this.errorCode,
+  });
+
+  final String status;
+  final String? message;
+  final int? errorCode;
 }
 
 final class _WorkspaceChanged implements Exception {

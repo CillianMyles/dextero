@@ -240,6 +240,19 @@ void main() {
     );
   });
 
+  test('propagates a missing command through the workspace guard', () async {
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+
+    await expectLater(
+      guarded.call({'command': 'definitely-not-a-real-command-12345'}),
+      throwsA(isA<ProcessException>()),
+    );
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
   test('rejects execution after the workspace directory is replaced', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'run-command-replaced-workspace-',
