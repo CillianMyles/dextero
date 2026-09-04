@@ -458,6 +458,51 @@ void main() {
     expect(result.stderr, contains('filesystem birth time is unavailable'));
   });
 
+  test('distinguishes Windows directories with matching timestamps', () async {
+    if (!Platform.isWindows) return;
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-windows-file-id-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final firstDirectory = await Directory('${sandbox.path}/first').create();
+    final secondDirectory = await Directory('${sandbox.path}/second').create();
+    final timestamp = DateTime.utc(2025);
+    final timestampResult = await Process.run(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        r'[IO.Directory]::SetCreationTimeUtc('
+            r'$env:DEXTERO_FIRST_PATH, [DateTime]::Parse('
+            r'$env:DEXTERO_TIMESTAMP)); '
+            r'[IO.Directory]::SetCreationTimeUtc('
+            r'$env:DEXTERO_SECOND_PATH, [DateTime]::Parse('
+            r'$env:DEXTERO_TIMESTAMP))',
+      ],
+      environment: {
+        'DEXTERO_FIRST_PATH': firstDirectory.path,
+        'DEXTERO_SECOND_PATH': secondDirectory.path,
+        'DEXTERO_TIMESTAMP': timestamp.toIso8601String(),
+      },
+    );
+    expect(
+      timestampResult.exitCode,
+      0,
+      reason: timestampResult.stderr as String,
+    );
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+
+    final first = await registry.resolve(firstDirectory.path);
+    final second = await registry.resolve(secondDirectory.path);
+
+    expect(second.projectId, isNot(first.projectId));
+    expect(second.workspaceId, isNot(first.workspaceId));
+  });
+
   test('rejects malformed host identities', () {
     expect(
       () => HostIdentity(
