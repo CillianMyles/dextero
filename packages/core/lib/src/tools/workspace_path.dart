@@ -1,11 +1,16 @@
 import 'dart:io';
 
+import '../opened_file_identity.dart';
 import '../workspace_boundary.dart';
 
 final class WorkspacePath {
-  WorkspacePath(String root, {WorkspaceBoundary? boundary})
-    : _root = Directory(root).absolute,
-      _boundary = boundary {
+  WorkspacePath(
+    String root, {
+    WorkspaceBoundary? boundary,
+    Future<void> Function(String path)? beforeFileOpen,
+  }) : _beforeFileOpen = beforeFileOpen,
+       _root = Directory(root).absolute,
+       _boundary = boundary {
     if (boundary != null && _root.path != boundary.root) {
       throw ArgumentError('workspace boundary must match the configured root');
     }
@@ -13,6 +18,7 @@ final class WorkspacePath {
 
   final Directory _root;
   final WorkspaceBoundary? _boundary;
+  final Future<void> Function(String path)? _beforeFileOpen;
 
   String get root => _root.path;
 
@@ -59,8 +65,15 @@ final class WorkspacePath {
       relativePath,
       expectedType: FileSystemEntityType.file,
     );
+    final expectedIdentity = await OpenedFileIdentity.capturePath(path);
+    await _beforeFileOpen?.call(path);
     final file = await File(path).open(mode: mode);
     try {
+      await OpenedFileIdentity.verify(
+        file: file,
+        expectedPath: path,
+        expectedIdentity: expectedIdentity,
+      );
       await _boundary?.validate();
       return file;
     } on Object {
