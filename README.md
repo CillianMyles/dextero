@@ -146,7 +146,9 @@ Git repositories keep a local incarnation marker in their shared Git metadata,
 so linked worktrees share a project identity while a replacement checkout at
 the same path receives new project and workspace identities. The host registry
 also records the metadata directory's filesystem incarnation, so copying a
-repository does not copy its identity while moving it preserves the identity.
+repository does not copy its identity while moving it within one filesystem
+preserves the identity. A cross-filesystem move rotates the IDs because it is
+indistinguishable from a copied repository after the original disappears.
 Standard separate Git directories are supported; symbolic `.git` entries are
 rejected. Linux identity resolution requires filesystem birth-time metadata.
 Agents revalidate the selected workspace's filesystem incarnation, Git

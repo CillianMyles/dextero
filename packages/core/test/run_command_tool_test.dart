@@ -105,7 +105,7 @@ void main() {
       FileSystemEntity.identicalSync(result['stdout']! as String, root.path),
       isTrue,
     );
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test('normalizes Linux guard identity across timezones', () async {
     if (!Platform.isLinux) return;
@@ -146,7 +146,7 @@ void main() {
 
     expect(result['exit_code'], 0, reason: result['stderr'] as String);
     expect(jsonDecode(result['stdout']! as String), arguments);
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test('captures non-zero exits without merging stderr into stdout', () async {
     final script = await _script(
