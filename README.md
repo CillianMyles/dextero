@@ -142,6 +142,9 @@ dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"
 The first JSONL record describes the host, project, workspace, and controller
 identities. Human and full-screen terminal headers show their display names;
 the Flutter identity badge shows the stable IDs in its tooltip.
+Git repositories keep a local incarnation marker in their shared Git metadata,
+so linked worktrees share a project identity while a replacement checkout at
+the same path receives new project and workspace identities.
 
 Run all checks:
 

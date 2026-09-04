@@ -75,22 +75,26 @@ final class LocalIdentityRegistry {
         locked = true;
         // Re-read after taking the lock so concurrent hosts merge their entries.
         final state = await _readState();
+        final projectKey = await _projectKey(project);
+        final workspaceKey = project.isGit
+            ? '$projectKey::$workspacePath'
+            : workspacePath;
         final deviceId = state.deviceId ?? _identifiers.next('device');
         final projectId =
-            state.projects[project.key] ?? _identifiers.next('project');
+            state.projects[projectKey] ?? _identifiers.next('project');
         final workspaceId =
-            state.workspaces[workspacePath] ?? _identifiers.next('workspace');
+            state.workspaces[workspaceKey] ?? _identifiers.next('workspace');
         final changed =
             state.deviceId != deviceId ||
-            state.projects[project.key] != projectId ||
-            state.workspaces[workspacePath] != workspaceId;
+            state.projects[projectKey] != projectId ||
+            state.workspaces[workspaceKey] != workspaceId;
 
         if (changed) {
           await _writeState(
             _IdentityState(
               deviceId: deviceId,
-              projects: {...state.projects, project.key: projectId},
-              workspaces: {...state.workspaces, workspacePath: workspaceId},
+              projects: {...state.projects, projectKey: projectId},
+              workspaces: {...state.workspaces, workspaceKey: workspaceId},
             ),
           );
         }
@@ -147,6 +151,59 @@ final class LocalIdentityRegistry {
     }
   }
 
+  Future<String> _projectKey(_ProjectLocation project) async {
+    final repositoryDirectory = project.repositoryDirectory;
+    if (repositoryDirectory == null) return project.root.path;
+
+    final repositoryPath = await repositoryDirectory.resolveSymbolicLinks();
+    final markerFile = File(
+      _join(repositoryPath, 'dextero-project-identity-v1'),
+    );
+    final marker = await _withInProcessLock(
+      'repository:${markerFile.absolute.path}',
+      () async {
+        final lock = await File(
+          '${markerFile.path}.lock',
+        ).open(mode: FileMode.append);
+        var locked = false;
+        try {
+          await lock.lock(FileLock.exclusive);
+          locked = true;
+          return await _readOrCreateRepositoryMarker(markerFile);
+        } finally {
+          if (locked) await lock.unlock();
+          await lock.close();
+        }
+      },
+    );
+    return '$repositoryPath::$marker';
+  }
+
+  Future<String> _readOrCreateRepositoryMarker(File markerFile) async {
+    if (await markerFile.exists()) {
+      try {
+        return _validateId(await markerFile.readAsString(), 'repository');
+      } on Object catch (error) {
+        throw FormatException(
+          'Cannot read repository identity ${markerFile.path}: $error',
+        );
+      }
+    }
+
+    final marker = _identifiers.next('repository');
+    final temporary = File(
+      '${markerFile.path}.$pid.'
+      '${DateTime.now().toUtc().microsecondsSinceEpoch}.tmp',
+    );
+    try {
+      await temporary.writeAsString('$marker\n', flush: true);
+      await temporary.rename(markerFile.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
+    return marker;
+  }
+
   static Future<T> _withInProcessLock<T>(
     String key,
     Future<T> Function() action,
@@ -180,10 +237,12 @@ final class _IdentityState {
 }
 
 final class _ProjectLocation {
-  const _ProjectLocation({required this.key, required this.root});
+  const _ProjectLocation({required this.root, this.repositoryDirectory});
 
-  final String key;
   final Directory root;
+  final Directory? repositoryDirectory;
+
+  bool get isGit => repositoryDirectory != null;
 }
 
 Future<_ProjectLocation> _findProject(Directory workspace) async {
@@ -192,8 +251,8 @@ Future<_ProjectLocation> _findProject(Directory workspace) async {
     final dotGitDirectory = Directory(_join(current.path, '.git'));
     if (await dotGitDirectory.exists()) {
       return _ProjectLocation(
-        key: await dotGitDirectory.resolveSymbolicLinks(),
         root: current,
+        repositoryDirectory: dotGitDirectory,
       );
     }
     final dotGitFile = File(_join(current.path, '.git'));
@@ -217,15 +276,15 @@ Future<_ProjectLocation> _findProject(Directory workspace) async {
             )
           : gitDirectory;
       return _ProjectLocation(
-        key: await commonDirectory.resolveSymbolicLinks(),
         root: current,
+        repositoryDirectory: commonDirectory,
       );
     }
     final parent = current.parent;
     if (parent.path == current.path) break;
     current = parent;
   }
-  return _ProjectLocation(key: workspace.path, root: workspace);
+  return _ProjectLocation(root: workspace);
 }
 
 Map<String, String> _stringMap(Object? value) {

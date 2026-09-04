@@ -59,6 +59,28 @@ void main() {
     expect(feature.workspaceId, isNot(primary.workspaceId));
   });
 
+  test('does not reuse identities when a Git checkout is replaced', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-replaced-repository-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final gitDirectory = await Directory('${workspace.path}/.git').create();
+    final stateFile = File('${sandbox.path}/state/identities.json');
+    final registry = LocalIdentityRegistry(
+      stateFile: stateFile,
+      identifiers: _SequenceIdentifiers(),
+    );
+
+    final first = await registry.resolve(workspace.path);
+    await gitDirectory.delete(recursive: true);
+    await Directory(gitDirectory.path).create();
+    final replacement = await registry.resolve(workspace.path);
+
+    expect(replacement.projectId, isNot(first.projectId));
+    expect(replacement.workspaceId, isNot(first.workspaceId));
+  });
+
   test('merges identities resolved concurrently by separate hosts', () async {
     final sandbox = await Directory.systemTemp.createTemp('dextero-hosts-');
     addTearDown(() => sandbox.delete(recursive: true));

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -23,6 +24,8 @@ final class CliControllerIdentityStore {
   }
 
   final File _stateFile;
+  static final Map<String, Future<void>> _inProcessTails = {};
+  static var _temporarySequence = 0;
 
   Future<ControllerIdentity> load(Map<String, String> environment) async {
     final name = environment['DEXTERO_CONTROLLER_NAME']?.trim();
@@ -36,31 +39,83 @@ final class CliControllerIdentityStore {
       return ControllerIdentity(id: validated.id, name: validated.name);
     }
 
-    if (await _stateFile.exists()) {
+    return _withInProcessLock(_stateFile.absolute.path, () async {
+      await _stateFile.parent.create(recursive: true);
+      final lock = await File(
+        '${_stateFile.path}.lock',
+      ).open(mode: FileMode.append);
+      var locked = false;
       try {
-        final decoded = jsonDecode(await _stateFile.readAsString());
-        if (decoded is! Map<String, Object?> || decoded['version'] != 1) {
-          throw const FormatException('unsupported controller state version');
-        }
+        await lock.lock(FileLock.exclusive);
+        locked = true;
+        final existing = await _read(effectiveName);
+        if (existing != null) return existing;
+
+        final id = ControllerIdentities.createId();
+        await _write(id);
         final validated = ControllerIdentities.validated(
-          id: decoded['controllerId']! as String,
+          id: id,
           name: effectiveName,
         );
         return ControllerIdentity(id: validated.id, name: validated.name);
-      } on Object catch (error) {
-        throw FormatException(
-          'Cannot read controller identity ${_stateFile.path}: $error',
-        );
+      } finally {
+        if (locked) await lock.unlock();
+        await lock.close();
+      }
+    });
+  }
+
+  Future<ControllerIdentity?> _read(String name) async {
+    if (!await _stateFile.exists()) return null;
+    try {
+      final decoded = jsonDecode(await _stateFile.readAsString());
+      if (decoded is! Map<String, Object?> || decoded['version'] != 1) {
+        throw const FormatException('unsupported controller state version');
+      }
+      final validated = ControllerIdentities.validated(
+        id: decoded['controllerId']! as String,
+        name: name,
+      );
+      return ControllerIdentity(id: validated.id, name: validated.name);
+    } on Object catch (error) {
+      throw FormatException(
+        'Cannot read controller identity ${_stateFile.path}: $error',
+      );
+    }
+  }
+
+  Future<void> _write(String id) async {
+    final temporary = File(
+      '${_stateFile.path}.$pid.${_temporarySequence++}.tmp',
+    );
+    try {
+      await temporary.writeAsString(
+        '${jsonEncode({'version': 1, 'controllerId': id})}\n',
+        flush: true,
+      );
+      await temporary.rename(_stateFile.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
+  }
+
+  static Future<T> _withInProcessLock<T>(
+    String key,
+    Future<T> Function() action,
+  ) async {
+    final previous = _inProcessTails[key] ?? Future.value();
+    final completer = Completer<void>();
+    final current = completer.future;
+    _inProcessTails[key] = current;
+    await previous;
+    try {
+      return await action();
+    } finally {
+      completer.complete();
+      if (identical(_inProcessTails[key], current)) {
+        _inProcessTails.remove(key);
       }
     }
-
-    final id = ControllerIdentities.createId();
-    await _stateFile.parent.create(recursive: true);
-    await _stateFile.writeAsString(
-      '${jsonEncode({'version': 1, 'controllerId': id})}\n',
-      flush: true,
-    );
-    return ControllerIdentity(id: id, name: effectiveName);
   }
 }
 
