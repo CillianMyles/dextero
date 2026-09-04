@@ -76,11 +76,22 @@ final class LocalIdentityRegistry {
         // Re-read after taking the lock so concurrent hosts merge their entries.
         final state = await _readState();
         final projectKey = await _projectKey(project);
-        final workspaceKey = await _workspaceKey(
-          project,
-          projectKey,
-          workspacePath,
-        );
+        final checkoutKey = await _checkoutKey(project, projectKey);
+        final checkoutOwner = checkoutKey == null
+            ? null
+            : await _filesystemIncarnation(project.root);
+        final registeredOwner = checkoutKey == null
+            ? null
+            : state.checkoutOwners[checkoutKey];
+        if (registeredOwner != null && registeredOwner != checkoutOwner) {
+          throw FormatException(
+            'Git checkout metadata is already associated with another '
+            'workspace.',
+          );
+        }
+        final workspaceKey = checkoutKey == null
+            ? projectKey
+            : '$checkoutKey::${_relativePath(project.root.path, workspacePath)}';
         final deviceId = state.deviceId ?? _identifiers.next('device');
         final projectId =
             state.projects[projectKey] ?? _identifiers.next('project');
@@ -89,7 +100,8 @@ final class LocalIdentityRegistry {
         final changed =
             state.deviceId != deviceId ||
             state.projects[projectKey] != projectId ||
-            state.workspaces[workspaceKey] != workspaceId;
+            state.workspaces[workspaceKey] != workspaceId ||
+            (checkoutKey != null && registeredOwner == null);
 
         if (changed) {
           await _writeState(
@@ -97,6 +109,10 @@ final class LocalIdentityRegistry {
               deviceId: deviceId,
               projects: {...state.projects, projectKey: projectId},
               workspaces: {...state.workspaces, workspaceKey: workspaceId},
+              checkoutOwners: {
+                ...state.checkoutOwners,
+                ?checkoutKey: checkoutOwner!,
+              },
             ),
           );
         }
@@ -126,6 +142,7 @@ final class LocalIdentityRegistry {
         deviceId: decoded['deviceId'] as String?,
         projects: _stringMap(decoded['projects']),
         workspaces: _stringMap(decoded['workspaces']),
+        checkoutOwners: _stringMap(decoded['checkoutOwners']),
       );
     } on Object catch (error) {
       throw FormatException(
@@ -145,6 +162,7 @@ final class LocalIdentityRegistry {
         'deviceId': state.deviceId,
         'projects': state.projects,
         'workspaces': state.workspaces,
+        'checkoutOwners': state.checkoutOwners,
       });
       await temporary.writeAsString('$encoded\n', flush: true);
       await temporary.rename(_stateFile.path);
@@ -165,16 +183,16 @@ final class LocalIdentityRegistry {
       filename: 'dextero-project-identity-v1',
       prefix: 'repository',
     );
-    return 'git::$marker';
+    final incarnation = await _filesystemIncarnation(Directory(repositoryPath));
+    return 'git::$marker::$incarnation';
   }
 
-  Future<String> _workspaceKey(
+  Future<String?> _checkoutKey(
     _ProjectLocation project,
     String projectKey,
-    String workspacePath,
   ) async {
     final checkoutDirectory = project.checkoutDirectory;
-    if (checkoutDirectory == null) return projectKey;
+    if (checkoutDirectory == null) return null;
 
     final checkoutPath = await checkoutDirectory.resolveSymbolicLinks();
     final marker = await _identityMarker(
@@ -182,8 +200,8 @@ final class LocalIdentityRegistry {
       filename: 'dextero-checkout-identity-v1',
       prefix: 'checkout',
     );
-    final relativePath = _relativePath(project.root.path, workspacePath);
-    return '$projectKey::$marker::$relativePath';
+    final incarnation = await _filesystemIncarnation(Directory(checkoutPath));
+    return '$projectKey::$marker::$incarnation';
   }
 
   Future<String> _identityMarker({
@@ -263,11 +281,13 @@ final class _IdentityState {
     this.deviceId,
     this.projects = const {},
     this.workspaces = const {},
+    this.checkoutOwners = const {},
   });
 
   final String? deviceId;
   final Map<String, String> projects;
   final Map<String, String> workspaces;
+  final Map<String, String> checkoutOwners;
 }
 
 final class _ProjectLocation {
@@ -360,23 +380,31 @@ Future<void> _validateGitDirectoryOwnership({
     return;
   }
 
-  // Submodules and repositories created with --separate-git-dir declare their
-  // worktree in Git config instead of using a linked-worktree back-pointer.
+  // A standard --separate-git-dir repository has neither a linked-worktree
+  // back-pointer nor core.worktree. Ask Git to validate the relationship that
+  // the .git file declares. The host registry separately binds the resulting
+  // checkout identity to this workspace's filesystem incarnation, preventing
+  // another directory from reusing the same metadata.
   final result = await Process.run('git', [
-    '--git-dir',
-    gitDirectory.path,
-    'config',
-    '--path',
-    '--get',
-    'core.worktree',
+    '-C',
+    workspaceRoot.path,
+    'rev-parse',
+    '--show-toplevel',
+    '--absolute-git-dir',
   ]);
   if (result.exitCode == 0) {
-    final configured = (result.stdout as String).trim();
-    if (configured.isNotEmpty) {
+    final discovered = const LineSplitter().convert(
+      (result.stdout as String).trim(),
+    );
+    if (discovered.length == 2) {
       final expected = await workspaceRoot.resolveSymbolicLinks();
-      final candidate = Directory(_resolvePath(gitDirectory.path, configured));
-      if (await candidate.exists() &&
-          await candidate.resolveSymbolicLinks() == expected) {
+      final actualRoot = await Directory(discovered[0]).resolveSymbolicLinks();
+      final expectedGitDirectory = await gitDirectory.resolveSymbolicLinks();
+      final actualGitDirectory = await Directory(
+        discovered[1],
+      ).resolveSymbolicLinks();
+      if (actualRoot == expected &&
+          actualGitDirectory == expectedGitDirectory) {
         return;
       }
     }

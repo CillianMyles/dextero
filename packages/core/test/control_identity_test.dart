@@ -99,22 +99,16 @@ void main() {
       'dextero-separate-gitdir-',
     );
     addTearDown(() => sandbox.delete(recursive: true));
-    final workspace = await Directory('${sandbox.path}/workspace').create();
-    final gitDirectory = await Directory('${sandbox.path}/metadata').create();
-    await Directory('${gitDirectory.path}/objects').create();
-    await Directory('${gitDirectory.path}/refs/heads').create(recursive: true);
-    await File(
-      '${workspace.path}/.git',
-    ).writeAsString('gitdir: ${gitDirectory.path}\n');
-    await File(
-      '${gitDirectory.path}/HEAD',
-    ).writeAsString('ref: refs/heads/main\n');
-    await File('${gitDirectory.path}/config').writeAsString('''
-[core]
-  repositoryformatversion = 0
-  bare = false
-  worktree = ../workspace
-''');
+    final workspace = Directory('${sandbox.path}/workspace');
+    final gitDirectory = Directory('${sandbox.path}/metadata');
+    final initialized = await Process.run('git', [
+      'init',
+      '--quiet',
+      '--separate-git-dir',
+      gitDirectory.path,
+      workspace.path,
+    ]);
+    expect(initialized.exitCode, 0, reason: initialized.stderr as String);
 
     final identity = await LocalIdentityRegistry(
       stateFile: File('${sandbox.path}/state/identities.json'),
@@ -123,6 +117,38 @@ void main() {
 
     expect(identity.projectId, startsWith('project_'));
     expect(identity.workspaceId, startsWith('workspace_'));
+  });
+
+  test('rejects reuse of a standard separate Git directory', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-reused-separate-gitdir-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final owner = Directory('${sandbox.path}/owner');
+    final gitDirectory = Directory('${sandbox.path}/metadata');
+    final initialized = await Process.run('git', [
+      'init',
+      '--quiet',
+      '--separate-git-dir',
+      gitDirectory.path,
+      owner.path,
+    ]);
+    expect(initialized.exitCode, 0, reason: initialized.stderr as String);
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+    await registry.resolve(owner.path);
+
+    final forged = await Directory('${sandbox.path}/forged').create();
+    await File(
+      '${forged.path}/.git',
+    ).writeAsString('gitdir: ${gitDirectory.path}\n');
+
+    await expectLater(
+      registry.resolve(forged.path),
+      throwsA(isA<FormatException>()),
+    );
   });
 
   test('does not reuse identities when a Git checkout is replaced', () async {
@@ -146,6 +172,39 @@ void main() {
     expect(replacement.projectId, isNot(first.projectId));
     expect(replacement.workspaceId, isNot(first.workspaceId));
   });
+
+  test(
+    'does not reuse marker identities from a copied Git repository',
+    () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'dextero-copied-repository-',
+      );
+      addTearDown(() => sandbox.delete(recursive: true));
+      final original = await Directory('${sandbox.path}/original').create();
+      final originalGit = await Directory('${original.path}/.git').create();
+      final registry = LocalIdentityRegistry(
+        stateFile: File('${sandbox.path}/state/identities.json'),
+        identifiers: _SequenceIdentifiers(),
+      );
+      final first = await registry.resolve(original.path);
+
+      final copied = await Directory('${sandbox.path}/copied').create();
+      final copiedGit = await Directory('${copied.path}/.git').create();
+      for (final marker in [
+        'dextero-project-identity-v1',
+        'dextero-checkout-identity-v1',
+      ]) {
+        await File(
+          '${originalGit.path}/$marker',
+        ).copy('${copiedGit.path}/$marker');
+      }
+
+      final copy = await registry.resolve(copied.path);
+
+      expect(copy.projectId, isNot(first.projectId));
+      expect(copy.workspaceId, isNot(first.workspaceId));
+    },
+  );
 
   test(
     'does not reuse identities when a non-Git directory is replaced',
