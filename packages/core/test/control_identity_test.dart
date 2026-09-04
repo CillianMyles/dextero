@@ -30,6 +30,45 @@ void main() {
     },
   );
 
+  test('rejects a symlinked registry entry inside the workspace', () async {
+    if (Platform.isWindows) return;
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-symlinked-contained-state-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final stateDirectory = await Directory(
+      '${workspace.path}/.dextero-state',
+    ).create();
+    final outsideState = await File('${sandbox.path}/outside-identities.json')
+        .writeAsString(
+          '{"version":1,"projects":{},"workspaces":{},"checkoutOwners":{}}',
+        );
+    final stateLink = Link('${stateDirectory.path}/identities.json');
+    await stateLink.create(outsideState.path);
+
+    await expectLater(
+      LocalIdentityRegistry(
+        stateFile: File(stateLink.path),
+      ).resolve(workspace.path),
+      throwsA(
+        isA<ArgumentError>().having(
+          (error) => error.message,
+          'message',
+          contains('outside the controlled workspace'),
+        ),
+      ),
+    );
+    expect(
+      await FileSystemEntity.type(stateLink.path, followLinks: false),
+      FileSystemEntityType.link,
+    );
+    expect(
+      await outsideState.readAsString(),
+      '{"version":1,"projects":{},"workspaces":{},"checkoutOwners":{}}',
+    );
+  });
+
   test(
     'keeps device, project, and workspace identities across reloads',
     () async {

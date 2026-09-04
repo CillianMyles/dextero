@@ -38,7 +38,7 @@ final class LocalIdentityRegistry {
   LocalIdentityRegistry({
     required File stateFile,
     IdentifierGenerator? identifiers,
-  }) : _stateFile = stateFile.absolute,
+  }) : _stateFile = File(paths.normalize(stateFile.absolute.path)),
        _identifiers = identifiers ?? SecureIdentifierGenerator();
 
   factory LocalIdentityRegistry.fromEnvironment(Map<String, String> values) {
@@ -137,25 +137,32 @@ final class LocalIdentityRegistry {
   }
 
   Future<void> _validateStateLocation(String workspacePath) async {
+    _rejectContainedStatePath(_stateFile.path, workspacePath);
+    _rejectContainedStatePath(
+      await _prospectiveCanonicalEntryPath(_stateFile),
+      workspacePath,
+    );
     var statePath = await _prospectiveCanonicalPath(_stateFile);
-    if (paths.equals(statePath, workspacePath) ||
-        paths.isWithin(workspacePath, statePath)) {
-      throw ArgumentError.value(
-        _stateFile.path,
-        'stateFile',
-        'must be outside the controlled workspace',
-      );
-    }
+    _rejectContainedStatePath(statePath, workspacePath);
     await _stateFile.parent.create(recursive: true);
+    _rejectContainedStatePath(
+      await _prospectiveCanonicalEntryPath(_stateFile),
+      workspacePath,
+    );
     statePath = await _prospectiveCanonicalPath(_stateFile);
-    if (paths.equals(statePath, workspacePath) ||
-        paths.isWithin(workspacePath, statePath)) {
-      throw ArgumentError.value(
-        _stateFile.path,
-        'stateFile',
-        'must be outside the controlled workspace',
-      );
+    _rejectContainedStatePath(statePath, workspacePath);
+  }
+
+  void _rejectContainedStatePath(String statePath, String workspacePath) {
+    if (!paths.equals(statePath, workspacePath) &&
+        !paths.isWithin(workspacePath, statePath)) {
+      return;
     }
+    throw ArgumentError.value(
+      _stateFile.path,
+      'stateFile',
+      'must be outside the controlled workspace',
+    );
   }
 
   Future<_IdentityState> _readState() async {
@@ -607,6 +614,11 @@ Future<String> _prospectiveCanonicalPath(File file) async {
   final canonicalAncestor = await ancestor.resolveSymbolicLinks();
   final remainder = paths.relative(file.path, from: ancestor.path);
   return paths.normalize(paths.join(canonicalAncestor, remainder));
+}
+
+Future<String> _prospectiveCanonicalEntryPath(File file) async {
+  final parentPath = await _prospectiveCanonicalPath(File(file.parent.path));
+  return paths.normalize(paths.join(parentPath, paths.basename(file.path)));
 }
 
 Map<String, String> _stringMap(Object? value) {
