@@ -17,6 +17,7 @@ const _allowedEnvironmentKeys = <String>{
   'TEMP',
   'TMP',
   'TMPDIR',
+  'TZ',
   'USER',
 };
 

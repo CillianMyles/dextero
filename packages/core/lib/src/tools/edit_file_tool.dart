@@ -52,29 +52,33 @@ final class EditFileTool implements Tool {
       throw const FormatException('newText must be a string');
     }
 
-    final filePath = await _workspace.resolveExisting(
-      path,
-      expectedType: FileSystemEntityType.file,
-    );
-    final file = File(filePath);
-    final content = await file.readAsString();
-    final matches = _countOccurrences(content, oldText);
-    if (matches == 0) {
-      throw StateError('oldText was not found in $path');
-    }
-    if (matches > 1) {
-      throw StateError(
-        'oldText occurs $matches times in $path; edit is ambiguous',
-      );
-    }
+    final file = await _workspace.openExistingFile(path, mode: FileMode.append);
+    try {
+      await file.setPosition(0);
+      final content = utf8.decode(await file.read(await file.length()));
+      final matches = _countOccurrences(content, oldText);
+      if (matches == 0) {
+        throw StateError('oldText was not found in $path');
+      }
+      if (matches > 1) {
+        throw StateError(
+          'oldText occurs $matches times in $path; edit is ambiguous',
+        );
+      }
 
-    final updated = content.replaceFirst(oldText, newText);
-    await file.writeAsString(updated, flush: true);
-    return {
-      'path': path,
-      'replacements': 1,
-      'bytes': utf8.encode(updated).length,
-    };
+      final updated = content.replaceFirst(oldText, newText);
+      await file.truncate(0);
+      await file.setPosition(0);
+      await file.writeFrom(utf8.encode(updated));
+      await file.flush();
+      return {
+        'path': path,
+        'replacements': 1,
+        'bytes': utf8.encode(updated).length,
+      };
+    } finally {
+      await file.close();
+    }
   }
 
   int _countOccurrences(String content, String pattern) {

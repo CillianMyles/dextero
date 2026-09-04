@@ -102,7 +102,7 @@ exec "$@"
 ''';
 
 const _linuxGuardedProcessScript = r'''
-actual="$(stat -c '%d:%i:%w' .)" || exit 126
+actual="$(LC_ALL=C TZ=UTC stat -c '%d:%i:%w' .)" || exit 126
 if [ "linux:$actual" != "$DEXTERO_EXPECTED_WORKSPACE_IDENTITY" ]; then
   echo 'Configured workspace changed after identity resolution' >&2
   exit 126

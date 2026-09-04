@@ -106,6 +106,22 @@ void main() {
     );
   });
 
+  test('normalizes Linux guard identity across timezones', () async {
+    if (!Platform.isLinux) return;
+    final helper = File(
+      '${Directory.current.path}/test/fixtures/run_guarded_command.dart',
+    );
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [helper.path, root.path],
+      workingDirectory: Directory.current.path,
+      environment: {'TZ': 'America/New_York'},
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr as String);
+  });
+
   test('captures non-zero exits without merging stderr into stdout', () async {
     final script = await _script(
       root,

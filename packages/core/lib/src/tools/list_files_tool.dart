@@ -51,11 +51,16 @@ final class ListFilesTool implements Tool {
       expectedType: FileSystemEntityType.directory,
       allowRoot: true,
     );
-    final rootPath = await _workspace.canonicalRoot();
-    final entries = <JsonMap>[];
+    final listed = <FileSystemEntity>[];
     await for (final entity in Directory(
       directoryPath,
     ).list(recursive: recursive, followLinks: false)) {
+      listed.add(entity);
+    }
+    await _workspace.validateBoundary();
+    final rootPath = await _workspace.canonicalRoot();
+    final entries = <JsonMap>[];
+    for (final entity in listed) {
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
       final relativePath = entity.path.substring(
         rootPath.length + Platform.pathSeparator.length,

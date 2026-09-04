@@ -51,10 +51,30 @@ final class WorkspacePath {
     return resolvedPath;
   }
 
+  Future<RandomAccessFile> openExistingFile(
+    String relativePath, {
+    FileMode mode = FileMode.read,
+  }) async {
+    final path = await resolveExisting(
+      relativePath,
+      expectedType: FileSystemEntityType.file,
+    );
+    final file = await File(path).open(mode: mode);
+    try {
+      await _boundary?.validate();
+      return file;
+    } on Object {
+      await file.close();
+      rethrow;
+    }
+  }
+
   Future<String> canonicalRoot() async {
     await _boundary?.validate();
     final boundary = _boundary;
     if (boundary != null) return boundary.root;
     return _root.resolveSymbolicLinks();
   }
+
+  Future<void> validateBoundary() async => _boundary?.validate();
 }
