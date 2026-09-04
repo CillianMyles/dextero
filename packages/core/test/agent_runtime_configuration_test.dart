@@ -53,7 +53,7 @@ void main() {
     expect(configuration.availableModels, ['gemini-fast', 'gemini-custom']);
   });
 
-  test('adds a selected model to a configured allowlist', () {
+  test('adds a selected model to a configured allowlist', () async {
     final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
       'DEXTERO_CODEX_MODEL': 'codex-custom',
       'DEXTERO_CODEX_MODELS': 'default,gpt-5.3-codex-spark',
@@ -64,8 +64,12 @@ void main() {
       defaultCodexModel,
       codexSparkModel,
     ]);
+    final workspace = await WorkspaceBoundary.capture('.');
     expect(
-      () => configuration.createAgent(workspace: '.', modelName: 'not-allowed'),
+      () => configuration.createAgent(
+        workspace: workspace,
+        modelName: 'not-allowed',
+      ),
       throwsArgumentError,
     );
   });

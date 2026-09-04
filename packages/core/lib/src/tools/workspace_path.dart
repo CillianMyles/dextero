@@ -1,9 +1,18 @@
 import 'dart:io';
 
+import '../workspace_boundary.dart';
+
 final class WorkspacePath {
-  WorkspacePath(String root) : _root = Directory(root).absolute;
+  WorkspacePath(String root, {WorkspaceBoundary? boundary})
+    : _root = Directory(root).absolute,
+      _boundary = boundary {
+    if (boundary != null && _root.path != boundary.root) {
+      throw ArgumentError('workspace boundary must match the configured root');
+    }
+  }
 
   final Directory _root;
+  final WorkspaceBoundary? _boundary;
 
   String get root => _root.path;
 
@@ -19,7 +28,8 @@ final class WorkspacePath {
       throw ArgumentError('path must be relative to the configured workspace');
     }
 
-    final rootPath = await _root.resolveSymbolicLinks();
+    await _boundary?.validate();
+    final rootPath = _boundary?.root ?? await _root.resolveSymbolicLinks();
     final candidate = File('$rootPath${Platform.pathSeparator}$relativePath');
     final resolvedPath = await candidate.resolveSymbolicLinks();
     final insideRoot =
@@ -41,5 +51,10 @@ final class WorkspacePath {
     return resolvedPath;
   }
 
-  Future<String> canonicalRoot() => _root.resolveSymbolicLinks();
+  Future<String> canonicalRoot() async {
+    await _boundary?.validate();
+    final boundary = _boundary;
+    if (boundary != null) return boundary.root;
+    return _root.resolveSymbolicLinks();
+  }
 }

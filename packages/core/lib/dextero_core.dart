@@ -13,6 +13,7 @@ export 'src/process_environment.dart';
 export 'src/safe_metadata.dart';
 export 'src/task_runner.dart';
 export 'src/tool.dart';
+export 'src/workspace_boundary.dart';
 export 'src/tools/edit_file_tool.dart';
 export 'src/tools/list_files_tool.dart';
 export 'src/tools/read_file_tool.dart';

@@ -15,11 +15,19 @@ void main() {
     final link = Link('${sandbox.path}/workspace');
     await link.create(original.path);
 
-    final pinned = await canonicalWorkspacePath(link.path);
+    final pinned = await canonicalWorkspaceBoundary(link.path);
     await link.delete();
     await link.create(replacement.path);
 
-    expect(pinned, await original.resolveSymbolicLinks());
-    expect(pinned, isNot(await link.resolveSymbolicLinks()));
+    expect(pinned.root, await original.resolveSymbolicLinks());
+    expect(pinned.root, isNot(await link.resolveSymbolicLinks()));
+    await pinned.validate();
+
+    final moved = await original.rename('${sandbox.path}/moved');
+    await Directory(original.path).create();
+    addTearDown(() async {
+      if (await moved.exists()) await moved.delete(recursive: true);
+    });
+    await expectLater(pinned.validate(), throwsA(isA<FileSystemException>()));
   });
 }

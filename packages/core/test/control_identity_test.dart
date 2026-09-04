@@ -222,6 +222,28 @@ void main() {
     expect(replacement.workspaceId, isNot(first.workspaceId));
   });
 
+  test('does not reuse a recreated nested Git workspace', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-recreated-nested-workspace-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final project = await Directory('${sandbox.path}/project').create();
+    await Directory('${project.path}/.git').create();
+    final workspace = await Directory('${project.path}/workspace').create();
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+
+    final first = await registry.resolve(workspace.path);
+    await workspace.delete(recursive: true);
+    await workspace.create();
+    final replacement = await registry.resolve(workspace.path);
+
+    expect(replacement.projectId, first.projectId);
+    expect(replacement.workspaceId, isNot(first.workspaceId));
+  });
+
   test(
     'does not reuse marker identities from a copied Git repository',
     () async {

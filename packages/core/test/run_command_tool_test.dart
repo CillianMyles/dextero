@@ -176,6 +176,26 @@ void main() {
       throwsA(isA<ProcessException>()),
     );
   });
+
+  test('rejects execution after the workspace directory is replaced', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'run-command-replaced-workspace-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final boundary = await WorkspaceBoundary.capture(workspace.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+    await workspace.rename('${sandbox.path}/original');
+    await workspace.create();
+
+    await expectLater(
+      guarded.call({'command': Platform.resolvedExecutable}),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
 }
 
 Future<File> _script(Directory root, String body) async {

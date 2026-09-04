@@ -92,4 +92,22 @@ void main() {
     },
     skip: Platform.isWindows,
   );
+
+  test('rejects access after the workspace directory is replaced', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'read-file-replaced-workspace-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final boundary = await WorkspaceBoundary.capture(workspace.path);
+    final guarded = ReadFileTool(root: boundary.root, boundary: boundary);
+    await workspace.rename('${sandbox.path}/original');
+    await workspace.create();
+    await File('${workspace.path}/secret.txt').writeAsString('replacement');
+
+    await expectLater(
+      guarded.call({'path': 'secret.txt'}),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
 }

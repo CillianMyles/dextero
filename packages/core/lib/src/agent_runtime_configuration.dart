@@ -8,6 +8,7 @@ import 'tools/list_files_tool.dart';
 import 'tools/read_file_tool.dart';
 import 'tools/run_command_tool.dart';
 import 'tools/run_shell_tool.dart';
+import 'workspace_boundary.dart';
 
 enum AgentProvider { codex, gemini }
 
@@ -76,7 +77,7 @@ final class AgentRuntimeConfiguration {
   String get providerName => provider.name;
 
   ConversationAgent createAgent({
-    required String workspace,
+    required WorkspaceBoundary workspace,
     String? modelName,
     GeminiTransport? geminiTransport,
   }) {
@@ -88,18 +89,26 @@ final class AgentRuntimeConfiguration {
         'must be one of ${availableModels.join(', ')}',
       );
     }
+    final workspacePath = workspace.root;
     final tools = <Tool>[
-      ListFilesTool(root: workspace),
-      ReadFileTool(root: workspace),
-      EditFileTool(root: workspace),
-      RunCommandTool(workingDirectory: workspace),
-      RunShellTool(workingDirectory: workspace),
+      ListFilesTool(root: workspacePath, boundary: workspace),
+      ReadFileTool(root: workspacePath, boundary: workspace),
+      EditFileTool(root: workspacePath, boundary: workspace),
+      RunCommandTool(
+        workingDirectory: workspacePath,
+        workspaceBoundary: workspace,
+      ),
+      RunShellTool(
+        workingDirectory: workspacePath,
+        workspaceBoundary: workspace,
+      ),
     ];
     return switch (provider) {
       AgentProvider.codex => CodexConversationAgent(
         agent: CodexAppServerAgent(
           model: selectedModel == defaultCodexModel ? null : selectedModel,
-          workingDirectory: workspace,
+          workingDirectory: workspacePath,
+          workspaceBoundary: workspace,
         ),
         tools: tools,
         approvalRequiredTools: const {'edit_file'},

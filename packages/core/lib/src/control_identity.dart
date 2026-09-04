@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'chat_history.dart';
+import 'filesystem_identity.dart';
 
 /// Stable identity of the local host, project, and selected workspace.
 final class HostIdentity {
@@ -79,7 +80,7 @@ final class LocalIdentityRegistry {
         final checkoutKey = await _checkoutKey(project, projectKey);
         final checkoutOwner = checkoutKey == null
             ? null
-            : await _filesystemIncarnation(project.root);
+            : await resolveFilesystemIdentity(project.root);
         final registeredOwner = checkoutKey == null
             ? null
             : state.checkoutOwners[checkoutKey];
@@ -91,7 +92,7 @@ final class LocalIdentityRegistry {
         }
         final workspaceKey = checkoutKey == null
             ? projectKey
-            : '$checkoutKey::${_relativePath(project.root.path, workspacePath)}';
+            : '$checkoutKey::${await resolveFilesystemIdentity(Directory(workspacePath))}';
         final deviceId = state.deviceId ?? _identifiers.next('device');
         final projectId =
             state.projects[projectKey] ?? _identifiers.next('project');
@@ -174,7 +175,7 @@ final class LocalIdentityRegistry {
   Future<String> _projectKey(_ProjectLocation project) async {
     final repositoryDirectory = project.repositoryDirectory;
     if (repositoryDirectory == null) {
-      return 'directory::${await _filesystemIncarnation(project.root)}';
+      return 'directory::${await resolveFilesystemIdentity(project.root)}';
     }
 
     final repositoryPath = await repositoryDirectory.resolveSymbolicLinks();
@@ -183,7 +184,9 @@ final class LocalIdentityRegistry {
       filename: 'dextero-project-identity-v1',
       prefix: 'repository',
     );
-    final incarnation = await _filesystemIncarnation(Directory(repositoryPath));
+    final incarnation = await resolveFilesystemIdentity(
+      Directory(repositoryPath),
+    );
     return 'git::$marker::$incarnation';
   }
 
@@ -200,7 +203,9 @@ final class LocalIdentityRegistry {
       filename: 'dextero-checkout-identity-v1',
       prefix: 'checkout',
     );
-    final incarnation = await _filesystemIncarnation(Directory(checkoutPath));
+    final incarnation = await resolveFilesystemIdentity(
+      Directory(checkoutPath),
+    );
     return '$projectKey::$marker::$incarnation';
   }
 
@@ -551,68 +556,6 @@ String _filesystemDisplayName(String path) {
   return '${buffer.toString()}…';
 }
 
-String _relativePath(String root, String path) {
-  if (path == root) return '.';
-  final prefix = root.endsWith(Platform.pathSeparator)
-      ? root
-      : '$root${Platform.pathSeparator}';
-  if (!path.startsWith(prefix)) {
-    throw StateError('Workspace $path is not inside project root $root');
-  }
-  return path.substring(prefix.length);
-}
-
-Future<String> _filesystemIncarnation(Directory directory) async {
-  late final String executable;
-  late final List<String> arguments;
-  if (Platform.isMacOS) {
-    executable = '/usr/bin/stat';
-    arguments = ['-f', '%d:%i:%B', directory.path];
-  } else if (Platform.isLinux) {
-    executable = 'stat';
-    // `%w` retains sub-second birth-time precision, unlike integer `%W`.
-    arguments = ['-c', '%d:%i:%w', directory.path];
-  } else if (Platform.isWindows) {
-    executable = 'powershell.exe';
-    arguments = [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      _windowsFileIdentityScript,
-    ];
-  } else {
-    throw UnsupportedError(
-      'Stable non-Git workspace identity is unsupported on '
-      '${Platform.operatingSystem}.',
-    );
-  }
-
-  final result = await Process.run(
-    executable,
-    arguments,
-    environment: Platform.isWindows
-        ? {'DEXTERO_IDENTITY_PATH': directory.path}
-        : Platform.isLinux
-        ? const {'LC_ALL': 'C', 'TZ': 'UTC'}
-        : null,
-  );
-  final value = (result.stdout as String).trim();
-  if (result.exitCode != 0 || value.isEmpty) {
-    throw FileSystemException(
-      'Cannot resolve stable filesystem identity: ${result.stderr}',
-      directory.path,
-    );
-  }
-  if (Platform.isLinux && value.endsWith(':-')) {
-    throw FileSystemException(
-      'Cannot resolve stable filesystem identity: filesystem birth time is '
-      'unavailable',
-      directory.path,
-    );
-  }
-  return '${Platform.operatingSystem}:$value';
-}
-
 String _join(String parent, String child) =>
     '$parent${Platform.pathSeparator}$child';
 
@@ -621,80 +564,3 @@ String _resolvePath(String parent, String child) {
   if (candidate.isAbsolute) return candidate.path;
   return Directory(parent).uri.resolve(child).toFilePath();
 }
-
-const _windowsFileIdentityScript = r'''
-$source = @'
-using System;
-using System.ComponentModel;
-using System.IO;
-using System.Runtime.InteropServices;
-using Microsoft.Win32.SafeHandles;
-
-public static class DexteroFileIdentity
-{
-    private const uint FileFlagBackupSemantics = 0x02000000;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct ByHandleFileInformation
-    {
-        public uint FileAttributes;
-        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
-        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
-        public uint VolumeSerialNumber;
-        public uint FileSizeHigh;
-        public uint FileSizeLow;
-        public uint NumberOfLinks;
-        public uint FileIndexHigh;
-        public uint FileIndexLow;
-    }
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFile(
-        string fileName,
-        uint desiredAccess,
-        FileShare shareMode,
-        IntPtr securityAttributes,
-        FileMode creationDisposition,
-        uint flagsAndAttributes,
-        IntPtr templateFile);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetFileInformationByHandle(
-        SafeFileHandle handle,
-        out ByHandleFileInformation information);
-
-    public static string Read(string path)
-    {
-        SafeFileHandle handle = CreateFile(
-            path,
-            0,
-            FileShare.ReadWrite | FileShare.Delete,
-            IntPtr.Zero,
-            FileMode.Open,
-            FileFlagBackupSemantics,
-            IntPtr.Zero);
-        if (handle.IsInvalid)
-        {
-            throw new Win32Exception(Marshal.GetLastWin32Error());
-        }
-
-        using (handle)
-        {
-            ByHandleFileInformation information;
-            if (!GetFileInformationByHandle(handle, out information))
-            {
-                throw new Win32Exception(Marshal.GetLastWin32Error());
-            }
-            return information.VolumeSerialNumber.ToString("x8") + ":" +
-                information.FileIndexHigh.ToString("x8") +
-                information.FileIndexLow.ToString("x8");
-        }
-    }
-}
-'@
-Add-Type -TypeDefinition $source | Out-Null
-[Console]::Out.WriteLine(
-    [DexteroFileIdentity]::Read($env:DEXTERO_IDENTITY_PATH))
-''';

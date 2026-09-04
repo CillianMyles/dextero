@@ -27,12 +27,13 @@ Future<void> run(List<String> arguments) async {
     );
   }
 
-  final workspace = await canonicalWorkspacePath(
+  final workspace = await canonicalWorkspaceBoundary(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
   );
   final hostIdentity = await LocalIdentityRegistry.fromEnvironment(
     Platform.environment,
-  ).resolve(workspace);
+  ).resolve(workspace.root);
+  await workspace.validate();
   final bindAddress = _parseBindAddress(
     Platform.environment['DEXTERO_BIND_ADDRESS'] ?? '127.0.0.1',
   );

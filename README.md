@@ -149,6 +149,8 @@ also records the metadata directory's filesystem incarnation, so copying a
 repository does not copy its identity while moving it preserves the identity.
 Standard separate Git directories are supported; symbolic `.git` entries are
 rejected. Linux identity resolution requires filesystem birth-time metadata.
+Agents revalidate the selected workspace's filesystem incarnation before each
+file or process operation and fail closed if the directory was replaced.
 Non-Git workspaces use filesystem incarnation metadata in the host-owned
 registry, so replacing the directory rotates both identities without writing
 identity metadata into the controlled workspace.

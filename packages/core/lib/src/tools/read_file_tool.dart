@@ -2,10 +2,12 @@ import 'dart:io';
 
 import '../cancellation.dart';
 import '../tool.dart';
+import '../workspace_boundary.dart';
 import 'workspace_path.dart';
 
 final class ReadFileTool implements Tool {
-  ReadFileTool({required String root}) : _workspace = WorkspacePath(root);
+  ReadFileTool({required String root, WorkspaceBoundary? boundary})
+    : _workspace = WorkspacePath(root, boundary: boundary);
 
   final WorkspacePath _workspace;
 
