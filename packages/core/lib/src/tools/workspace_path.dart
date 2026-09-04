@@ -65,20 +65,20 @@ final class WorkspacePath {
       relativePath,
       expectedType: FileSystemEntityType.file,
     );
-    final expectedIdentity = await OpenedFileIdentity.capturePath(path);
-    await _beforeFileOpen?.call(path);
-    final file = await File(path).open(mode: mode);
+    final openedIdentity = await OpenedFileIdentity.capturePath(path);
     try {
-      await OpenedFileIdentity.verify(
-        file: file,
-        expectedPath: path,
-        expectedIdentity: expectedIdentity,
-      );
-      await _boundary?.validate();
-      return file;
-    } on Object {
-      await file.close();
-      rethrow;
+      await _beforeFileOpen?.call(path);
+      final file = await File(path).open(mode: mode);
+      try {
+        await openedIdentity.verify(file);
+        await _boundary?.validate();
+        return file;
+      } on Object {
+        await file.close();
+        rethrow;
+      }
+    } finally {
+      openedIdentity.close();
     }
   }
 

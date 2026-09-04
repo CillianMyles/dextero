@@ -9,26 +9,40 @@ import 'package:ffi/ffi.dart';
 /// the checked path before [File.open] runs. This evidence binds the resulting
 /// handle to both the object and canonical path that were checked beforehand.
 final class OpenedFileIdentity {
-  const OpenedFileIdentity._();
+  const OpenedFileIdentity._(
+    this._expectedPath,
+    this._expectedIdentity,
+    this._validationHandle,
+  );
 
-  static Future<String> capturePath(String path) async {
-    if (Platform.isWindows) return _windowsPathIdentity(path);
-    if (Platform.isMacOS) return _macPathIdentity(path);
-    if (Platform.isLinux) return _linuxPathIdentity(path);
+  final String _expectedPath;
+  final String _expectedIdentity;
+  final int _validationHandle;
+
+  static Future<OpenedFileIdentity> capturePath(String path) async {
+    if (Platform.isWindows) return _captureWindowsPath(path);
+    if (Platform.isMacOS || Platform.isLinux) {
+      return _capturePosixPath(path);
+    }
     throw UnsupportedError(
       'Opened-file identity is unsupported on ${Platform.operatingSystem}.',
     );
   }
 
-  static Future<void> verify({
-    required RandomAccessFile file,
-    required String expectedPath,
-    required String expectedIdentity,
-  }) async {
+  Future<void> verify(RandomAccessFile file) async {
+    if (Platform.isWindows) {
+      if (_windowsHandleIdentity(_validationHandle) != _expectedIdentity ||
+          !_samePath(_windowsHandlePath(_validationHandle), _expectedPath)) {
+        throw FileSystemException(
+          'Opened file changed after path validation',
+          _expectedPath,
+        );
+      }
+      return;
+    }
+
     final descriptor = _descriptor(file);
-    final actualIdentity = Platform.isWindows
-        ? _windowsDescriptorIdentity(descriptor)
-        : Platform.isMacOS
+    final actualIdentity = Platform.isMacOS
         ? _macDescriptorIdentity(descriptor)
         : Platform.isLinux
         ? _linuxDescriptorIdentity(descriptor)
@@ -37,18 +51,26 @@ final class OpenedFileIdentity {
             '${Platform.operatingSystem}.',
           );
     final actualPath = await _descriptorPath(descriptor);
-    if (actualIdentity != expectedIdentity ||
-        !_samePath(actualPath, expectedPath)) {
+    if (actualIdentity != _expectedIdentity ||
+        !_samePath(actualPath, _expectedPath)) {
       throw FileSystemException(
         'Opened file changed after path validation',
-        expectedPath,
+        _expectedPath,
       );
+    }
+  }
+
+  void close() {
+    if (Platform.isWindows) {
+      _closeHandle()(_validationHandle);
+    } else {
+      _closeDescriptor()(_validationHandle);
     }
   }
 
   // RandomAccessFile does not expose its descriptor in the public interface,
   // but the VM implementation supplies this fail-closed getter on every native
-  // platform. The Windows value is a CRT descriptor, not a Win32 HANDLE.
+  // platform.
   static int _descriptor(RandomAccessFile file) {
     try {
       final descriptor = (file as dynamic).fd;
@@ -64,9 +86,6 @@ final class OpenedFileIdentity {
       return File('/proc/self/fd/$descriptor').resolveSymbolicLinks();
     }
     if (Platform.isMacOS) return _macDescriptorPath(descriptor);
-    if (Platform.isWindows) {
-      return _windowsDescriptorPath(_windowsHandle(descriptor));
-    }
     throw UnsupportedError(
       'Opened-file paths are unsupported on ${Platform.operatingSystem}.',
     );
@@ -78,17 +97,28 @@ final class OpenedFileIdentity {
   }
 }
 
-String _macPathIdentity(String path) {
+Future<OpenedFileIdentity> _capturePosixPath(String path) async {
   final pointer = path.toNativeUtf8();
-  final value = calloc<_MacStat>();
+  int? descriptor;
   try {
-    final result = _macStat()(pointer, value);
-    if (result != 0) {
+    descriptor = _openDescriptor()(pointer, 0);
+    if (descriptor < 0) {
       throw FileSystemException('Cannot inspect validated file', path);
     }
-    return '${value.ref.device}:${value.ref.inode}';
+    final identity = Platform.isMacOS
+        ? _macDescriptorIdentity(descriptor)
+        : _linuxDescriptorIdentity(descriptor);
+    final actualPath = await OpenedFileIdentity._descriptorPath(descriptor);
+    if (!OpenedFileIdentity._samePath(actualPath, path)) {
+      throw FileSystemException('Validated file changed while opening', path);
+    }
+    return OpenedFileIdentity._(path, identity, descriptor);
+  } on Object {
+    if (descriptor != null && descriptor >= 0) {
+      _closeDescriptor()(descriptor);
+    }
+    rethrow;
   } finally {
-    calloc.free(value);
     calloc.free(pointer);
   }
 }
@@ -124,17 +154,6 @@ String _macDescriptorPath(int descriptor) {
   }
 }
 
-_MacStatDart _macStat() {
-  final library = DynamicLibrary.process();
-  try {
-    return library.lookupFunction<_MacStatNative, _MacStatDart>(
-      r'stat$INODE64',
-    );
-  } on ArgumentError {
-    return library.lookupFunction<_MacStatNative, _MacStatDart>('stat');
-  }
-}
-
 _MacFstatDart _macFstat() {
   final library = DynamicLibrary.process();
   try {
@@ -143,22 +162,6 @@ _MacFstatDart _macFstat() {
     );
   } on ArgumentError {
     return library.lookupFunction<_MacFstatNative, _MacFstatDart>('fstat');
-  }
-}
-
-String _linuxPathIdentity(String path) {
-  final pointer = path.toNativeUtf8();
-  final value = calloc<_LinuxStat>();
-  try {
-    final stat = DynamicLibrary.process()
-        .lookupFunction<_LinuxStatNative, _LinuxStatDart>('stat');
-    if (stat(pointer, value) != 0) {
-      throw FileSystemException('Cannot inspect validated file', path);
-    }
-    return '${value.ref.device}:${value.ref.inode}';
-  } finally {
-    calloc.free(value);
-    calloc.free(pointer);
   }
 }
 
@@ -176,32 +179,29 @@ String _linuxDescriptorIdentity(int descriptor) {
   }
 }
 
-String _windowsPathIdentity(String path) {
+OpenedFileIdentity _captureWindowsPath(String path) {
   final pointer = path.toNativeUtf16();
+  int? handle;
   try {
-    final handle = _createFile()(pointer, 0, 7, 0, 3, 0x02000000, 0);
+    // Keeping this handle open without FILE_SHARE_DELETE makes replacement of
+    // the validated file fail until the Dart handle has been opened. This
+    // avoids depending on the VM's private CRT descriptor representation.
+    handle = _createFile()(pointer, 0, 3, 0, 3, 0x02000000, 0);
     if (handle == -1) {
       throw FileSystemException('Cannot inspect validated file', path);
     }
-    try {
-      return _windowsHandleIdentity(handle);
-    } finally {
-      _closeHandle()(handle);
+    final identity = _windowsHandleIdentity(handle);
+    final actualPath = _windowsHandlePath(handle);
+    if (!OpenedFileIdentity._samePath(actualPath, path)) {
+      throw FileSystemException('Validated file changed while opening', path);
     }
+    return OpenedFileIdentity._(path, identity, handle);
+  } on Object {
+    if (handle != null && handle != -1) _closeHandle()(handle);
+    rethrow;
   } finally {
     calloc.free(pointer);
   }
-}
-
-String _windowsDescriptorIdentity(int descriptor) =>
-    _windowsHandleIdentity(_windowsHandle(descriptor));
-
-int _windowsHandle(int descriptor) {
-  final handle = _getOsFileHandle()(descriptor);
-  if (handle == -1) {
-    throw FileSystemException('Cannot inspect opened file handle');
-  }
-  return handle;
 }
 
 String _windowsHandleIdentity(int handle) {
@@ -218,7 +218,7 @@ String _windowsHandleIdentity(int handle) {
   }
 }
 
-String _windowsDescriptorPath(int handle) {
+String _windowsHandlePath(int handle) {
   final buffer = calloc<Uint16>(32768);
   try {
     final length = _getFinalPathNameByHandle()(handle, buffer, 32768, 0);
@@ -250,6 +250,12 @@ _CreateFileDart _createFile() =>
 _CloseHandleDart _closeHandle() => _kernel32
     .lookupFunction<_CloseHandleNative, _CloseHandleDart>('CloseHandle');
 
+_OpenDescriptorDart _openDescriptor() => DynamicLibrary.process()
+    .lookupFunction<_OpenDescriptorNative, _OpenDescriptorDart>('open');
+
+_CloseDescriptorDart _closeDescriptor() => DynamicLibrary.process()
+    .lookupFunction<_CloseDescriptorNative, _CloseDescriptorDart>('close');
+
 _GetFileInformationDart _getFileInformationByHandle() => _kernel32
     .lookupFunction<_GetFileInformationNative, _GetFileInformationDart>(
       'GetFileInformationByHandle',
@@ -260,33 +266,18 @@ _GetFinalPathDart _getFinalPathNameByHandle() =>
       'GetFinalPathNameByHandleW',
     );
 
-_GetOsFileHandleDart _getOsFileHandle() {
-  for (final name in const ['ucrtbase.dll', 'msvcrt.dll']) {
-    try {
-      return DynamicLibrary.open(
-        name,
-      ).lookupFunction<_GetOsFileHandleNative, _GetOsFileHandleDart>(
-        '_get_osfhandle',
-      );
-    } on ArgumentError {
-      // Try the other CRT name.
-    }
-  }
-  throw FileSystemException('Cannot load the Windows file-handle runtime');
-}
-
 final DynamicLibrary _kernel32 = Platform.isWindows
     ? DynamicLibrary.open('kernel32.dll')
     : DynamicLibrary.process();
 
-typedef _MacStatNative = Int32 Function(Pointer<Utf8>, Pointer<_MacStat>);
-typedef _MacStatDart = int Function(Pointer<Utf8>, Pointer<_MacStat>);
 typedef _MacFstatNative = Int32 Function(Int32, Pointer<_MacStat>);
 typedef _MacFstatDart = int Function(int, Pointer<_MacStat>);
-typedef _LinuxStatNative = Int32 Function(Pointer<Utf8>, Pointer<_LinuxStat>);
-typedef _LinuxStatDart = int Function(Pointer<Utf8>, Pointer<_LinuxStat>);
 typedef _LinuxFstatNative = Int32 Function(Int32, Pointer<_LinuxStat>);
 typedef _LinuxFstatDart = int Function(int, Pointer<_LinuxStat>);
+typedef _OpenDescriptorNative = Int32 Function(Pointer<Utf8>, Int32);
+typedef _OpenDescriptorDart = int Function(Pointer<Utf8>, int);
+typedef _CloseDescriptorNative = Int32 Function(Int32);
+typedef _CloseDescriptorDart = int Function(int);
 typedef _CreateFileNative =
     IntPtr Function(
       Pointer<Utf16>,
@@ -308,8 +299,6 @@ typedef _GetFileInformationDart =
 typedef _GetFinalPathNative =
     Uint32 Function(IntPtr, Pointer<Uint16>, Uint32, Uint32);
 typedef _GetFinalPathDart = int Function(int, Pointer<Uint16>, int, int);
-typedef _GetOsFileHandleNative = IntPtr Function(Int32);
-typedef _GetOsFileHandleDart = int Function(int);
 
 final class _MacStat extends Struct {
   @Uint32()
