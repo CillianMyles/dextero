@@ -11,7 +11,9 @@ review. The review budget and severity definitions in that file are binding.
 ## Establish state
 
 - Read the PR acceptance criteria, current diff, checks, unresolved findings,
-  and all review-round markers.
+  all review-round markers, and every unmarked automated trigger and result.
+  Reconstruct the count using the policy; a missing marker does not restore a
+  round, and an automatic review on PR open or ready is round one.
 - Confirm the current head and whether a review is already active. Do not send
   duplicate triggers or push underneath an active review.
 - Reject or question findings whose scenario is impossible, whose premise is
@@ -49,3 +51,8 @@ Round three is final. Apply one of the policy's terminal outcomes:
 Never interpret "keep working until approved" as permission for a fourth
 automated round. Only an explicit human extension resets or increases the
 budget.
+
+For an existing PR that already has three or more unmarked automated reviews,
+do not restart numbering at one and do not make another review-driven P2 code
+change. Treat its budget as exhausted immediately and apply the matching
+terminal outcome.

@@ -16,16 +16,25 @@ Do not begin a line-by-line correctness review until the problem and approach ar
 ## Check the review budget first
 
 Read `.agents/REVIEW_POLICY.md` in full. Inspect the complete PR discussion for
-review-round markers and identify the current head before doing a substantive
-review.
+review-round markers, unmarked triggers and results, and the current head before
+doing a substantive review. A missing marker never makes an earlier review
+free.
 
-- If the current head has a requested marker without a completed result,
-  perform that round, including round three. If three rounds were spent on
-  other heads or the current head was already reviewed, stop without inspecting
-  the diff and report that a human must explicitly extend the budget.
-- If this review was not already marked, record the next requested marker
-  before inspecting the diff. When direct PR write access is unavailable, put
-  the requested marker first in the review output so the coder can persist it.
+- Reconstruct which round the current invocation represents from persistent
+  evidence. A requested marker reserves its number once; never reuse it after a
+  cancelled, failed, stale, or interrupted attempt. A later trigger is the next
+  round even if nobody completed the earlier marker.
+- If three rounds were spent on other heads or the current head was already
+  reviewed, stop without inspecting the diff and report that a human must
+  explicitly extend the budget.
+- When you control the trigger, persist the requested marker before inspecting
+  the diff. If you cannot write to the PR and there is no durable trigger or
+  automatic-start event for this invocation, stop before substantive review and
+  hand the paste-ready marker to the coder or orchestrator to persist first.
+- If opening or marking the PR ready automatically started this review, count it
+  as round one and backfill its marker as soon as the PR discussion is writable.
+  A durable explicit trigger or automatic-start event may stand in for a missing
+  requested marker, but it still consumes the round if the review is interrupted.
 - Do not review a head that is known to fail required checks, duplicates an
   earlier round, or is changing under an active review.
 

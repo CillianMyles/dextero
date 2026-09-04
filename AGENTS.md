@@ -17,9 +17,10 @@ user explicitly asks to stop earlier.
 
 Before requesting automated PR review or addressing automated review feedback,
 read and follow `.agents/REVIEW_POLICY.md`. A PR gets at most three automated
-review rounds unless a human explicitly extends the budget. P0 and P1 findings
-remain blocking; deferrable P2 findings go to the roadmap as **Address later**;
-P3 findings do not justify another round.
+review rounds unless a human explicitly extends the budget. Automatic and
+unmarked reviews count, including the review triggered when a PR is opened or
+marked ready. P0 and P1 findings remain blocking; deferrable P2 findings go to
+the roadmap as **Address later**; P3 findings do not justify another round.
 
 ## Delivery
 
