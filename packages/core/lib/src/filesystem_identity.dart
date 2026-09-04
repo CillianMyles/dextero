@@ -1,28 +1,32 @@
 import 'dart:io';
 
+import 'trusted_executable.dart';
+
 /// Returns a host-observed identity for the current filesystem object.
 Future<String> resolveFilesystemIdentity(Directory directory) async {
   late final String executable;
   late final List<String> arguments;
   if (Platform.isMacOS) {
-    executable = await _trustedExecutable(directory, const ['/usr/bin/stat']);
+    executable = await resolveTrustedExecutable(directory, const [
+      '/usr/bin/stat',
+    ]);
     arguments = ['-f', '%d:%i:%B', directory.path];
   } else if (Platform.isLinux) {
-    executable = await _trustedExecutable(directory, const [
+    executable = await resolveTrustedExecutable(directory, const [
       '/usr/bin/stat',
       '/bin/stat',
     ]);
     // `%w` retains sub-second birth-time precision, unlike integer `%W`.
     arguments = ['-c', '%d:%i:%w', directory.path];
   } else if (Platform.isWindows) {
-    final systemRoot = _environmentValue('SYSTEMROOT');
+    final systemRoot = operatingSystemEnvironmentValue('SYSTEMROOT');
     if (systemRoot == null) {
       throw FileSystemException(
         'Cannot locate the trusted Windows system directory',
         directory.path,
       );
     }
-    executable = await _trustedExecutable(directory, [
+    executable = await resolveTrustedExecutable(directory, [
       '$systemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
     ]);
     arguments = [
@@ -65,43 +69,10 @@ Future<String> resolveFilesystemIdentity(Directory directory) async {
   return '${Platform.operatingSystem}:$value';
 }
 
-Future<String> _trustedExecutable(
-  Directory controlledDirectory,
-  List<String> candidates,
-) async {
-  final controlledPath = await controlledDirectory.resolveSymbolicLinks();
-  for (final candidate in candidates) {
-    final file = File(candidate);
-    if (!file.isAbsolute || !await file.exists()) continue;
-    final resolved = await file.resolveSymbolicLinks();
-    if (!_inside(resolved, controlledPath)) return resolved;
-  }
-  throw FileSystemException(
-    'Cannot locate a trusted filesystem identity executable',
-    controlledDirectory.path,
-  );
-}
-
-bool _inside(String path, String directory) {
-  if (Platform.isWindows) {
-    path = path.toLowerCase();
-    directory = directory.toLowerCase();
-  }
-  return path == directory ||
-      path.startsWith('$directory${Platform.pathSeparator}');
-}
-
-String? _environmentValue(String name) {
-  for (final entry in Platform.environment.entries) {
-    if (entry.key.toUpperCase() == name) return entry.value;
-  }
-  return null;
-}
-
 Map<String, String> _windowsIdentityEnvironment(String path) {
   final environment = {'DEXTERO_IDENTITY_PATH': path};
   for (final name in const ['SYSTEMROOT', 'TEMP', 'TMP']) {
-    final value = _environmentValue(name);
+    final value = operatingSystemEnvironmentValue(name);
     if (value != null) environment[name] = value;
   }
   return environment;

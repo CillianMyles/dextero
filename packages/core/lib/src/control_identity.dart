@@ -6,7 +6,7 @@ import 'package:path/path.dart' as paths;
 
 import 'chat_history.dart';
 import 'filesystem_identity.dart';
-import 'process_environment.dart';
+import 'trusted_executable.dart';
 
 /// Stable identity of the local host, project, and selected workspace.
 final class HostIdentity {
@@ -498,8 +498,12 @@ Future<void> _validateGitDirectoryOwnership({
   // the .git file declares. The host registry separately binds the resulting
   // checkout identity to this workspace's filesystem incarnation, preventing
   // another directory from reusing the same metadata.
+  final git = await resolveTrustedExecutable(
+    workspaceRoot,
+    _trustedGitCandidates(),
+  );
   final result = await Process.run(
-    'git',
+    git,
     [
       '-C',
       workspaceRoot.path,
@@ -509,7 +513,7 @@ Future<void> _validateGitDirectoryOwnership({
       '--git-common-dir',
     ],
     includeParentEnvironment: false,
-    environment: filteredProcessEnvironment(),
+    environment: _gitProbeEnvironment(),
   );
   if (result.exitCode == 0) {
     final discovered = const LineSplitter().convert(
@@ -535,6 +539,28 @@ Future<void> _validateGitDirectoryOwnership({
     'Git directory ${gitDirectory.path} does not belong to '
     '${workspaceRoot.path}',
   );
+}
+
+List<String> _trustedGitCandidates() {
+  if (!Platform.isWindows) return const ['/usr/bin/git', '/bin/git'];
+  final candidates = <String>[];
+  for (final name in const ['PROGRAMFILES', 'PROGRAMFILES(X86)']) {
+    final root = operatingSystemEnvironmentValue(name);
+    if (root == null) continue;
+    candidates.add('$root\\Git\\cmd\\git.exe');
+    candidates.add('$root\\Git\\bin\\git.exe');
+  }
+  return candidates;
+}
+
+Map<String, String> _gitProbeEnvironment() {
+  if (!Platform.isWindows) return const {'LC_ALL': 'C', 'TZ': 'UTC'};
+  final environment = <String, String>{};
+  for (final name in const ['SYSTEMROOT', 'TEMP', 'TMP', 'HOME']) {
+    final value = operatingSystemEnvironmentValue(name);
+    if (value != null) environment[name] = value;
+  }
+  return environment;
 }
 
 Map<String, String> _stringMap(Object? value) {

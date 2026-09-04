@@ -12,6 +12,8 @@ const _allowedEnvironmentKeys = <String>{
   'LOGNAME',
   'PATH',
   'PATHEXT',
+  'PROGRAMFILES',
+  'PROGRAMFILES(X86)',
   'SHELL',
   'SYSTEMROOT',
   'TEMP',

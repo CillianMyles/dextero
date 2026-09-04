@@ -204,6 +204,48 @@ void main() {
     expect(identity.workspaceId, startsWith('workspace_'));
   });
 
+  test('does not resolve Git from the controlled workspace', () async {
+    if (Platform.isWindows) return;
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-untrusted-git-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = Directory('${sandbox.path}/workspace');
+    final gitDirectory = Directory('${sandbox.path}/metadata');
+    final initialized = await Process.run('/usr/bin/git', [
+      'init',
+      '--quiet',
+      '--separate-git-dir',
+      gitDirectory.path,
+      workspace.path,
+    ]);
+    expect(initialized.exitCode, 0, reason: initialized.stderr as String);
+    final marker = File('${sandbox.path}/fake-git-ran');
+    final fakeGit = File('${workspace.path}/git');
+    await fakeGit.writeAsString(
+      '#!/bin/sh\n/usr/bin/touch "\$DEXTERO_FAKE_GIT_MARKER"\nexit 1\n',
+    );
+    final chmod = await Process.run('/bin/chmod', ['+x', fakeGit.path]);
+    expect(chmod.exitCode, 0, reason: chmod.stderr as String);
+    final helper = File(
+      '${Directory.current.path}/test/fixtures/resolve_host_identity.dart',
+    );
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [helper.path, '${sandbox.path}/state/identities.json', workspace.path],
+      workingDirectory: Directory.current.path,
+      includeParentEnvironment: false,
+      environment: {
+        'PATH': workspace.path,
+        'DEXTERO_FAKE_GIT_MARKER': marker.path,
+      },
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr as String);
+    expect(await marker.exists(), isFalse);
+  });
+
   test('ignores inherited Git directory overrides', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-git-overrides-',
