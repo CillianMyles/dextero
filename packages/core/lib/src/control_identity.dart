@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -48,6 +49,7 @@ final class LocalIdentityRegistry {
 
   final File _stateFile;
   final IdentifierGenerator _identifiers;
+  static final Map<String, Future<void>> _inProcessTails = {};
 
   File get stateFile => _stateFile;
 
@@ -62,34 +64,49 @@ final class LocalIdentityRegistry {
     }
     final workspacePath = await workspaceDirectory.resolveSymbolicLinks();
     final project = await _findProject(Directory(workspacePath));
-    final state = await _readState();
-    final deviceId = state.deviceId ?? _identifiers.next('device');
-    final projectId =
-        state.projects[project.key] ?? _identifiers.next('project');
-    final workspaceId =
-        state.workspaces[workspacePath] ?? _identifiers.next('workspace');
-    final changed =
-        state.deviceId != deviceId ||
-        state.projects[project.key] != projectId ||
-        state.workspaces[workspacePath] != workspaceId;
+    return _withInProcessLock(_stateFile.absolute.path, () async {
+      await _stateFile.parent.create(recursive: true);
+      final lock = await File(
+        '${_stateFile.path}.lock',
+      ).open(mode: FileMode.append);
+      var locked = false;
+      try {
+        await lock.lock(FileLock.exclusive);
+        locked = true;
+        // Re-read after taking the lock so concurrent hosts merge their entries.
+        final state = await _readState();
+        final deviceId = state.deviceId ?? _identifiers.next('device');
+        final projectId =
+            state.projects[project.key] ?? _identifiers.next('project');
+        final workspaceId =
+            state.workspaces[workspacePath] ?? _identifiers.next('workspace');
+        final changed =
+            state.deviceId != deviceId ||
+            state.projects[project.key] != projectId ||
+            state.workspaces[workspacePath] != workspaceId;
 
-    if (changed) {
-      await _writeState(
-        _IdentityState(
+        if (changed) {
+          await _writeState(
+            _IdentityState(
+              deviceId: deviceId,
+              projects: {...state.projects, project.key: projectId},
+              workspaces: {...state.workspaces, workspacePath: workspaceId},
+            ),
+          );
+        }
+
+        return HostIdentity(
           deviceId: deviceId,
-          projects: {...state.projects, project.key: projectId},
-          workspaces: {...state.workspaces, workspacePath: workspaceId},
-        ),
-      );
-    }
-
-    return HostIdentity(
-      deviceId: deviceId,
-      projectId: projectId,
-      projectName: _basename(project.root.path),
-      workspaceId: workspaceId,
-      workspaceName: _basename(workspacePath),
-    );
+          projectId: projectId,
+          projectName: _basename(project.root.path),
+          workspaceId: workspaceId,
+          workspaceName: _basename(workspacePath),
+        );
+      } finally {
+        if (locked) await lock.unlock();
+        await lock.close();
+      }
+    });
   }
 
   Future<_IdentityState> _readState() async {
@@ -112,14 +129,41 @@ final class LocalIdentityRegistry {
   }
 
   Future<void> _writeState(_IdentityState state) async {
-    await _stateFile.parent.create(recursive: true);
-    final temporary = File('${_stateFile.path}.tmp');
-    await temporary.writeAsString(
-      '${const JsonEncoder.withIndent('  ').convert({'version': 1, 'deviceId': state.deviceId, 'projects': state.projects, 'workspaces': state.workspaces})}\n',
-      flush: true,
+    final temporary = File(
+      '${_stateFile.path}.$pid.'
+      '${DateTime.now().toUtc().microsecondsSinceEpoch}.tmp',
     );
-    if (await _stateFile.exists()) await _stateFile.delete();
-    await temporary.rename(_stateFile.path);
+    try {
+      final encoded = const JsonEncoder.withIndent('  ').convert({
+        'version': 1,
+        'deviceId': state.deviceId,
+        'projects': state.projects,
+        'workspaces': state.workspaces,
+      });
+      await temporary.writeAsString('$encoded\n', flush: true);
+      await temporary.rename(_stateFile.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
+  }
+
+  static Future<T> _withInProcessLock<T>(
+    String key,
+    Future<T> Function() action,
+  ) async {
+    final previous = _inProcessTails[key] ?? Future.value();
+    final completer = Completer<void>();
+    final current = completer.future;
+    _inProcessTails[key] = current;
+    await previous;
+    try {
+      return await action();
+    } finally {
+      completer.complete();
+      if (identical(_inProcessTails[key], current)) {
+        _inProcessTails.remove(key);
+      }
+    }
   }
 }
 

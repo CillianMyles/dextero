@@ -18,6 +18,7 @@ const _controllerId = String.fromEnvironment('DEXTERO_CONTROLLER_ID');
 const _controllerName = String.fromEnvironment('DEXTERO_CONTROLLER_NAME');
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
     DexteroApp(
       controller: DexteroController.fromEnvironment({

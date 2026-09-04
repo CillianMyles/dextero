@@ -59,6 +59,39 @@ void main() {
     expect(feature.workspaceId, isNot(primary.workspaceId));
   });
 
+  test('merges identities resolved concurrently by separate hosts', () async {
+    final sandbox = await Directory.systemTemp.createTemp('dextero-hosts-');
+    addTearDown(() => sandbox.delete(recursive: true));
+    final firstWorkspace = await Directory('${sandbox.path}/first').create();
+    final secondWorkspace = await Directory('${sandbox.path}/second').create();
+    final stateFile = File('${sandbox.path}/state/identities.json');
+
+    final resolved = await Future.wait([
+      LocalIdentityRegistry(
+        stateFile: stateFile,
+        identifiers: _SeededIdentifiers('a'),
+      ).resolve(firstWorkspace.path),
+      LocalIdentityRegistry(
+        stateFile: stateFile,
+        identifiers: _SeededIdentifiers('b'),
+      ).resolve(secondWorkspace.path),
+    ]);
+    final reloaded = LocalIdentityRegistry(
+      stateFile: stateFile,
+      identifiers: _FailingIdentifiers(),
+    );
+
+    expect(resolved[1].deviceId, resolved[0].deviceId);
+    expect(
+      (await reloaded.resolve(firstWorkspace.path)).workspaceId,
+      resolved[0].workspaceId,
+    );
+    expect(
+      (await reloaded.resolve(secondWorkspace.path)).workspaceId,
+      resolved[1].workspaceId,
+    );
+  });
+
   test('fails closed when the identity registry is malformed', () async {
     final sandbox = await Directory.systemTemp.createTemp('dextero-identity-');
     addTearDown(() => sandbox.delete(recursive: true));
@@ -97,4 +130,15 @@ final class _SequenceIdentifiers implements IdentifierGenerator {
 final class _FailingIdentifiers implements IdentifierGenerator {
   @override
   String next(String prefix) => throw StateError('identity was not stable');
+}
+
+final class _SeededIdentifiers implements IdentifierGenerator {
+  _SeededIdentifiers(this.seed);
+
+  final String seed;
+  var _value = 0;
+
+  @override
+  String next(String prefix) =>
+      '${prefix}_${seed.padRight(15, seed)}${_value++}';
 }
