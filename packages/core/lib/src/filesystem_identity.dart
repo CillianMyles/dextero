@@ -59,14 +59,26 @@ Future<String> resolveFilesystemIdentity(Directory directory) async {
       directory.path,
     );
   }
-  if (Platform.isLinux && value.endsWith(':-')) {
+  return normalizeFilesystemIdentity(
+    operatingSystem: Platform.operatingSystem,
+    value: value,
+    path: directory.path,
+  );
+}
+
+String normalizeFilesystemIdentity({
+  required String operatingSystem,
+  required String value,
+  required String path,
+}) {
+  if (operatingSystem == 'linux' && value.endsWith(':-')) {
     throw FileSystemException(
       'Cannot resolve stable filesystem identity: filesystem birth time is '
       'unavailable',
-      directory.path,
+      path,
     );
   }
-  return '${Platform.operatingSystem}:$value';
+  return '$operatingSystem:$value';
 }
 
 Map<String, String> _windowsIdentityEnvironment(String path) {

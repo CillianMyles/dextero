@@ -595,33 +595,6 @@ void main() {
     expect(newYork.stdout, utc.stdout);
   });
 
-  test('rejects an unavailable Linux filesystem birth time', () async {
-    if (!Platform.isLinux) return;
-    final sandbox = await Directory.systemTemp.createTemp(
-      'dextero-no-birth-time-',
-    );
-    addTearDown(() => sandbox.delete(recursive: true));
-    final workspace = await Directory('${sandbox.path}/workspace').create();
-    final fakeBin = await Directory('${sandbox.path}/bin').create();
-    final fakeStat = File('${fakeBin.path}/stat');
-    await fakeStat.writeAsString('#!/bin/sh\nprintf "7:9:-\\n"\n');
-    final chmod = await Process.run('chmod', ['+x', fakeStat.path]);
-    expect(chmod.exitCode, 0, reason: chmod.stderr as String);
-    final helper = File(
-      '${Directory.current.path}/test/fixtures/resolve_host_identity.dart',
-    );
-
-    final result = await Process.run(
-      Platform.resolvedExecutable,
-      [helper.path, '${sandbox.path}/state/identities.json', workspace.path],
-      workingDirectory: Directory.current.path,
-      environment: {'PATH': fakeBin.path},
-    );
-
-    expect(result.exitCode, isNot(0));
-    expect(result.stderr, contains('filesystem birth time is unavailable'));
-  });
-
   test('distinguishes Windows directories with matching timestamps', () async {
     if (!Platform.isWindows) return;
     final sandbox = await Directory.systemTemp.createTemp(

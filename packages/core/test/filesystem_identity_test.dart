@@ -1,8 +1,26 @@
 import 'dart:io';
 
+import 'package:dextero_core/src/filesystem_identity.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('rejects an unavailable Linux filesystem birth time', () {
+    expect(
+      () => normalizeFilesystemIdentity(
+        operatingSystem: 'linux',
+        value: '7:9:-',
+        path: '/workspace',
+      ),
+      throwsA(
+        isA<FileSystemException>().having(
+          (error) => error.message,
+          'message',
+          contains('filesystem birth time is unavailable'),
+        ),
+      ),
+    );
+  });
+
   test('does not resolve Linux stat from the controlled workspace', () async {
     if (!Platform.isLinux) return;
     final workspace = await Directory.systemTemp.createTemp(
