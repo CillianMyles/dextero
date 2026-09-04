@@ -250,6 +250,8 @@ These concerns cut across all milestones:
   delegated specialists.
 - [ ] Stable migration and compatibility policy before a `1.0` release.
 
+## Review follow-ups
+
 ## Deliberate non-goals for the MVP
 
 - Bundling or requiring Postgres on each controlled computer

@@ -13,6 +13,11 @@ For every change:
 Do not report the work complete before the commit and push succeed unless the
 user explicitly asks to stop earlier.
 
+## Automated review loop
+
+Before requesting automated PR review or addressing automated review feedback,
+read and follow `.agents/REVIEW_POLICY.md`.
+
 ## Delivery
 
 Build user-facing capabilities as tracer bullets through every layer:
