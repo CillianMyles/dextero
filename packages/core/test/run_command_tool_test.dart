@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dextero_core/dextero_core.dart';
@@ -122,6 +123,31 @@ void main() {
     expect(result.exitCode, 0, reason: result.stderr as String);
   });
 
+  test('preserves exact argv through the Windows guard', () async {
+    if (!Platform.isWindows) return;
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+    final script = await _script(
+      root,
+      'stdout.write(jsonEncode(arguments));',
+      imports: "import 'dart:convert';",
+    );
+    final arguments = ['', 'hello world', 'quote"inside', r'trailing\\'];
+
+    final result =
+        await guarded.call({
+              'command': Platform.resolvedExecutable,
+              'arguments': [script.path, ...arguments],
+            })
+            as JsonMap;
+
+    expect(result['exit_code'], 0, reason: result['stderr'] as String);
+    expect(jsonDecode(result['stdout']! as String), arguments);
+  });
+
   test('captures non-zero exits without merging stderr into stdout', () async {
     final script = await _script(
       root,
@@ -235,8 +261,9 @@ void main() {
   });
 }
 
-Future<File> _script(Directory root, String body) async {
+Future<File> _script(Directory root, String body, {String imports = ''}) async {
   return File('${root.path}/script.dart').writeAsString(
-    "import 'dart:io';\nvoid main(List<String> arguments) { $body }\n",
+    "import 'dart:io';\n$imports\n"
+    'void main(List<String> arguments) { $body }\n',
   );
 }

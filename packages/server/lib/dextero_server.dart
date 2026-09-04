@@ -27,12 +27,18 @@ Future<void> run(List<String> arguments) async {
     );
   }
 
-  final workspace = await canonicalWorkspaceBoundary(
+  var workspace = await canonicalWorkspaceBoundary(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
   );
-  final hostIdentity = await LocalIdentityRegistry.fromEnvironment(
+  final identityRegistry = LocalIdentityRegistry.fromEnvironment(
     Platform.environment,
-  ).resolve(workspace.root);
+  );
+  // The first resolution creates any missing repository identity markers.
+  // Capture again so the agent boundary pins the exact topology that produced
+  // the reported identity, then resolve once more under that boundary.
+  await identityRegistry.resolve(workspace.root);
+  workspace = await canonicalWorkspaceBoundary(workspace.root);
+  final hostIdentity = await identityRegistry.resolve(workspace.root);
   await workspace.validate();
   final bindAddress = _parseBindAddress(
     Platform.environment['DEXTERO_BIND_ADDRESS'] ?? '127.0.0.1',

@@ -1,12 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'control_identity.dart';
 import 'filesystem_identity.dart';
 
 /// Pins a workspace to one canonical filesystem object for an agent lifetime.
 final class WorkspaceBoundary {
-  const WorkspaceBoundary._({required this.root, required String identity})
-    : _identity = identity;
+  const WorkspaceBoundary._({
+    required this.root,
+    required String identity,
+    required String repositoryTopologyIdentity,
+  }) : _identity = identity,
+       _repositoryTopologyIdentity = repositoryTopologyIdentity;
 
   static Future<WorkspaceBoundary> capture(String workspace) async {
     final directory = Directory(workspace).absolute;
@@ -18,20 +23,28 @@ final class WorkspaceBoundary {
       );
     }
     final root = await directory.resolveSymbolicLinks();
-    return WorkspaceBoundary._(
+    final boundary = WorkspaceBoundary._(
       root: root,
       identity: await resolveFilesystemIdentity(Directory(root)),
+      repositoryTopologyIdentity: await resolveRepositoryTopologyIdentity(
+        Directory(root),
+      ),
     );
+    await boundary.validate();
+    return boundary;
   }
 
   final String root;
   final String _identity;
+  final String _repositoryTopologyIdentity;
 
   Future<void> validate() async {
     try {
       final directory = Directory(root);
       if (await directory.resolveSymbolicLinks() != root ||
-          await resolveFilesystemIdentity(directory) != _identity) {
+          await resolveFilesystemIdentity(directory) != _identity ||
+          await resolveRepositoryTopologyIdentity(directory) !=
+              _repositoryTopologyIdentity) {
         throw const _WorkspaceChanged();
       }
     } on Object {
@@ -113,6 +126,7 @@ exec "$@"
 
 const _windowsGuardedProcessScript =
     windowsFileIdentityBootstrap +
+    _windowsProcessLauncherBootstrap +
     r'''
 $actual = 'windows:' + [DexteroFileIdentity]::Read((Get-Location).Path)
 if (-not [String]::Equals(
@@ -129,7 +143,94 @@ $commandArguments = @(
 Remove-Item Env:DEXTERO_EXPECTED_WORKSPACE_IDENTITY
 Remove-Item Env:DEXTERO_GUARDED_COMMAND
 Remove-Item Env:DEXTERO_GUARDED_ARGUMENTS
-& $command @commandArguments
-if ($null -eq $LASTEXITCODE) { exit 0 }
-exit $LASTEXITCODE
+$exitCode = [DexteroProcessLauncher]::Run(
+    $command,
+    [string[]] $commandArguments,
+    (Get-Location).Path)
+exit $exitCode
+''';
+
+const _windowsProcessLauncherBootstrap = r'''
+$launcherSource = @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
+
+public static class DexteroProcessLauncher
+{
+    public static int Run(
+        string executable,
+        string[] arguments,
+        string workingDirectory)
+    {
+        ProcessStartInfo startInfo = new ProcessStartInfo();
+        startInfo.FileName = executable;
+        startInfo.Arguments = JoinArguments(arguments);
+        startInfo.WorkingDirectory = workingDirectory;
+        startInfo.UseShellExecute = false;
+
+        using (Process process = Process.Start(startInfo))
+        {
+            process.WaitForExit();
+            return process.ExitCode;
+        }
+    }
+
+    private static string JoinArguments(string[] arguments)
+    {
+        List<string> quoted = new List<string>();
+        foreach (string argument in arguments)
+        {
+            quoted.Add(QuoteArgument(argument));
+        }
+        return String.Join(" ", quoted.ToArray());
+    }
+
+    // Match the Windows CommandLineToArgvW/CRT escaping convention used by
+    // direct process launchers, including empty values and trailing slashes.
+    private static string QuoteArgument(string argument)
+    {
+        bool needsQuotes = argument.Length == 0;
+        foreach (char character in argument)
+        {
+            if (Char.IsWhiteSpace(character) || character == '"')
+            {
+                needsQuotes = true;
+                break;
+            }
+        }
+        if (!needsQuotes)
+        {
+            return argument;
+        }
+
+        StringBuilder result = new StringBuilder();
+        result.Append('"');
+        int slashes = 0;
+        foreach (char character in argument)
+        {
+            if (character == '\\')
+            {
+                slashes++;
+                continue;
+            }
+            if (character == '"')
+            {
+                result.Append('\\', slashes * 2 + 1);
+                result.Append('"');
+                slashes = 0;
+                continue;
+            }
+            result.Append('\\', slashes);
+            result.Append(character);
+            slashes = 0;
+        }
+        result.Append('\\', slashes * 2);
+        result.Append('"');
+        return result.ToString();
+    }
+}
+'@
+Add-Type -TypeDefinition $launcherSource | Out-Null
 ''';

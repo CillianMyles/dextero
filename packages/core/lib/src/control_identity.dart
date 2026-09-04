@@ -308,6 +308,61 @@ final class _ProjectLocation {
   final Directory? checkoutDirectory;
 }
 
+/// Captures every repository-local input that can change the stable project or
+/// checkout identity while the selected workspace directory itself survives.
+Future<String> resolveRepositoryTopologyIdentity(Directory workspace) async {
+  final project = await _findProject(workspace);
+  final repositoryDirectory = project.repositoryDirectory;
+  final checkoutDirectory = project.checkoutDirectory;
+  if (repositoryDirectory == null || checkoutDirectory == null) {
+    return 'directory';
+  }
+
+  final repositoryPath = await repositoryDirectory.resolveSymbolicLinks();
+  final checkoutPath = await checkoutDirectory.resolveSymbolicLinks();
+  return jsonEncode({
+    'kind': 'git',
+    'projectRoot': await project.root.resolveSymbolicLinks(),
+    'projectRootIdentity': await resolveFilesystemIdentity(project.root),
+    'repositoryPath': repositoryPath,
+    'repositoryIdentity': await resolveFilesystemIdentity(
+      Directory(repositoryPath),
+    ),
+    'repositoryMarker': await _markerEvidence(
+      Directory(repositoryPath),
+      'dextero-project-identity-v1',
+    ),
+    'checkoutPath': checkoutPath,
+    'checkoutIdentity': await resolveFilesystemIdentity(
+      Directory(checkoutPath),
+    ),
+    'checkoutMarker': await _markerEvidence(
+      Directory(checkoutPath),
+      'dextero-checkout-identity-v1',
+    ),
+  });
+}
+
+Future<Map<String, Object?>> _markerEvidence(
+  Directory directory,
+  String filename,
+) async {
+  final marker = File(_join(directory.path, filename));
+  final type = await FileSystemEntity.type(marker.path, followLinks: false);
+  return {
+    'type': _fileSystemEntityTypeName(type),
+    if (type == FileSystemEntityType.file) 'value': await marker.readAsString(),
+  };
+}
+
+String _fileSystemEntityTypeName(FileSystemEntityType type) {
+  if (type == FileSystemEntityType.file) return 'file';
+  if (type == FileSystemEntityType.directory) return 'directory';
+  if (type == FileSystemEntityType.link) return 'link';
+  if (type == FileSystemEntityType.notFound) return 'notFound';
+  return 'other';
+}
+
 Future<_ProjectLocation> _findProject(Directory workspace) async {
   var current = workspace;
   while (true) {
