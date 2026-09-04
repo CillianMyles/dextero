@@ -252,9 +252,6 @@ These concerns cut across all milestones:
 
 ## Review follow-ups
 
-P2 findings deferred after the three-round automated review budget are recorded
-here with their PR origin and an observable exit condition.
-
 ## Deliberate non-goals for the MVP
 
 - Bundling or requiring Postgres on each controlled computer

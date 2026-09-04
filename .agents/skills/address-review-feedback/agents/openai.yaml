@@ -1,4 +1,0 @@
-interface:
-  display_name: "Address Review Feedback"
-  short_description: "Resolve feedback within a bounded review budget"
-  default_prompt: "Use $address-review-feedback to triage and address this pull request feedback without exceeding the review budget."
