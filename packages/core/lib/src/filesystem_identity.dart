@@ -158,7 +158,9 @@ public static class DexteroFileIdentity
             }
             return information.VolumeSerialNumber.ToString("x8") + ":" +
                 information.FileIndexHigh.ToString("x8") +
-                information.FileIndexLow.ToString("x8");
+                information.FileIndexLow.ToString("x8") + ":" +
+                information.CreationTime.dwHighDateTime.ToString("x8") +
+                information.CreationTime.dwLowDateTime.ToString("x8");
         }
     }
 }

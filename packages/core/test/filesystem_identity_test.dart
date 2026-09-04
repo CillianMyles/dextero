@@ -45,6 +45,23 @@ void main() {
     );
   });
 
+  test('retains Windows creation time in filesystem identity', () async {
+    if (!Platform.isWindows) return;
+    final directory = await Directory.systemTemp.createTemp(
+      'dextero-windows-filesystem-identity-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final identity = await resolveFilesystemIdentity(directory);
+    final fields = identity.split(':');
+
+    expect(fields, hasLength(4));
+    expect(fields.first, 'windows');
+    for (final field in fields.skip(1)) {
+      expect(field, matches(RegExp(r'^[0-9a-f]{8,16}$')));
+    }
+  });
+
   test('does not resolve Linux stat from the controlled workspace', () async {
     if (!Platform.isLinux) return;
     final workspace = await Directory.systemTemp.createTemp(
