@@ -1,14 +1,17 @@
 import '../cancellation.dart';
 import '../tool.dart';
+import '../workspace_boundary.dart';
 import 'tool_process_runner.dart';
 
 final class RunCommandTool implements Tool {
   RunCommandTool({
     required String workingDirectory,
+    WorkspaceBoundary? workspaceBoundary,
     Duration timeout = const Duration(seconds: 30),
     int maxOutputBytes = 1024 * 1024,
   }) : _runner = ToolProcessRunner(
          workingDirectory: workingDirectory,
+         workspaceBoundary: workspaceBoundary,
          timeout: timeout,
          maxOutputBytes: maxOutputBytes,
        );

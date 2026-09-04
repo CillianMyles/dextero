@@ -50,7 +50,9 @@ void main() {
 
     expect(result, 0);
     expect(client.approvals, [('conversation-1', 'run-42', 'approval-7')]);
-    expect(jsonDecode(io.output.single), {
+    expect(io.output, hasLength(2));
+    expect(jsonDecode(io.output.first)['type'], 'host_status');
+    expect(jsonDecode(io.output.last), {
       'schema_version': 1,
       'type': 'approval_result',
       'conversation_id': 'conversation-1',
@@ -145,6 +147,15 @@ final class _FakeClient implements TerminalChatClient {
   Future<HostStatus> status() async => HostStatus(
     name: 'Dextero',
     version: '0.0.1',
+    deviceId: 'device_0123456789abcdef',
+    projectId: 'project_0123456789abcdef',
+    projectName: 'Dextero',
+    workspaceId: 'workspace_0123456789abcdef',
+    workspaceName: 'main',
+    controller: ControllerIdentity(
+      id: 'controller_0123456789abcdef',
+      name: 'Test CLI',
+    ),
     startedAt: DateTime.utc(2026),
     persistence: 'memory',
     conversationId: 'conversation-1',

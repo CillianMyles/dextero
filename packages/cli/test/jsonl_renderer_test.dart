@@ -5,6 +5,48 @@ import 'package:dextero_server/dextero_client.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('renders host and controller identities as versioned status', () {
+    final rendered = const JsonlRenderer().hostStatus(
+      HostStatus(
+        name: 'Dextero',
+        version: '0.0.1',
+        deviceId: 'device_0123456789abcdef',
+        projectId: 'project_0123456789abcdef',
+        projectName: 'Dextero',
+        workspaceId: 'workspace_0123456789abcdef',
+        workspaceName: 'main',
+        controller: ControllerIdentity(
+          id: 'controller_0123456789abcdef',
+          name: 'Test CLI',
+        ),
+        startedAt: DateTime.utc(2026),
+        persistence: 'memory',
+        conversationId: 'conversation-1',
+        retentionNotice: 'Until restart',
+        databaseRequired: false,
+        streamingAvailable: true,
+        modelProvider: 'gemini',
+        modelName: 'gemini-2.5-flash',
+        availableModels: const ['gemini-2.5-flash'],
+      ),
+    );
+
+    expect(jsonDecode(rendered), {
+      'schema_version': 1,
+      'type': 'host_status',
+      'device_id': 'device_0123456789abcdef',
+      'project_id': 'project_0123456789abcdef',
+      'project_name': 'Dextero',
+      'workspace_id': 'workspace_0123456789abcdef',
+      'workspace_name': 'main',
+      'controller_id': 'controller_0123456789abcdef',
+      'controller_name': 'Test CLI',
+      'conversation_id': 'conversation-1',
+      'model_provider': 'gemini',
+      'model_name': 'gemini-2.5-flash',
+    });
+  });
+
   test('renders a stable versioned JSONL event without null fields', () {
     final rendered = const JsonlRenderer().entry(
       ChatEntry(

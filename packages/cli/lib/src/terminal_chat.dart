@@ -33,6 +33,7 @@ final class TerminalChat {
   final List<ChatEntry> _entries = [];
   final Set<String> _plainRenderedEntryIds = {};
   var _plainHeaderRendered = false;
+  var _jsonlStatusRendered = false;
   late HostStatus _status;
 
   Future<int> run({
@@ -47,6 +48,11 @@ final class TerminalChat {
       _status = await _client.status();
       if (modelName != null && modelName != _status.modelName) {
         _status = await _client.selectModel(modelName);
+      }
+      if (outputMode == TerminalOutputMode.jsonl &&
+          (cancelRunId != null ||
+              (approveRunId != null && approvalId != null))) {
+        _render();
       }
       if (cancelRunId != null) {
         final cancelled = await _client.cancelRun(
@@ -95,7 +101,7 @@ final class TerminalChat {
       }
 
       while (true) {
-        _io.write('you> ');
+        if (outputMode == TerminalOutputMode.human) _io.write('you> ');
         final line = _io.readLine();
         if (line == null || line.trim() == '/exit') break;
         if (line.trim().isEmpty) continue;
@@ -170,6 +176,10 @@ final class TerminalChat {
 
   void _render() {
     if (outputMode == TerminalOutputMode.jsonl) {
+      if (!_jsonlStatusRendered) {
+        _jsonlStatusRendered = true;
+        _io.writeln(_jsonlRenderer.hostStatus(_status));
+      }
       for (final entry in _entries) {
         if (!_plainRenderedEntryIds.add(entry.entryId)) continue;
         _io.writeln(_jsonlRenderer.entry(entry));
@@ -179,8 +189,13 @@ final class TerminalChat {
     if (!_plainHeaderRendered) {
       _plainHeaderRendered = true;
       _io.writeln(
-        '${_status.name} ${_status.version} — '
-        '${_status.modelProvider} · ${_status.modelName}'
+        '${_renderer.safeText(_status.name)} '
+        '${_renderer.safeText(_status.version)} — '
+        '${_renderer.safeText(_status.modelProvider)} · '
+        '${_renderer.safeText(_status.modelName)}'
+        ' — ${_renderer.safeText(_status.projectName)}/'
+        '${_renderer.safeText(_status.workspaceName)}'
+        ' — ${_renderer.safeText(_status.controller.name)}'
         '${_entries.isEmpty ? ' — no messages yet' : ''}',
       );
     }

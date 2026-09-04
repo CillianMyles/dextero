@@ -6,11 +6,13 @@ import 'dart:typed_data';
 import '../cancellation.dart';
 import '../process_environment.dart';
 import '../tool.dart';
+import '../workspace_boundary.dart';
 
 /// Runs a process with bounded, separate stdout and stderr capture.
 final class ToolProcessRunner {
   ToolProcessRunner({
     required String workingDirectory,
+    this.workspaceBoundary,
     this.timeout = const Duration(seconds: 30),
     this.maxOutputBytes = 1024 * 1024,
   }) : workingDirectory = Directory(workingDirectory).absolute.path {
@@ -31,6 +33,7 @@ final class ToolProcessRunner {
   }
 
   final String workingDirectory;
+  final WorkspaceBoundary? workspaceBoundary;
   final Duration timeout;
   final int maxOutputBytes;
 
@@ -41,14 +44,22 @@ final class ToolProcessRunner {
     ToolOutputSink? onOutput,
   }) async {
     cancellationToken?.throwIfCancellationRequested();
-    final process = await Process.start(
-      command,
-      arguments,
-      workingDirectory: workingDirectory,
-      runInShell: false,
-      includeParentEnvironment: false,
-      environment: filteredProcessEnvironment(),
-    );
+    final environment = filteredProcessEnvironment();
+    final boundary = workspaceBoundary;
+    final process = boundary == null
+        ? await Process.start(
+            command,
+            arguments,
+            workingDirectory: workingDirectory,
+            runInShell: false,
+            includeParentEnvironment: false,
+            environment: environment,
+          )
+        : await boundary.startProcess(
+            command,
+            arguments,
+            environment: environment,
+          );
     final stdoutFuture = _capture(process.stdout, 'stdout', onOutput);
     final stderrFuture = _capture(process.stderr, 'stderr', onOutput);
     final termination = Completer<_TerminationReason>();

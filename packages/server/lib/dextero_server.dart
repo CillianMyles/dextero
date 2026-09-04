@@ -5,6 +5,7 @@ import 'package:serverpod/serverpod.dart';
 
 import 'src/auth/dextero_token_authenticator.dart';
 import 'src/control/chat_runtime.dart';
+import 'src/control/canonical_workspace.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 
@@ -26,9 +27,19 @@ Future<void> run(List<String> arguments) async {
     );
   }
 
-  final workspace = Directory(
+  var workspace = await canonicalWorkspaceBoundary(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
-  ).absolute.path;
+  );
+  final identityRegistry = LocalIdentityRegistry.fromEnvironment(
+    Platform.environment,
+  );
+  // The first resolution creates any missing repository identity markers.
+  // Capture again so the agent boundary pins the exact topology that produced
+  // the reported identity, then resolve once more under that boundary.
+  await identityRegistry.resolve(workspace.root);
+  workspace = await canonicalWorkspaceBoundary(workspace.root);
+  final hostIdentity = await identityRegistry.resolve(workspace.root);
+  await workspace.validate();
   final bindAddress = _parseBindAddress(
     Platform.environment['DEXTERO_BIND_ADDRESS'] ?? '127.0.0.1',
   );
@@ -46,6 +57,7 @@ Future<void> run(List<String> arguments) async {
     token: token,
     chatService: service,
     defaultConversationId: conversation.id,
+    hostIdentity: hostIdentity,
     modelProvider: agentConfiguration.providerName,
     modelName: agentConfiguration.modelName,
     bindAddress: bindAddress,
@@ -68,6 +80,7 @@ Future<Serverpod> startControlServer({
   required String token,
   required ChatService chatService,
   required String defaultConversationId,
+  required HostIdentity hostIdentity,
   List<String> arguments = const [],
   int? apiPort,
   bool runInGuardedZone = true,
@@ -87,6 +100,7 @@ Future<Serverpod> startControlServer({
   ChatRuntime.configure(
     chatService: chatService,
     defaultConversationId: defaultConversationId,
+    hostIdentity: hostIdentity,
     modelProvider: modelProvider,
     modelName: modelName,
     availableModels: availableModels,

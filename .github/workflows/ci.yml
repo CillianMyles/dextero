@@ -88,6 +88,15 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Test Windows process and file guards
+        if: matrix.target == 'windows'
+        working-directory: packages/core
+        run: >-
+          dart test
+          test/filesystem_identity_test.dart
+          test/run_command_tool_test.dart
+          test/workspace_path_test.dart
+
       - name: Build app
         working-directory: packages/app
         run: ${{ matrix.command }}

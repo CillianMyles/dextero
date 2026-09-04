@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dextero_core/dextero_core.dart';
@@ -84,6 +85,68 @@ void main() {
       isTrue,
     );
   });
+
+  test('executes through a filesystem-bound workspace', () async {
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+    final script = await _script(root, 'stdout.write(Directory.current.path);');
+
+    final result =
+        await guarded.call({
+              'command': Platform.resolvedExecutable,
+              'arguments': [script.path],
+            })
+            as JsonMap;
+
+    expect(
+      FileSystemEntity.identicalSync(result['stdout']! as String, root.path),
+      isTrue,
+    );
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test('normalizes Linux guard identity across timezones', () async {
+    if (!Platform.isLinux) return;
+    final helper = File(
+      '${Directory.current.path}/test/fixtures/run_guarded_command.dart',
+    );
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [helper.path, root.path],
+      workingDirectory: Directory.current.path,
+      environment: {'TZ': 'America/New_York'},
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr as String);
+  });
+
+  test('preserves exact argv through the Windows guard', () async {
+    if (!Platform.isWindows) return;
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+    final script = await _script(
+      root,
+      'stdout.write(jsonEncode(arguments));',
+      imports: "import 'dart:convert';",
+    );
+    final arguments = ['', 'hello world', 'quote"inside', r'trailing\\'];
+
+    final result =
+        await guarded.call({
+              'command': Platform.resolvedExecutable,
+              'arguments': [script.path, ...arguments],
+            })
+            as JsonMap;
+
+    expect(result['exit_code'], 0, reason: result['stderr'] as String);
+    expect(jsonDecode(result['stdout']! as String), arguments);
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test('captures non-zero exits without merging stderr into stdout', () async {
     final script = await _script(
@@ -176,10 +239,44 @@ void main() {
       throwsA(isA<ProcessException>()),
     );
   });
+
+  test('propagates a missing command through the workspace guard', () async {
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+
+    await expectLater(
+      guarded.call({'command': 'definitely-not-a-real-command-12345'}),
+      throwsA(isA<ProcessException>()),
+    );
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test('rejects execution after the workspace directory is replaced', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'run-command-replaced-workspace-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final boundary = await WorkspaceBoundary.capture(workspace.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+    await workspace.rename('${sandbox.path}/original');
+    await workspace.create();
+
+    await expectLater(
+      guarded.call({'command': Platform.resolvedExecutable}),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
 }
 
-Future<File> _script(Directory root, String body) async {
+Future<File> _script(Directory root, String body, {String imports = ''}) async {
   return File('${root.path}/script.dart').writeAsString(
-    "import 'dart:io';\nvoid main(List<String> arguments) { $body }\n",
+    "import 'dart:io';\n$imports\n"
+    'void main(List<String> arguments) { $body }\n',
   );
 }

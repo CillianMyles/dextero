@@ -6,6 +6,18 @@ import 'package:test/test.dart';
 import '../integration/test_tools/serverpod_test_tools.dart';
 import '../integration/test_tools/test_server_config.dart';
 
+final _hostIdentity = core.HostIdentity(
+  deviceId: 'device_0123456789abcdef',
+  projectId: 'project_0123456789abcdef',
+  projectName: 'Dextero',
+  workspaceId: 'workspace_0123456789abcdef',
+  workspaceName: 'main',
+);
+final _controllerIdentity = ControllerIdentity(
+  id: 'controller_0123456789abcdef',
+  name: 'Acceptance controller',
+);
+
 void main() {
   late core.InMemoryChatHistoryStore store;
   late core.ChatService service;
@@ -18,6 +30,7 @@ void main() {
     ChatRuntime.configure(
       chatService: service,
       defaultConversationId: conversationId,
+      hostIdentity: _hostIdentity,
     );
   });
 
@@ -34,11 +47,17 @@ void main() {
     test(
       'crosses core, store, endpoint, and generated client models',
       () async {
-        final status = await endpoints.control.status(controller);
+        final status = await endpoints.control.status(
+          controller,
+          _controllerIdentity,
+        );
         expect(status.conversationId, conversationId);
+        expect(status.controller.id, _controllerIdentity.id);
+        expect(status.projectId, _hostIdentity.projectId);
 
         final accepted = await endpoints.control.submitMessage(
           controller,
+          _controllerIdentity,
           ChatSubmitRequest(
             conversationId: status.conversationId,
             message: 'Hello Dextero',
@@ -47,7 +66,7 @@ void main() {
           ),
         );
         final received = await endpoints.control
-            .streamHistory(controller, conversationId, -1)
+            .streamHistory(controller, _controllerIdentity, conversationId, -1)
             .take(5)
             .toList();
 
@@ -70,6 +89,7 @@ void main() {
 
         final fetched = await endpoints.control.history(
           controller,
+          _controllerIdentity,
           conversationId,
         );
         expect(

@@ -2,6 +2,12 @@ class: HostStatus
 fields:
   name: String
   version: String
+  deviceId: String
+  projectId: String
+  projectName: String
+  workspaceId: String
+  workspaceName: String
+  controller: ControllerIdentity
   startedAt: DateTime
   persistence: String
   conversationId: String

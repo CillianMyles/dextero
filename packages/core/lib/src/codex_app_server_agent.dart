@@ -8,6 +8,7 @@ import 'chat_service.dart';
 import 'process_environment.dart';
 import 'safe_metadata.dart';
 import 'tool.dart';
+import 'workspace_boundary.dart';
 
 typedef CodexTransportFactory = Future<CodexAppServerTransport> Function();
 
@@ -36,15 +37,21 @@ final class ProcessCodexAppServerTransport implements CodexAppServerTransport {
   static Future<ProcessCodexAppServerTransport> start({
     String executable = 'codex',
     String? workingDirectory,
+    WorkspaceBoundary? workspaceBoundary,
   }) async {
-    final process = await Process.start(
-      executable,
-      ['app-server'],
-      workingDirectory: workingDirectory,
-      runInShell: false,
-      includeParentEnvironment: false,
-      environment: codexProcessEnvironment(),
-    );
+    final environment = codexProcessEnvironment();
+    final process = workspaceBoundary == null
+        ? await Process.start(
+            executable,
+            ['app-server'],
+            workingDirectory: workingDirectory,
+            runInShell: false,
+            includeParentEnvironment: false,
+            environment: environment,
+          )
+        : await workspaceBoundary.startProcess(executable, const [
+            'app-server',
+          ], environment: environment);
     return ProcessCodexAppServerTransport._(process);
   }
 
@@ -136,6 +143,7 @@ final class CodexAppServerAgent {
   CodexAppServerAgent({
     this.model,
     this.workingDirectory,
+    this.workspaceBoundary,
     this.messageTimeout = const Duration(minutes: 5),
     String codexExecutable = 'codex',
     CodexTransportFactory? transportFactory,
@@ -144,10 +152,12 @@ final class CodexAppServerAgent {
            (() => ProcessCodexAppServerTransport.start(
              executable: codexExecutable,
              workingDirectory: workingDirectory,
+             workspaceBoundary: workspaceBoundary,
            ));
 
   final String? model;
   final String? workingDirectory;
+  final WorkspaceBoundary? workspaceBoundary;
   final Duration messageTimeout;
   final CodexTransportFactory _transportFactory;
 
@@ -162,6 +172,7 @@ final class CodexAppServerAgent {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
     }
+    await workspaceBoundary?.validate();
     final toolsByName = {for (final tool in tools) tool.definition.name: tool};
     if (toolsByName.length != tools.length) {
       throw ArgumentError('Tool names must be unique.');

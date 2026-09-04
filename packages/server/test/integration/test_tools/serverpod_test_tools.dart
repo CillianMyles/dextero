@@ -15,11 +15,14 @@ import 'package:serverpod_test/serverpod_test.dart' as _i1;
 import 'package:serverpod/serverpod.dart' as _i2;
 import 'dart:async' as _i3;
 import 'package:dextero_server/src/generated/control/host_status.dart' as _i4;
-import 'package:dextero_server/src/generated/control/chat_submission.dart'
+import 'package:dextero_server/src/generated/control/controller_identity.dart'
     as _i5;
-import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
+import 'package:dextero_server/src/generated/control/chat_submission.dart'
     as _i6;
-import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i7;
+import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
+    as _i7;
+import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i8;
+import 'dart:convert' as _i9;
 import 'package:dextero_server/src/generated/protocol.dart';
 import 'package:dextero_server/src/generated/endpoints.dart';
 export 'package:serverpod_test/serverpod_test_public_exports.dart';
@@ -134,6 +137,7 @@ class _ControlEndpoint {
 
   _i3.Future<_i4.HostStatus> status(
     _i1.TestSessionBuilder sessionBuilder,
+    _i5.ControllerIdentity controller,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -146,7 +150,7 @@ class _ControlEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'control',
           methodName: 'status',
-          parameters: _i1.testObjectToJson({}),
+          parameters: _i1.testObjectToJson({'controller': controller}),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -164,6 +168,7 @@ class _ControlEndpoint {
 
   _i3.Future<_i4.HostStatus> selectModel(
     _i1.TestSessionBuilder sessionBuilder,
+    _i5.ControllerIdentity controller,
     String modelName,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -177,7 +182,10 @@ class _ControlEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'control',
           methodName: 'selectModel',
-          parameters: _i1.testObjectToJson({'modelName': modelName}),
+          parameters: _i1.testObjectToJson({
+            'controller': controller,
+            'modelName': modelName,
+          }),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -193,9 +201,10 @@ class _ControlEndpoint {
     });
   }
 
-  _i3.Future<_i5.ChatSubmission> submitMessage(
+  _i3.Future<_i6.ChatSubmission> submitMessage(
     _i1.TestSessionBuilder sessionBuilder,
-    _i6.ChatSubmitRequest request,
+    _i5.ControllerIdentity controller,
+    _i7.ChatSubmitRequest request,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -208,7 +217,10 @@ class _ControlEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'control',
           methodName: 'submitMessage',
-          parameters: _i1.testObjectToJson({'request': request}),
+          parameters: _i1.testObjectToJson({
+            'controller': controller,
+            'request': request,
+          }),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -216,7 +228,7 @@ class _ControlEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i5.ChatSubmission>);
+                as _i3.Future<_i6.ChatSubmission>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -226,6 +238,7 @@ class _ControlEndpoint {
 
   _i3.Future<bool> cancelRun(
     _i1.TestSessionBuilder sessionBuilder,
+    _i5.ControllerIdentity controller,
     String conversationId,
     String runId,
   ) async {
@@ -241,6 +254,7 @@ class _ControlEndpoint {
           endpointPath: 'control',
           methodName: 'cancelRun',
           parameters: _i1.testObjectToJson({
+            'controller': controller,
             'conversationId': conversationId,
             'runId': runId,
           }),
@@ -261,6 +275,7 @@ class _ControlEndpoint {
 
   _i3.Future<bool> approveWork(
     _i1.TestSessionBuilder sessionBuilder,
+    _i5.ControllerIdentity controller,
     String conversationId,
     String runId,
     String approvalId,
@@ -277,6 +292,7 @@ class _ControlEndpoint {
           endpointPath: 'control',
           methodName: 'approveWork',
           parameters: _i1.testObjectToJson({
+            'controller': controller,
             'conversationId': conversationId,
             'runId': runId,
             'approvalId': approvalId,
@@ -296,8 +312,9 @@ class _ControlEndpoint {
     });
   }
 
-  _i3.Future<List<_i7.ChatEntry>> history(
+  _i3.Future<List<_i8.ChatEntry>> history(
     _i1.TestSessionBuilder sessionBuilder,
+    _i5.ControllerIdentity controller,
     String conversationId,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -311,7 +328,10 @@ class _ControlEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'control',
           methodName: 'history',
-          parameters: _i1.testObjectToJson({'conversationId': conversationId}),
+          parameters: _i1.testObjectToJson({
+            'controller': controller,
+            'conversationId': conversationId,
+          }),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -319,7 +339,7 @@ class _ControlEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i7.ChatEntry>>);
+                as _i3.Future<List<_i8.ChatEntry>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -327,12 +347,13 @@ class _ControlEndpoint {
     });
   }
 
-  _i3.Stream<_i7.ChatEntry> streamHistory(
+  _i3.Stream<_i8.ChatEntry> streamHistory(
     _i1.TestSessionBuilder sessionBuilder,
+    _i5.ControllerIdentity controller,
     String conversationId,
     int afterSequence,
   ) {
-    var _localTestStreamManager = _i1.TestStreamManager<_i7.ChatEntry>();
+    var _localTestStreamManager = _i1.TestStreamManager<_i8.ChatEntry>();
     _i1.callStreamFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
@@ -345,6 +366,9 @@ class _ControlEndpoint {
             endpointPath: 'control',
             methodName: 'streamHistory',
             arguments: {
+              'controller': _i9.jsonDecode(
+                _i2.SerializationManager.encode(controller),
+              ),
               'conversationId': conversationId,
               'afterSequence': afterSequence,
             },

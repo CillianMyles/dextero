@@ -29,12 +29,15 @@ cli ─┘
 The app and CLI use the generated client without importing or launching the
 server runtime. User messages are stored before assistant work begins; replies,
 tool activity, lifecycle, and errors append to the same ordered history.
+The host also publishes stable local device, project, workspace, and controller
+identities so later permission grants can be attributed without using display
+names or filesystem paths as security keys.
 
 ## Run
 
 Requirements:
 
-- Dart 3.10+
+- Dart 3.11+
 - Flutter with the intended target platform enabled
 - Chrome for web, Android Studio for Android, or Xcode for iOS and macOS
 - GTK 3 development libraries for Linux or Visual Studio with Desktop C++ for
@@ -136,6 +139,25 @@ Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
 dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"
 ```
 
+The first JSONL record describes the host, project, workspace, and controller
+identities. Human and full-screen terminal headers show their display names;
+the Flutter identity badge shows the stable IDs in its tooltip.
+Git repositories keep a local incarnation marker in their shared Git metadata,
+so linked worktrees share a project identity while a replacement checkout at
+the same path receives new project and workspace identities. The host registry
+also records the metadata directory's filesystem incarnation, so copying a
+repository does not copy its identity while moving it within one filesystem
+preserves the identity. A cross-filesystem move rotates the IDs because it is
+indistinguishable from a copied repository after the original disappears.
+Standard separate Git directories are supported; symbolic `.git` entries are
+rejected. Linux identity resolution requires filesystem birth-time metadata.
+Agents revalidate the selected workspace's filesystem incarnation, Git
+topology, and identity markers before each file or process operation and fail
+closed if any of them changes.
+Non-Git workspaces use filesystem incarnation metadata in the host-owned
+registry, so replacing the directory rotates both identities without writing
+identity metadata into the controlled workspace.
+
 Run all checks:
 
 ```sh
@@ -151,6 +173,10 @@ or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. File edits pause for explicit approval, but process tools
 do not yet have the policy coverage planned for Milestone 3. Every `edit_file`
 invocation requests a fresh approval; decisions are not currently remembered.
+Controller IDs are persisted by each client and sent with every control call.
+They provide stable attribution but are self-asserted, not cryptographic proof
+of a device. Until pairing exists, the server must not use them alone to grant
+authority.
 
 The host binds to `127.0.0.1` by default. Set `BIND_ADDRESS` to a numeric IP
 only when a protected local-network controller or tunnel needs direct access:
@@ -180,7 +206,8 @@ history, or tool subprocess environments.
 
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
 typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
-and `cancelRun` operations.
+and `cancelRun` operations. Each operation requires a typed controller identity;
+host status returns the stable local device, project, and workspace identities.
 Generated server, client, and test code is committed. After changing an
 endpoint or `.spy.yaml` model, run:
 

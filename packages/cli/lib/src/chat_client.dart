@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:dextero_server/dextero_client.dart';
+
+import 'controller_identity_store.dart';
 
 abstract interface class TerminalChatClient {
   Future<HostStatus> status();
@@ -26,43 +30,63 @@ final class ServerpodTerminalChatClient implements TerminalChatClient {
   ServerpodTerminalChatClient({
     required String serverUrl,
     required String token,
-  }) {
+    Future<ControllerIdentity>? controller,
+  }) : _controller =
+           controller ??
+           CliControllerIdentityStore.fromEnvironment(
+             Platform.environment,
+           ).load(Platform.environment) {
     final normalizedUrl = serverUrl.endsWith('/') ? serverUrl : '$serverUrl/';
     _client = Client(normalizedUrl)
       ..authKeyProvider = DexteroTokenAuthProvider(token);
   }
 
   late final Client _client;
+  final Future<ControllerIdentity> _controller;
 
   @override
-  Future<HostStatus> status() => _client.control.status();
+  Future<HostStatus> status() async =>
+      _client.control.status(await _controller);
 
   @override
-  Future<HostStatus> selectModel(String modelName) =>
-      _client.control.selectModel(modelName);
+  Future<HostStatus> selectModel(String modelName) async =>
+      _client.control.selectModel(await _controller, modelName);
 
   @override
-  Future<List<ChatEntry>> history(String conversationId) =>
-      _client.control.history(conversationId);
+  Future<List<ChatEntry>> history(String conversationId) async =>
+      _client.control.history(await _controller, conversationId);
 
   @override
-  Future<ChatSubmission> submit(ChatSubmitRequest request) =>
-      _client.control.submitMessage(request);
+  Future<ChatSubmission> submit(ChatSubmitRequest request) async =>
+      _client.control.submitMessage(await _controller, request);
 
   @override
-  Future<bool> cancelRun(String conversationId, String runId) =>
-      _client.control.cancelRun(conversationId, runId);
+  Future<bool> cancelRun(String conversationId, String runId) async =>
+      _client.control.cancelRun(await _controller, conversationId, runId);
 
   @override
   Future<bool> approveWork(
     String conversationId,
     String runId,
     String approvalId,
-  ) => _client.control.approveWork(conversationId, runId, approvalId);
+  ) async => _client.control.approveWork(
+    await _controller,
+    conversationId,
+    runId,
+    approvalId,
+  );
 
   @override
-  Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
-      _client.control.streamHistory(conversationId, afterSequence);
+  Stream<ChatEntry> streamHistory(
+    String conversationId,
+    int afterSequence,
+  ) async* {
+    yield* _client.control.streamHistory(
+      await _controller,
+      conversationId,
+      afterSequence,
+    );
+  }
 
   @override
   Future<void> close() async => _client.close();

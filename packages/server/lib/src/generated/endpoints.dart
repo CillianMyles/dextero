@@ -13,8 +13,10 @@
 
 import 'package:serverpod/serverpod.dart' as _i1;
 import '../control/control_endpoint.dart' as _i2;
-import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
+import 'package:dextero_server/src/generated/control/controller_identity.dart'
     as _i3;
+import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
+    as _i4;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -28,13 +30,27 @@ class Endpoints extends _i1.EndpointDispatch {
       methodConnectors: {
         'status': _i1.MethodConnector(
           name: 'status',
-          params: {},
+          params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
+          },
           call: (_i1.Session session, Map<String, dynamic> params) async =>
-              (endpoints['control'] as _i2.ControlEndpoint).status(session),
+              (endpoints['control'] as _i2.ControlEndpoint).status(
+                session,
+                params['controller'],
+              ),
         ),
         'selectModel': _i1.MethodConnector(
           name: 'selectModel',
           params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
             'modelName': _i1.ParameterDescription(
               name: 'modelName',
               type: _i1.getType<String>(),
@@ -44,27 +60,39 @@ class Endpoints extends _i1.EndpointDispatch {
           call: (_i1.Session session, Map<String, dynamic> params) async =>
               (endpoints['control'] as _i2.ControlEndpoint).selectModel(
                 session,
+                params['controller'],
                 params['modelName'],
               ),
         ),
         'submitMessage': _i1.MethodConnector(
           name: 'submitMessage',
           params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
             'request': _i1.ParameterDescription(
               name: 'request',
-              type: _i1.getType<_i3.ChatSubmitRequest>(),
+              type: _i1.getType<_i4.ChatSubmitRequest>(),
               nullable: false,
             ),
           },
           call: (_i1.Session session, Map<String, dynamic> params) async =>
               (endpoints['control'] as _i2.ControlEndpoint).submitMessage(
                 session,
+                params['controller'],
                 params['request'],
               ),
         ),
         'cancelRun': _i1.MethodConnector(
           name: 'cancelRun',
           params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
             'conversationId': _i1.ParameterDescription(
               name: 'conversationId',
               type: _i1.getType<String>(),
@@ -79,6 +107,7 @@ class Endpoints extends _i1.EndpointDispatch {
           call: (_i1.Session session, Map<String, dynamic> params) async =>
               (endpoints['control'] as _i2.ControlEndpoint).cancelRun(
                 session,
+                params['controller'],
                 params['conversationId'],
                 params['runId'],
               ),
@@ -86,6 +115,11 @@ class Endpoints extends _i1.EndpointDispatch {
         'approveWork': _i1.MethodConnector(
           name: 'approveWork',
           params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
             'conversationId': _i1.ParameterDescription(
               name: 'conversationId',
               type: _i1.getType<String>(),
@@ -105,6 +139,7 @@ class Endpoints extends _i1.EndpointDispatch {
           call: (_i1.Session session, Map<String, dynamic> params) async =>
               (endpoints['control'] as _i2.ControlEndpoint).approveWork(
                 session,
+                params['controller'],
                 params['conversationId'],
                 params['runId'],
                 params['approvalId'],
@@ -113,6 +148,11 @@ class Endpoints extends _i1.EndpointDispatch {
         'history': _i1.MethodConnector(
           name: 'history',
           params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
             'conversationId': _i1.ParameterDescription(
               name: 'conversationId',
               type: _i1.getType<String>(),
@@ -122,12 +162,18 @@ class Endpoints extends _i1.EndpointDispatch {
           call: (_i1.Session session, Map<String, dynamic> params) async =>
               (endpoints['control'] as _i2.ControlEndpoint).history(
                 session,
+                params['controller'],
                 params['conversationId'],
               ),
         ),
         'streamHistory': _i1.MethodStreamConnector(
           name: 'streamHistory',
           params: {
+            'controller': _i1.ParameterDescription(
+              name: 'controller',
+              type: _i1.getType<_i3.ControllerIdentity>(),
+              nullable: false,
+            ),
             'conversationId': _i1.ParameterDescription(
               name: 'conversationId',
               type: _i1.getType<String>(),
@@ -148,6 +194,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 Map<String, Stream> streamParams,
               ) => (endpoints['control'] as _i2.ControlEndpoint).streamHistory(
                 session,
+                params['controller'],
                 params['conversationId'],
                 params['afterSequence'],
               ),

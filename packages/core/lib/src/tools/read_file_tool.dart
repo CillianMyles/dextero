@@ -1,11 +1,13 @@
-import 'dart:io';
+import 'dart:convert';
 
 import '../cancellation.dart';
 import '../tool.dart';
+import '../workspace_boundary.dart';
 import 'workspace_path.dart';
 
 final class ReadFileTool implements Tool {
-  ReadFileTool({required String root}) : _workspace = WorkspacePath(root);
+  ReadFileTool({required String root, WorkspaceBoundary? boundary})
+    : _workspace = WorkspacePath(root, boundary: boundary);
 
   final WorkspacePath _workspace;
 
@@ -38,11 +40,12 @@ final class ReadFileTool implements Tool {
       throw const FormatException('path must be a non-empty string');
     }
 
-    final filePath = await _workspace.resolveExisting(
-      path,
-      expectedType: FileSystemEntityType.file,
-    );
-
-    return {'path': path, 'content': await File(filePath).readAsString()};
+    final file = await _workspace.openExistingFile(path);
+    try {
+      final content = utf8.decode(await file.read(await file.length()));
+      return {'path': path, 'content': content};
+    } finally {
+      await file.close();
+    }
   }
 }

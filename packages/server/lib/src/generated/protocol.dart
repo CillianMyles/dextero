@@ -20,8 +20,9 @@ import 'control/chat_entry_status.dart' as _i6;
 import 'control/chat_event_family.dart' as _i7;
 import 'control/chat_submission.dart' as _i8;
 import 'control/chat_submit_request.dart' as _i9;
-import 'control/host_status.dart' as _i10;
-import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i11;
+import 'control/controller_identity.dart' as _i10;
+import 'control/host_status.dart' as _i11;
+import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i12;
 export 'control/chat_entry.dart';
 export 'control/chat_entry_kind.dart';
 export 'control/chat_entry_source.dart';
@@ -29,6 +30,7 @@ export 'control/chat_entry_status.dart';
 export 'control/chat_event_family.dart';
 export 'control/chat_submission.dart';
 export 'control/chat_submit_request.dart';
+export 'control/controller_identity.dart';
 export 'control/host_status.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
@@ -87,8 +89,11 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i9.ChatSubmitRequest) {
       return _i9.ChatSubmitRequest.fromJson(data) as T;
     }
-    if (t == _i10.HostStatus) {
-      return _i10.HostStatus.fromJson(data) as T;
+    if (t == _i10.ControllerIdentity) {
+      return _i10.ControllerIdentity.fromJson(data) as T;
+    }
+    if (t == _i11.HostStatus) {
+      return _i11.HostStatus.fromJson(data) as T;
     }
     if (t == _i1.getType<_i3.ChatEntry?>()) {
       return (data != null ? _i3.ChatEntry.fromJson(data) : null) as T;
@@ -111,14 +116,18 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i1.getType<_i9.ChatSubmitRequest?>()) {
       return (data != null ? _i9.ChatSubmitRequest.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i10.HostStatus?>()) {
-      return (data != null ? _i10.HostStatus.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i10.ControllerIdentity?>()) {
+      return (data != null ? _i10.ControllerIdentity.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i11.HostStatus?>()) {
+      return (data != null ? _i11.HostStatus.fromJson(data) : null) as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i11.ChatEntry>) {
-      return (data as List).map((e) => deserialize<_i11.ChatEntry>(e)).toList()
+    if (t == List<_i12.ChatEntry>) {
+      return (data as List).map((e) => deserialize<_i12.ChatEntry>(e)).toList()
           as T;
     }
     try {
@@ -136,7 +145,8 @@ class Protocol extends _i1.SerializationManagerServer {
       _i7.ChatEventFamily => 'ChatEventFamily',
       _i8.ChatSubmission => 'ChatSubmission',
       _i9.ChatSubmitRequest => 'ChatSubmitRequest',
-      _i10.HostStatus => 'HostStatus',
+      _i10.ControllerIdentity => 'ControllerIdentity',
+      _i11.HostStatus => 'HostStatus',
       _ => null,
     };
   }
@@ -165,7 +175,9 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'ChatSubmission';
       case _i9.ChatSubmitRequest():
         return 'ChatSubmitRequest';
-      case _i10.HostStatus():
+      case _i10.ControllerIdentity():
+        return 'ControllerIdentity';
+      case _i11.HostStatus():
         return 'HostStatus';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -202,8 +214,11 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName == 'ChatSubmitRequest') {
       return deserialize<_i9.ChatSubmitRequest>(data['data']);
     }
+    if (dataClassName == 'ControllerIdentity') {
+      return deserialize<_i10.ControllerIdentity>(data['data']);
+    }
     if (dataClassName == 'HostStatus') {
-      return deserialize<_i10.HostStatus>(data['data']);
+      return deserialize<_i11.HostStatus>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);

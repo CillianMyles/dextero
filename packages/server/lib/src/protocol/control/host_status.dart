@@ -12,12 +12,19 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'package:dextero_server/src/protocol/protocol.dart' as _i2;
+import '../control/controller_identity.dart' as _i2;
+import 'package:dextero_server/src/protocol/protocol.dart' as _i3;
 
 abstract class HostStatus implements _i1.SerializableModel {
   HostStatus._({
     required this.name,
     required this.version,
+    required this.deviceId,
+    required this.projectId,
+    required this.projectName,
+    required this.workspaceId,
+    required this.workspaceName,
+    required this.controller,
     required this.startedAt,
     required this.persistence,
     required this.conversationId,
@@ -32,6 +39,12 @@ abstract class HostStatus implements _i1.SerializableModel {
   factory HostStatus({
     required String name,
     required String version,
+    required String deviceId,
+    required String projectId,
+    required String projectName,
+    required String workspaceId,
+    required String workspaceName,
+    required _i2.ControllerIdentity controller,
     required DateTime startedAt,
     required String persistence,
     required String conversationId,
@@ -47,6 +60,14 @@ abstract class HostStatus implements _i1.SerializableModel {
     return HostStatus(
       name: jsonSerialization['name'] as String,
       version: jsonSerialization['version'] as String,
+      deviceId: jsonSerialization['deviceId'] as String,
+      projectId: jsonSerialization['projectId'] as String,
+      projectName: jsonSerialization['projectName'] as String,
+      workspaceId: jsonSerialization['workspaceId'] as String,
+      workspaceName: jsonSerialization['workspaceName'] as String,
+      controller: _i3.Protocol().deserialize<_i2.ControllerIdentity>(
+        jsonSerialization['controller'],
+      ),
       startedAt: _i1.DateTimeJsonExtension.fromJson(
         jsonSerialization['startedAt'],
       ),
@@ -61,7 +82,7 @@ abstract class HostStatus implements _i1.SerializableModel {
       ),
       modelProvider: jsonSerialization['modelProvider'] as String,
       modelName: jsonSerialization['modelName'] as String,
-      availableModels: _i2.Protocol().deserialize<List<String>>(
+      availableModels: _i3.Protocol().deserialize<List<String>>(
         jsonSerialization['availableModels'],
       ),
     );
@@ -70,6 +91,18 @@ abstract class HostStatus implements _i1.SerializableModel {
   String name;
 
   String version;
+
+  String deviceId;
+
+  String projectId;
+
+  String projectName;
+
+  String workspaceId;
+
+  String workspaceName;
+
+  _i2.ControllerIdentity controller;
 
   DateTime startedAt;
 
@@ -95,6 +128,12 @@ abstract class HostStatus implements _i1.SerializableModel {
   HostStatus copyWith({
     String? name,
     String? version,
+    String? deviceId,
+    String? projectId,
+    String? projectName,
+    String? workspaceId,
+    String? workspaceName,
+    _i2.ControllerIdentity? controller,
     DateTime? startedAt,
     String? persistence,
     String? conversationId,
@@ -111,6 +150,12 @@ abstract class HostStatus implements _i1.SerializableModel {
       '__className__': 'HostStatus',
       'name': name,
       'version': version,
+      'deviceId': deviceId,
+      'projectId': projectId,
+      'projectName': projectName,
+      'workspaceId': workspaceId,
+      'workspaceName': workspaceName,
+      'controller': controller.toJson(),
       'startedAt': startedAt.toJson(),
       'persistence': persistence,
       'conversationId': conversationId,
@@ -133,6 +178,12 @@ class _HostStatusImpl extends HostStatus {
   _HostStatusImpl({
     required String name,
     required String version,
+    required String deviceId,
+    required String projectId,
+    required String projectName,
+    required String workspaceId,
+    required String workspaceName,
+    required _i2.ControllerIdentity controller,
     required DateTime startedAt,
     required String persistence,
     required String conversationId,
@@ -145,6 +196,12 @@ class _HostStatusImpl extends HostStatus {
   }) : super._(
          name: name,
          version: version,
+         deviceId: deviceId,
+         projectId: projectId,
+         projectName: projectName,
+         workspaceId: workspaceId,
+         workspaceName: workspaceName,
+         controller: controller,
          startedAt: startedAt,
          persistence: persistence,
          conversationId: conversationId,
@@ -163,6 +220,12 @@ class _HostStatusImpl extends HostStatus {
   HostStatus copyWith({
     String? name,
     String? version,
+    String? deviceId,
+    String? projectId,
+    String? projectName,
+    String? workspaceId,
+    String? workspaceName,
+    _i2.ControllerIdentity? controller,
     DateTime? startedAt,
     String? persistence,
     String? conversationId,
@@ -176,6 +239,12 @@ class _HostStatusImpl extends HostStatus {
     return HostStatus(
       name: name ?? this.name,
       version: version ?? this.version,
+      deviceId: deviceId ?? this.deviceId,
+      projectId: projectId ?? this.projectId,
+      projectName: projectName ?? this.projectName,
+      workspaceId: workspaceId ?? this.workspaceId,
+      workspaceName: workspaceName ?? this.workspaceName,
+      controller: controller ?? this.controller.copyWith(),
       startedAt: startedAt ?? this.startedAt,
       persistence: persistence ?? this.persistence,
       conversationId: conversationId ?? this.conversationId,

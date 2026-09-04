@@ -59,6 +59,26 @@ void main() {
     expect(io.output.join(), contains('gemini · gemini-pro'));
   });
 
+  test('removes terminal controls from identity header labels', () async {
+    final io = _FakeIo(lines: const []);
+    final result = await TerminalChat(
+      client: _FakeClient(
+        customStatus: _status(
+          projectName: 'project\u009b2J',
+          workspaceName: 'workspace\u001b[2J',
+          controllerName: 'controller\u0085name',
+        ),
+      ),
+      io: io,
+    ).run();
+
+    expect(result, 0);
+    expect(io.output.join(), contains('project2J/workspace — controllername'));
+    expect(io.output.join(), isNot(contains('\u009b')));
+    expect(io.output.join(), isNot(contains('\u001b')));
+    expect(io.output.join(), isNot(contains('\u0085')));
+  });
+
   test(
     'reports client errors through the deterministic error stream',
     () async {
@@ -128,7 +148,9 @@ void main() {
       ).run(approveRunId: 'run-42', approvalId: 'approval-7');
 
       expect(result, accepted ? 0 : 1);
-      expect(jsonDecode(io.output.single), {
+      expect(io.output, hasLength(2));
+      expect(jsonDecode(io.output.first)['type'], 'host_status');
+      expect(jsonDecode(io.output.last), {
         'schema_version': 1,
         'type': 'approval_result',
         'conversation_id': 'conversation-1',
@@ -138,6 +160,28 @@ void main() {
         'status': accepted ? 'approved' : 'not_pending',
       });
     }
+  });
+
+  test('emits identity before a JSONL cancellation result', () async {
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: _FakeClient(),
+      io: io,
+      outputMode: TerminalOutputMode.jsonl,
+    ).run(cancelRunId: 'run-42');
+
+    expect(result, 0);
+    expect(io.output, hasLength(2));
+    expect(jsonDecode(io.output.first)['type'], 'host_status');
+    expect(jsonDecode(io.output.last), {
+      'schema_version': 1,
+      'type': 'cancellation_result',
+      'conversation_id': 'conversation-1',
+      'run_id': 'run-42',
+      'accepted': true,
+      'status': 'cancellation_requested',
+    });
   });
 
   test('emits only stable JSONL events in automation mode', () async {
@@ -156,8 +200,27 @@ void main() {
         .toList();
     expect(records, isNotEmpty);
     expect(records.every((record) => record['schema_version'] == 1), isTrue);
-    expect(records.every((record) => record['type'] == 'chat_event'), isTrue);
+    expect(records.first['type'], 'host_status');
+    expect(records.first['controller_id'], 'controller_0123456789abcdef');
+    expect(
+      records.skip(1).every((record) => record['type'] == 'chat_event'),
+      isTrue,
+    );
     expect(io.output.join(), isNot(contains('Dextero is working')));
+  });
+
+  test('emits only the identity status JSONL record at end of input', () async {
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: _FakeClient(),
+      io: io,
+      outputMode: TerminalOutputMode.jsonl,
+    ).run();
+
+    expect(result, 0);
+    expect(io.output, hasLength(1));
+    expect(jsonDecode(io.output.single)['type'], 'host_status');
   });
 }
 
@@ -167,12 +230,14 @@ final class _FakeClient implements TerminalChatClient {
     this.endBeforeTerminal = false,
     this.statusError,
     this.approvalAccepted = true,
+    this.customStatus,
   });
 
   final bool fail;
   final bool endBeforeTerminal;
   final Object? statusError;
   final bool approvalAccepted;
+  final HostStatus? customStatus;
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
   bool closed = false;
@@ -207,7 +272,7 @@ final class _FakeClient implements TerminalChatClient {
   @override
   Future<HostStatus> status() async {
     if (statusError != null) throw statusError!;
-    return _status();
+    return customStatus ?? _status();
   }
 
   @override
@@ -325,9 +390,23 @@ final class _FakeIo implements TerminalIo {
   void writeln(String value) => output.add('$value\n');
 }
 
-HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
+HostStatus _status({
+  String modelName = 'gemini-2.5-flash',
+  String projectName = 'Dextero',
+  String workspaceName = 'main',
+  String controllerName = 'Test CLI',
+}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
+  deviceId: 'device_0123456789abcdef',
+  projectId: 'project_0123456789abcdef',
+  projectName: projectName,
+  workspaceId: 'workspace_0123456789abcdef',
+  workspaceName: workspaceName,
+  controller: ControllerIdentity(
+    id: 'controller_0123456789abcdef',
+    name: controllerName,
+  ),
   startedAt: DateTime.utc(2026),
   persistence: 'memory',
   conversationId: 'conversation-1',

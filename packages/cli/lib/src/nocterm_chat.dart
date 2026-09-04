@@ -296,7 +296,10 @@ final class _DexteroTuiState extends State<DexteroTui> {
                   ),
                   if (status != null)
                     Text(
-                      _renderer.safeText(status.retentionNotice),
+                      _renderer.safeText(
+                        '${status.projectName}/${status.workspaceName} · '
+                        '${status.controller.name} · ${status.retentionNotice}',
+                      ),
                       style: TextStyle(color: _muted),
                     ),
                 ],

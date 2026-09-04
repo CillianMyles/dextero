@@ -29,8 +29,23 @@ void main() {
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
     expect(find.text('Gemini · gemini-2.5-flash'), findsOneWidget);
     expect(find.byType(ShadEmpty), findsOneWidget);
-    expect(find.byType(ShadBadge), findsNWidgets(2));
+    expect(find.byType(ShadBadge), findsNWidgets(3));
+    expect(find.byKey(const Key('identity-status')), findsOneWidget);
     expect(find.byType(ShadInput), findsOneWidget);
+
+    final identityTooltip = tester.widget<ShadTooltip>(
+      find.ancestor(
+        of: find.byKey(const Key('identity-status')),
+        matching: find.byType(ShadTooltip),
+      ),
+    );
+    final identityText =
+        identityTooltip.builder(
+              tester.element(find.byKey(const Key('identity-status'))),
+            )
+            as Text;
+    expect(identityText.data, contains('controller_0123456789abcdef'));
+    expect(identityText.data, contains('workspace_0123456789abcdef'));
   });
 
   testWidgets('selects a model before the first message', (tester) async {
@@ -771,6 +786,15 @@ final class _FakeChatApi implements ChatApi {
 HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
+  deviceId: 'device_0123456789abcdef',
+  projectId: 'project_0123456789abcdef',
+  projectName: 'Dextero',
+  workspaceId: 'workspace_0123456789abcdef',
+  workspaceName: 'main',
+  controller: ControllerIdentity(
+    id: 'controller_0123456789abcdef',
+    name: 'Test app',
+  ),
   startedAt: DateTime.utc(2026),
   persistence: 'memory',
   conversationId: 'conversation-1',
