@@ -69,7 +69,9 @@ final class WorkspaceBoundary {
     if (Platform.isWindows) {
       guardedEnvironment.addAll({
         'DEXTERO_GUARDED_COMMAND': executable,
-        'DEXTERO_GUARDED_ARGUMENTS': jsonEncode(arguments),
+        'DEXTERO_GUARDED_ARGUMENTS': base64Encode(
+          utf8.encode(_windowsArgumentLine(arguments)),
+        ),
       });
       return Process.start(
         'powershell.exe',
@@ -126,7 +128,6 @@ exec "$@"
 
 const _windowsGuardedProcessScript =
     windowsFileIdentityBootstrap +
-    _windowsProcessLauncherBootstrap +
     r'''
 $actual = 'windows:' + [DexteroFileIdentity]::Read((Get-Location).Path)
 if (-not [String]::Equals(
@@ -138,99 +139,52 @@ if (-not [String]::Equals(
   exit 126
 }
 $command = (Get-Command -CommandType Application -Name $env:DEXTERO_GUARDED_COMMAND -ErrorAction Stop).Source
-$commandArguments = @(
-    ConvertFrom-Json -InputObject $env:DEXTERO_GUARDED_ARGUMENTS)
+$commandArguments = [Text.Encoding]::UTF8.GetString(
+    [Convert]::FromBase64String($env:DEXTERO_GUARDED_ARGUMENTS))
 Remove-Item Env:DEXTERO_EXPECTED_WORKSPACE_IDENTITY
 Remove-Item Env:DEXTERO_GUARDED_COMMAND
 Remove-Item Env:DEXTERO_GUARDED_ARGUMENTS
-$exitCode = [DexteroProcessLauncher]::Run(
-    $command,
-    [string[]] $commandArguments,
-    (Get-Location).Path)
+$startInfo = New-Object System.Diagnostics.ProcessStartInfo
+$startInfo.FileName = $command
+$startInfo.Arguments = $commandArguments
+$startInfo.WorkingDirectory = (Get-Location).Path
+$startInfo.UseShellExecute = $false
+$process = [Diagnostics.Process]::Start($startInfo)
+$process.WaitForExit()
+$exitCode = $process.ExitCode
+$process.Dispose()
 exit $exitCode
 ''';
 
-const _windowsProcessLauncherBootstrap = r'''
-$launcherSource = @'
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
+String _windowsArgumentLine(List<String> arguments) =>
+    arguments.map(_quoteWindowsArgument).join(' ');
 
-public static class DexteroProcessLauncher
-{
-    public static int Run(
-        string executable,
-        string[] arguments,
-        string workingDirectory)
-    {
-        ProcessStartInfo startInfo = new ProcessStartInfo();
-        startInfo.FileName = executable;
-        startInfo.Arguments = JoinArguments(arguments);
-        startInfo.WorkingDirectory = workingDirectory;
-        startInfo.UseShellExecute = false;
+String _quoteWindowsArgument(String argument) {
+  if (argument.isNotEmpty && !RegExp(r'[\s"]').hasMatch(argument)) {
+    return argument;
+  }
 
-        using (Process process = Process.Start(startInfo))
-        {
-            process.WaitForExit();
-            return process.ExitCode;
-        }
+  final result = StringBuffer('"');
+  var slashes = 0;
+  for (final unit in argument.codeUnits) {
+    if (unit == 0x5c) {
+      slashes++;
+      continue;
     }
-
-    private static string JoinArguments(string[] arguments)
-    {
-        List<string> quoted = new List<string>();
-        foreach (string argument in arguments)
-        {
-            quoted.Add(QuoteArgument(argument));
-        }
-        return String.Join(" ", quoted.ToArray());
+    if (unit == 0x22) {
+      result
+        ..write(r'\' * (slashes * 2 + 1))
+        ..write('"');
+      slashes = 0;
+      continue;
     }
-
-    // Match the Windows CommandLineToArgvW/CRT escaping convention used by
-    // direct process launchers, including empty values and trailing slashes.
-    private static string QuoteArgument(string argument)
-    {
-        bool needsQuotes = argument.Length == 0;
-        foreach (char character in argument)
-        {
-            if (Char.IsWhiteSpace(character) || character == '"')
-            {
-                needsQuotes = true;
-                break;
-            }
-        }
-        if (!needsQuotes)
-        {
-            return argument;
-        }
-
-        StringBuilder result = new StringBuilder();
-        result.Append('"');
-        int slashes = 0;
-        foreach (char character in argument)
-        {
-            if (character == '\\')
-            {
-                slashes++;
-                continue;
-            }
-            if (character == '"')
-            {
-                result.Append('\\', slashes * 2 + 1);
-                result.Append('"');
-                slashes = 0;
-                continue;
-            }
-            result.Append('\\', slashes);
-            result.Append(character);
-            slashes = 0;
-        }
-        result.Append('\\', slashes * 2);
-        result.Append('"');
-        return result.ToString();
-    }
+    result
+      ..write(r'\' * slashes)
+      ..writeCharCode(unit);
+    slashes = 0;
+  }
+  result
+    ..write(r'\' * (slashes * 2))
+    ..write('"');
+  return result.toString();
 }
-'@
-Add-Type -TypeDefinition $launcherSource | Out-Null
-''';
