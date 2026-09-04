@@ -94,6 +94,37 @@ void main() {
     );
   });
 
+  test('rejects a forged Git common directory', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-forged-commondir-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final victim = await Directory('${sandbox.path}/victim').create();
+    final victimGit = await Directory('${victim.path}/.git').create();
+    final forged = await Directory('${sandbox.path}/forged').create();
+    final forgedGit = await Directory('${sandbox.path}/admin').create();
+    await File(
+      '${forged.path}/.git',
+    ).writeAsString('gitdir: ${forgedGit.path}\n');
+    await File(
+      '${forgedGit.path}/gitdir',
+    ).writeAsString('${forged.path}/.git\n');
+    await File(
+      '${forgedGit.path}/commondir',
+    ).writeAsString('${victimGit.path}\n');
+
+    await expectLater(
+      LocalIdentityRegistry(
+        stateFile: File('${sandbox.path}/state/identities.json'),
+      ).resolve(forged.path),
+      throwsA(isA<FormatException>()),
+    );
+    expect(
+      File('${victimGit.path}/dextero-project-identity-v1').existsSync(),
+      isFalse,
+    );
+  });
+
   test('rejects a symbolic .git directory', () async {
     if (Platform.isWindows) return;
     final sandbox = await Directory.systemTemp.createTemp(

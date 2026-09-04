@@ -334,20 +334,22 @@ Future<_ProjectLocation> _findProject(Directory workspace) async {
       final gitDirectory = Directory(
         _resolvePath(current.path, firstLine.substring('gitdir: '.length)),
       );
+      final commonDirectoryFile = File(_join(gitDirectory.path, 'commondir'));
+      final Directory commonDirectory;
+      if (await commonDirectoryFile.exists()) {
+        commonDirectory = await _readCommonGitDirectory(
+          commonDirectoryFile,
+          gitDirectory,
+        );
+      } else {
+        commonDirectory = gitDirectory;
+      }
       await _validateGitDirectoryOwnership(
         workspaceRoot: current,
         dotGitFile: dotGitFile,
         gitDirectory: gitDirectory,
+        commonDirectory: commonDirectory,
       );
-      final commonDirectoryFile = File(_join(gitDirectory.path, 'commondir'));
-      final commonDirectory = await commonDirectoryFile.exists()
-          ? Directory(
-              _resolvePath(
-                gitDirectory.path,
-                (await commonDirectoryFile.readAsString()).trim(),
-              ),
-            )
-          : gitDirectory;
       return _ProjectLocation(
         root: current,
         repositoryDirectory: commonDirectory,
@@ -361,14 +363,36 @@ Future<_ProjectLocation> _findProject(Directory workspace) async {
   return _ProjectLocation(root: workspace);
 }
 
+Future<Directory> _readCommonGitDirectory(
+  File commonDirectoryFile,
+  Directory gitDirectory,
+) async {
+  final value = (await commonDirectoryFile.readAsString()).trim();
+  if (value.isEmpty) {
+    throw FormatException(
+      'Malformed Git common-directory file: ${commonDirectoryFile.path}',
+    );
+  }
+  return Directory(_resolvePath(gitDirectory.path, value));
+}
+
 Future<void> _validateGitDirectoryOwnership({
   required Directory workspaceRoot,
   required File dotGitFile,
   required Directory gitDirectory,
+  required Directory commonDirectory,
 }) async {
   if (!await gitDirectory.exists()) {
     throw FormatException('Git directory does not exist: ${gitDirectory.path}');
   }
+  if (!await commonDirectory.exists()) {
+    throw FormatException(
+      'Git common directory does not exist: ${commonDirectory.path}',
+    );
+  }
+
+  final gitPath = await gitDirectory.resolveSymbolicLinks();
+  final commonPath = await commonDirectory.resolveSymbolicLinks();
 
   final backPointerFile = File(_join(gitDirectory.path, 'gitdir'));
   if (await backPointerFile.exists()) {
@@ -387,7 +411,23 @@ Future<void> _validateGitDirectoryOwnership({
         '${workspaceRoot.path}',
       );
     }
+    final adminDirectory = Directory(gitPath);
+    if (commonPath !=
+            await adminDirectory.parent.parent.resolveSymbolicLinks() ||
+        _basename(adminDirectory.parent.path) != 'worktrees') {
+      throw FormatException(
+        'Git common directory ${commonDirectory.path} does not own '
+        '${gitDirectory.path}',
+      );
+    }
     return;
+  }
+
+  if (commonPath != gitPath) {
+    throw FormatException(
+      'Git common directory ${commonDirectory.path} is not valid for '
+      '${workspaceRoot.path}',
+    );
   }
 
   // A standard --separate-git-dir repository has neither a linked-worktree
@@ -401,20 +441,24 @@ Future<void> _validateGitDirectoryOwnership({
     'rev-parse',
     '--show-toplevel',
     '--absolute-git-dir',
+    '--git-common-dir',
   ]);
   if (result.exitCode == 0) {
     final discovered = const LineSplitter().convert(
       (result.stdout as String).trim(),
     );
-    if (discovered.length == 2) {
+    if (discovered.length == 3) {
       final expected = await workspaceRoot.resolveSymbolicLinks();
       final actualRoot = await Directory(discovered[0]).resolveSymbolicLinks();
-      final expectedGitDirectory = await gitDirectory.resolveSymbolicLinks();
       final actualGitDirectory = await Directory(
         discovered[1],
       ).resolveSymbolicLinks();
+      final actualCommonDirectory = await Directory(
+        _resolvePath(workspaceRoot.path, discovered[2]),
+      ).resolveSymbolicLinks();
       if (actualRoot == expected &&
-          actualGitDirectory == expectedGitDirectory) {
+          actualGitDirectory == gitPath &&
+          actualCommonDirectory == commonPath) {
         return;
       }
     }

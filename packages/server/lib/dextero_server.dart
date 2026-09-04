@@ -5,6 +5,7 @@ import 'package:serverpod/serverpod.dart';
 
 import 'src/auth/dextero_token_authenticator.dart';
 import 'src/control/chat_runtime.dart';
+import 'src/control/canonical_workspace.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 
@@ -26,9 +27,9 @@ Future<void> run(List<String> arguments) async {
     );
   }
 
-  final workspace = Directory(
+  final workspace = await canonicalWorkspacePath(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
-  ).absolute.path;
+  );
   final hostIdentity = await LocalIdentityRegistry.fromEnvironment(
     Platform.environment,
   ).resolve(workspace);
