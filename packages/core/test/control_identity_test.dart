@@ -62,6 +62,42 @@ void main() {
     expect(feature.workspaceId, isNot(primary.workspaceId));
   });
 
+  for (final metacharacter in Platform.isWindows ? ['#'] : ['#', '?']) {
+    test(
+      'treats $metacharacter in a relative gitdir as a literal path',
+      () async {
+        final sandbox = await Directory.systemTemp.createTemp(
+          'dextero-relative-gitdir-',
+        );
+        addTearDown(() => sandbox.delete(recursive: true));
+        final project = await Directory('${sandbox.path}/project').create();
+        final commonGit = await Directory('${project.path}/.git').create();
+        final worktree = await Directory('${sandbox.path}/feature').create();
+        final checkoutName = 'sub${metacharacter}x';
+        final worktreeGit = await Directory(
+          '${commonGit.path}/worktrees/$checkoutName',
+        ).create(recursive: true);
+        await File(
+          '${worktree.path}/.git',
+        ).writeAsString('gitdir: ../project/.git/worktrees/$checkoutName\n');
+        await File('${worktreeGit.path}/commondir').writeAsString('../..\n');
+        await File(
+          '${worktreeGit.path}/gitdir',
+        ).writeAsString('${worktree.path}/.git\n');
+        final registry = LocalIdentityRegistry(
+          stateFile: File('${sandbox.path}/state/identities.json'),
+          identifiers: _SequenceIdentifiers(),
+        );
+
+        final feature = await registry.resolve(worktree.path);
+        final primary = await registry.resolve(project.path);
+
+        expect(feature.projectId, primary.projectId);
+        expect(feature.workspaceId, isNot(primary.workspaceId));
+      },
+    );
+  }
+
   test('rejects a gitdir owned by another checkout', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-forged-gitdir-',

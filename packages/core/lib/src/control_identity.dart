@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path/path.dart' as paths;
+
 import 'chat_history.dart';
 import 'filesystem_identity.dart';
 import 'process_environment.dart';
@@ -621,7 +623,6 @@ String _join(String parent, String child) =>
     '$parent${Platform.pathSeparator}$child';
 
 String _resolvePath(String parent, String child) {
-  final candidate = Directory(child);
-  if (candidate.isAbsolute) return candidate.path;
-  return Directory(parent).uri.resolve(child).toFilePath();
+  if (paths.isAbsolute(child)) return paths.normalize(child);
+  return paths.normalize(paths.join(parent, child));
 }
