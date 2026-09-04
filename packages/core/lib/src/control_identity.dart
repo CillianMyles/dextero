@@ -104,9 +104,9 @@ final class LocalIdentityRegistry {
         return HostIdentity(
           deviceId: deviceId,
           projectId: projectId,
-          projectName: _basename(project.root.path),
+          projectName: _filesystemDisplayName(project.root.path),
           workspaceId: workspaceId,
-          workspaceName: _basename(workspacePath),
+          workspaceName: _filesystemDisplayName(workspacePath),
         );
       } finally {
         if (locked) await lock.unlock();
@@ -156,13 +156,7 @@ final class LocalIdentityRegistry {
   Future<String> _projectKey(_ProjectLocation project) async {
     final repositoryDirectory = project.repositoryDirectory;
     if (repositoryDirectory == null) {
-      final rootPath = await project.root.resolveSymbolicLinks();
-      final marker = await _identityMarker(
-        directory: Directory(_join(rootPath, '.dextero')),
-        filename: 'workspace-identity-v1',
-        prefix: 'directory',
-      );
-      return '$rootPath::$marker';
+      return 'directory::${await _filesystemIncarnation(project.root)}';
     }
 
     final repositoryPath = await repositoryDirectory.resolveSymbolicLinks();
@@ -171,7 +165,7 @@ final class LocalIdentityRegistry {
       filename: 'dextero-project-identity-v1',
       prefix: 'repository',
     );
-    return '$repositoryPath::$marker';
+    return 'git::$marker';
   }
 
   Future<String> _workspaceKey(
@@ -180,7 +174,7 @@ final class LocalIdentityRegistry {
     String workspacePath,
   ) async {
     final checkoutDirectory = project.checkoutDirectory;
-    if (checkoutDirectory == null) return '$projectKey::$workspacePath';
+    if (checkoutDirectory == null) return projectKey;
 
     final checkoutPath = await checkoutDirectory.resolveSymbolicLinks();
     final marker = await _identityMarker(
@@ -188,7 +182,8 @@ final class LocalIdentityRegistry {
       filename: 'dextero-checkout-identity-v1',
       prefix: 'checkout',
     );
-    return '$projectKey::$workspacePath::$marker';
+    final relativePath = _relativePath(project.root.path, workspacePath);
+    return '$projectKey::$marker::$relativePath';
   }
 
   Future<String> _identityMarker({
@@ -392,6 +387,78 @@ String _validateName(String value, String argumentName) {
 String _basename(String path) {
   final segments = Uri.file(path).pathSegments.where((part) => part.isNotEmpty);
   return segments.isEmpty ? path : segments.last;
+}
+
+String _filesystemDisplayName(String path) {
+  final raw = _basename(path);
+  final sanitized = String.fromCharCodes(
+    raw.runes.map((rune) => rune < 32 || rune == 127 ? 0xFFFD : rune),
+  ).trim();
+  if (sanitized.isEmpty) return 'Unnamed workspace';
+  if (sanitized.length <= 120) return sanitized;
+
+  final buffer = StringBuffer();
+  var codeUnits = 0;
+  for (final rune in sanitized.runes) {
+    final width = rune > 0xFFFF ? 2 : 1;
+    if (codeUnits + width > 119) break;
+    buffer.writeCharCode(rune);
+    codeUnits += width;
+  }
+  return '${buffer.toString()}…';
+}
+
+String _relativePath(String root, String path) {
+  if (path == root) return '.';
+  final prefix = root.endsWith(Platform.pathSeparator)
+      ? root
+      : '$root${Platform.pathSeparator}';
+  if (!path.startsWith(prefix)) {
+    throw StateError('Workspace $path is not inside project root $root');
+  }
+  return path.substring(prefix.length);
+}
+
+Future<String> _filesystemIncarnation(Directory directory) async {
+  late final String executable;
+  late final List<String> arguments;
+  if (Platform.isMacOS) {
+    executable = '/usr/bin/stat';
+    arguments = ['-f', '%d:%i:%B', directory.path];
+  } else if (Platform.isLinux) {
+    executable = '/usr/bin/stat';
+    arguments = ['-c', '%d:%i:%W', directory.path];
+  } else if (Platform.isWindows) {
+    executable = 'powershell.exe';
+    arguments = [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      r'$item = Get-Item -LiteralPath $env:DEXTERO_IDENTITY_PATH -Force; '
+          r'"$($item.PSDrive.Name):$($item.CreationTimeUtc.Ticks)"',
+    ];
+  } else {
+    throw UnsupportedError(
+      'Stable non-Git workspace identity is unsupported on '
+      '${Platform.operatingSystem}.',
+    );
+  }
+
+  final result = await Process.run(
+    executable,
+    arguments,
+    environment: Platform.isWindows
+        ? {'DEXTERO_IDENTITY_PATH': directory.path}
+        : null,
+  );
+  final value = (result.stdout as String).trim();
+  if (result.exitCode != 0 || value.isEmpty) {
+    throw FileSystemException(
+      'Cannot resolve stable filesystem identity: ${result.stderr}',
+      directory.path,
+    );
+  }
+  return '${Platform.operatingSystem}:$value';
 }
 
 String _join(String parent, String child) =>

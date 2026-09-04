@@ -101,8 +101,83 @@ void main() {
 
       expect(replacement.projectId, isNot(first.projectId));
       expect(replacement.workspaceId, isNot(first.workspaceId));
+      expect(Directory('${workspace.path}/.dextero').existsSync(), isFalse);
     },
   );
+
+  test('preserves identities when a Git repository is moved', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-moved-repository-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final original = await Directory('${sandbox.path}/original').create();
+    await Directory('${original.path}/.git').create();
+    final workspace = await Directory('${original.path}/workspace').create();
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+
+    final first = await registry.resolve(workspace.path);
+    final moved = await original.rename('${sandbox.path}/moved');
+    final relocated = await registry.resolve('${moved.path}/workspace');
+
+    expect(relocated.projectId, first.projectId);
+    expect(relocated.workspaceId, first.workspaceId);
+    expect(relocated.projectName, 'moved');
+    expect(relocated.workspaceName, 'workspace');
+  });
+
+  test('preserves identities when a non-Git directory is moved', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-moved-directory-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final original = await Directory('${sandbox.path}/original').create();
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+
+    final first = await registry.resolve(original.path);
+    final moved = await original.rename('${sandbox.path}/moved');
+    final relocated = await registry.resolve(moved.path);
+
+    expect(relocated.projectId, first.projectId);
+    expect(relocated.workspaceId, first.workspaceId);
+  });
+
+  test('sanitizes filesystem-derived identity display names', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-display-name-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final suffix = Platform.isWindows ? '' : '\t';
+    final longName = '${List.filled(130, 'x').join()}$suffix';
+    final workspace = await Directory('${sandbox.path}/$longName').create();
+
+    final identity = await LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    ).resolve(workspace.path);
+
+    expect(identity.projectName.length, lessThanOrEqualTo(120));
+    expect(identity.workspaceName.length, lessThanOrEqualTo(120));
+    expect(
+      identity.workspaceName.codeUnits.any((unit) => unit < 32 || unit == 127),
+      isFalse,
+    );
+
+    if (!Platform.isWindows) {
+      final blank = await Directory('${sandbox.path}/   ').create();
+      final blankIdentity = await LocalIdentityRegistry(
+        stateFile: File('${sandbox.path}/state/identities.json'),
+        identifiers: _SequenceIdentifiers(),
+      ).resolve(blank.path);
+      expect(blankIdentity.projectName, 'Unnamed workspace');
+      expect(blankIdentity.workspaceName, 'Unnamed workspace');
+    }
+  });
 
   test('does not reuse a linked worktree identity at the same path', () async {
     final sandbox = await Directory.systemTemp.createTemp(
