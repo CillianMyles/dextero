@@ -81,6 +81,41 @@ void main() {
     expect(replacement.workspaceId, isNot(first.workspaceId));
   });
 
+  test('does not reuse a linked worktree identity at the same path', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-replaced-worktree-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final project = await Directory('${sandbox.path}/project').create();
+    final commonGit = await Directory('${project.path}/.git').create();
+    final worktree = await Directory('${sandbox.path}/feature').create();
+    final worktreeGit = Directory('${commonGit.path}/worktrees/feature');
+
+    Future<void> createWorktreeMetadata() async {
+      await worktree.create();
+      await worktreeGit.create(recursive: true);
+      await File(
+        '${worktree.path}/.git',
+      ).writeAsString('gitdir: ${worktreeGit.path}\n');
+      await File('${worktreeGit.path}/commondir').writeAsString('../..\n');
+    }
+
+    await createWorktreeMetadata();
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+    final first = await registry.resolve(worktree.path);
+
+    await worktree.delete(recursive: true);
+    await worktreeGit.delete(recursive: true);
+    await createWorktreeMetadata();
+    final replacement = await registry.resolve(worktree.path);
+
+    expect(replacement.projectId, first.projectId);
+    expect(replacement.workspaceId, isNot(first.workspaceId));
+  });
+
   test('merges identities resolved concurrently by separate hosts', () async {
     final sandbox = await Directory.systemTemp.createTemp('dextero-hosts-');
     addTearDown(() => sandbox.delete(recursive: true));

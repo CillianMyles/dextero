@@ -1,4 +1,5 @@
 import 'package:dextero_app/src/controller_identity_store.dart';
+import 'package:dextero_app/src/controller_identity_synchronizer_factory.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -30,5 +31,40 @@ void main() {
 
     expect(identity.id, 'controller_0123456789abcdef');
     expect(identity.name, 'Living room iPad');
+  });
+
+  test('serializes concurrent first-run identity creation', () async {
+    String? stored;
+    final first = AppControllerIdentityStore(
+      readId: () async => stored,
+      writeId: (value) async => stored = value,
+    );
+    final second = AppControllerIdentityStore(
+      readId: () async => stored,
+      writeId: (value) async => stored = value,
+    );
+
+    final identities = await Future.wait([
+      first.load(const {}),
+      second.load(const {}),
+    ]);
+
+    expect(identities[1].id, identities[0].id);
+  });
+
+  test('serializes platform identity creation between clients', () async {
+    String? stored;
+    AppControllerIdentityStore store() => AppControllerIdentityStore(
+      readId: () async => stored,
+      writeId: (value) async => stored = value,
+      synchronizer: createControllerIdentitySynchronizer(),
+    );
+
+    final identities = await Future.wait([
+      store().load(const {}),
+      store().load(const {}),
+    ]);
+
+    expect(identities[1].id, identities[0].id);
   });
 }

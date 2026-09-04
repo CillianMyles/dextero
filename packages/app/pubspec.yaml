@@ -4,7 +4,7 @@ publish_to: none
 version: 0.0.1+1
 
 environment:
-  sdk: ">=3.10.0 <4.0.0"
+  sdk: ">=3.11.0 <4.0.0"
   flutter: 3.47.2
 
 resolution: workspace
@@ -16,6 +16,7 @@ dependencies:
     sdk: flutter
   shad: ^0.99.4
   shared_preferences: ^2.5.5
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_lints: ^6.0.0

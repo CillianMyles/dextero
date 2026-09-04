@@ -37,7 +37,7 @@ names or filesystem paths as security keys.
 
 Requirements:
 
-- Dart 3.10+
+- Dart 3.11+
 - Flutter with the intended target platform enabled
 - Chrome for web, Android Studio for Android, or Xcode for iOS and macOS
 - GTK 3 development libraries for Linux or Visual Studio with Desktop C++ for

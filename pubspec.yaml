@@ -4,7 +4,7 @@ version: 0.0.1
 publish_to: none
 
 environment:
-  sdk: ">=3.10.0 <4.0.0"
+  sdk: ">=3.11.0 <4.0.0"
 
 workspace:
   - packages/core
@@ -15,3 +15,7 @@ workspace:
 dev_dependencies:
   lints: ^6.0.0
   test: ^1.31.0
+
+dependency_overrides:
+  # Newer releases require Dart 3.12; Dextero still supports Dart 3.11.
+  shared_preferences_android: 2.4.23
