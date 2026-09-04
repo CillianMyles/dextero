@@ -85,6 +85,27 @@ void main() {
     );
   });
 
+  test('executes through a filesystem-bound workspace', () async {
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    final guarded = RunCommandTool(
+      workingDirectory: boundary.root,
+      workspaceBoundary: boundary,
+    );
+    final script = await _script(root, 'stdout.write(Directory.current.path);');
+
+    final result =
+        await guarded.call({
+              'command': Platform.resolvedExecutable,
+              'arguments': [script.path],
+            })
+            as JsonMap;
+
+    expect(
+      FileSystemEntity.identicalSync(result['stdout']! as String, root.path),
+      isTrue,
+    );
+  });
+
   test('captures non-zero exits without merging stderr into stdout', () async {
     final script = await _script(
       root,

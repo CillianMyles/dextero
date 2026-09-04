@@ -168,6 +168,39 @@ void main() {
     expect(identity.workspaceId, startsWith('workspace_'));
   });
 
+  test('ignores inherited Git directory overrides', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-git-overrides-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = Directory('${sandbox.path}/workspace');
+    final gitDirectory = Directory('${sandbox.path}/metadata');
+    final initialized = await Process.run('git', [
+      'init',
+      '--quiet',
+      '--separate-git-dir',
+      gitDirectory.path,
+      workspace.path,
+    ]);
+    expect(initialized.exitCode, 0, reason: initialized.stderr as String);
+    final unrelated = await Directory('${sandbox.path}/unrelated').create();
+    final helper = File(
+      '${Directory.current.path}/test/fixtures/resolve_host_identity.dart',
+    );
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [helper.path, '${sandbox.path}/state/identities.json', workspace.path],
+      workingDirectory: Directory.current.path,
+      environment: {
+        'GIT_DIR': '${unrelated.path}/.git',
+        'GIT_WORK_TREE': unrelated.path,
+      },
+    );
+
+    expect(result.exitCode, 0, reason: result.stderr as String);
+  });
+
   test('rejects reuse of a standard separate Git directory', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-reused-separate-gitdir-',

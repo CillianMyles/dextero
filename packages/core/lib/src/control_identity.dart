@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'chat_history.dart';
 import 'filesystem_identity.dart';
+import 'process_environment.dart';
 
 /// Stable identity of the local host, project, and selected workspace.
 final class HostIdentity {
@@ -440,14 +441,19 @@ Future<void> _validateGitDirectoryOwnership({
   // the .git file declares. The host registry separately binds the resulting
   // checkout identity to this workspace's filesystem incarnation, preventing
   // another directory from reusing the same metadata.
-  final result = await Process.run('git', [
-    '-C',
-    workspaceRoot.path,
-    'rev-parse',
-    '--show-toplevel',
-    '--absolute-git-dir',
-    '--git-common-dir',
-  ]);
+  final result = await Process.run(
+    'git',
+    [
+      '-C',
+      workspaceRoot.path,
+      'rev-parse',
+      '--show-toplevel',
+      '--absolute-git-dir',
+      '--git-common-dir',
+    ],
+    includeParentEnvironment: false,
+    environment: filteredProcessEnvironment(),
+  );
   if (result.exitCode == 0) {
     final discovered = const LineSplitter().convert(
       (result.stdout as String).trim(),

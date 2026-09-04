@@ -189,10 +189,13 @@ final class TerminalChat {
     if (!_plainHeaderRendered) {
       _plainHeaderRendered = true;
       _io.writeln(
-        '${_status.name} ${_status.version} — '
-        '${_status.modelProvider} · ${_status.modelName}'
-        ' — ${_status.projectName}/${_status.workspaceName}'
-        ' — ${_status.controller.name}'
+        '${_renderer.safeText(_status.name)} '
+        '${_renderer.safeText(_status.version)} — '
+        '${_renderer.safeText(_status.modelProvider)} · '
+        '${_renderer.safeText(_status.modelName)}'
+        ' — ${_renderer.safeText(_status.projectName)}/'
+        '${_renderer.safeText(_status.workspaceName)}'
+        ' — ${_renderer.safeText(_status.controller.name)}'
         '${_entries.isEmpty ? ' — no messages yet' : ''}',
       );
     }

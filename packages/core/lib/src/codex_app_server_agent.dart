@@ -37,15 +37,21 @@ final class ProcessCodexAppServerTransport implements CodexAppServerTransport {
   static Future<ProcessCodexAppServerTransport> start({
     String executable = 'codex',
     String? workingDirectory,
+    WorkspaceBoundary? workspaceBoundary,
   }) async {
-    final process = await Process.start(
-      executable,
-      ['app-server'],
-      workingDirectory: workingDirectory,
-      runInShell: false,
-      includeParentEnvironment: false,
-      environment: codexProcessEnvironment(),
-    );
+    final environment = codexProcessEnvironment();
+    final process = workspaceBoundary == null
+        ? await Process.start(
+            executable,
+            ['app-server'],
+            workingDirectory: workingDirectory,
+            runInShell: false,
+            includeParentEnvironment: false,
+            environment: environment,
+          )
+        : await workspaceBoundary.startProcess(executable, const [
+            'app-server',
+          ], environment: environment);
     return ProcessCodexAppServerTransport._(process);
   }
 
@@ -146,6 +152,7 @@ final class CodexAppServerAgent {
            (() => ProcessCodexAppServerTransport.start(
              executable: codexExecutable,
              workingDirectory: workingDirectory,
+             workspaceBoundary: workspaceBoundary,
            ));
 
   final String? model;

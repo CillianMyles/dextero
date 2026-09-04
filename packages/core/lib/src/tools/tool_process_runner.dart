@@ -44,15 +44,22 @@ final class ToolProcessRunner {
     ToolOutputSink? onOutput,
   }) async {
     cancellationToken?.throwIfCancellationRequested();
-    await workspaceBoundary?.validate();
-    final process = await Process.start(
-      command,
-      arguments,
-      workingDirectory: workingDirectory,
-      runInShell: false,
-      includeParentEnvironment: false,
-      environment: filteredProcessEnvironment(),
-    );
+    final environment = filteredProcessEnvironment();
+    final boundary = workspaceBoundary;
+    final process = boundary == null
+        ? await Process.start(
+            command,
+            arguments,
+            workingDirectory: workingDirectory,
+            runInShell: false,
+            includeParentEnvironment: false,
+            environment: environment,
+          )
+        : await boundary.startProcess(
+            command,
+            arguments,
+            environment: environment,
+          );
     final stdoutFuture = _capture(process.stdout, 'stdout', onOutput);
     final stderrFuture = _capture(process.stderr, 'stderr', onOutput);
     final termination = Completer<_TerminationReason>();

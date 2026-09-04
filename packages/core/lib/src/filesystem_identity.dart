@@ -17,7 +17,7 @@ Future<String> resolveFilesystemIdentity(Directory directory) async {
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      _windowsFileIdentityScript,
+      windowsFileIdentityScript,
     ];
   } else {
     throw UnsupportedError(
@@ -52,7 +52,7 @@ Future<String> resolveFilesystemIdentity(Directory directory) async {
   return '${Platform.operatingSystem}:$value';
 }
 
-const _windowsFileIdentityScript = r'''
+const windowsFileIdentityBootstrap = r'''
 $source = @'
 using System;
 using System.ComponentModel;
@@ -125,6 +125,11 @@ public static class DexteroFileIdentity
 }
 '@
 Add-Type -TypeDefinition $source | Out-Null
+''';
+
+const windowsFileIdentityScript =
+    windowsFileIdentityBootstrap +
+    r'''
 [Console]::Out.WriteLine(
     [DexteroFileIdentity]::Read($env:DEXTERO_IDENTITY_PATH))
 ''';

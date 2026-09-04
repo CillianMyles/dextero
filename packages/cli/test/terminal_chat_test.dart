@@ -59,6 +59,26 @@ void main() {
     expect(io.output.join(), contains('gemini · gemini-pro'));
   });
 
+  test('removes terminal controls from identity header labels', () async {
+    final io = _FakeIo(lines: const []);
+    final result = await TerminalChat(
+      client: _FakeClient(
+        customStatus: _status(
+          projectName: 'project\u009b2J',
+          workspaceName: 'workspace\u001b[2J',
+          controllerName: 'controller\u0085name',
+        ),
+      ),
+      io: io,
+    ).run();
+
+    expect(result, 0);
+    expect(io.output.join(), contains('project2J/workspace — controllername'));
+    expect(io.output.join(), isNot(contains('\u009b')));
+    expect(io.output.join(), isNot(contains('\u001b')));
+    expect(io.output.join(), isNot(contains('\u0085')));
+  });
+
   test(
     'reports client errors through the deterministic error stream',
     () async {
@@ -210,12 +230,14 @@ final class _FakeClient implements TerminalChatClient {
     this.endBeforeTerminal = false,
     this.statusError,
     this.approvalAccepted = true,
+    this.customStatus,
   });
 
   final bool fail;
   final bool endBeforeTerminal;
   final Object? statusError;
   final bool approvalAccepted;
+  final HostStatus? customStatus;
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
   bool closed = false;
@@ -250,7 +272,7 @@ final class _FakeClient implements TerminalChatClient {
   @override
   Future<HostStatus> status() async {
     if (statusError != null) throw statusError!;
-    return _status();
+    return customStatus ?? _status();
   }
 
   @override
@@ -368,17 +390,22 @@ final class _FakeIo implements TerminalIo {
   void writeln(String value) => output.add('$value\n');
 }
 
-HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
+HostStatus _status({
+  String modelName = 'gemini-2.5-flash',
+  String projectName = 'Dextero',
+  String workspaceName = 'main',
+  String controllerName = 'Test CLI',
+}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
   deviceId: 'device_0123456789abcdef',
   projectId: 'project_0123456789abcdef',
-  projectName: 'Dextero',
+  projectName: projectName,
   workspaceId: 'workspace_0123456789abcdef',
-  workspaceName: 'main',
+  workspaceName: workspaceName,
   controller: ControllerIdentity(
     id: 'controller_0123456789abcdef',
-    name: 'Test CLI',
+    name: controllerName,
   ),
   startedAt: DateTime.utc(2026),
   persistence: 'memory',
