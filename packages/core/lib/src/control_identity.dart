@@ -427,7 +427,8 @@ Future<String> _filesystemIncarnation(Directory directory) async {
     arguments = ['-f', '%d:%i:%B', directory.path];
   } else if (Platform.isLinux) {
     executable = '/usr/bin/stat';
-    arguments = ['-c', '%d:%i:%W', directory.path];
+    // `%w` retains sub-second birth-time precision, unlike integer `%W`.
+    arguments = ['-c', '%d:%i:%w', directory.path];
   } else if (Platform.isWindows) {
     executable = 'powershell.exe';
     arguments = [
