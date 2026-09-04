@@ -4,6 +4,7 @@ export 'src/approval.dart';
 export 'src/cancellation.dart';
 export 'src/chat_history.dart';
 export 'src/chat_service.dart';
+export 'src/control_identity.dart';
 export 'src/codex_app_server_agent.dart';
 export 'src/gemini_model.dart';
 export 'src/model.dart';

@@ -74,7 +74,7 @@ result from a local Dextero host.
 
 Turn current guardrails into enforceable product boundaries.
 
-- [ ] Establish stable controller/device and project/workspace identities
+- [x] Establish stable controller/device and project/workspace identities
   before allowing remembered grants.
 - [ ] Define capability grants scoped by principal, task, project or global
   context, resource, operation, constraints, and duration.

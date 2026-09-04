@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_core/dextero_core.dart';
+import 'package:dextero_server/dextero_client.dart' show ControllerIdentity;
 import 'package:dextero_server/dextero_server.dart';
 import 'package:test/test.dart';
 
@@ -39,6 +40,13 @@ void main() {
         token: token,
         chatService: service,
         defaultConversationId: conversation.id,
+        hostIdentity: HostIdentity(
+          deviceId: 'device_0123456789abcdef',
+          projectId: 'project_0123456789abcdef',
+          projectName: 'Dextero',
+          workspaceId: 'workspace_0123456789abcdef',
+          workspaceName: 'acceptance',
+        ),
         modelProvider: 'gemini',
         modelName: defaultGeminiModel,
         availableModels: const [defaultGeminiModel, 'gemini-selected'],
@@ -86,6 +94,12 @@ void main() {
         client: ServerpodTerminalChatClient(
           serverUrl: 'http://localhost:${pod.server.port}/',
           token: token,
+          controller: Future.value(
+            ControllerIdentity(
+              id: 'controller_0123456789abcdef',
+              name: 'Acceptance CLI',
+            ),
+          ),
         ),
         io: io,
         correlationIdFactory: () => 'acceptance-cli-1',
@@ -106,6 +120,12 @@ void main() {
       final approver = ServerpodTerminalChatClient(
         serverUrl: 'http://localhost:${pod.server.port}/',
         token: token,
+        controller: Future.value(
+          ControllerIdentity(
+            id: 'controller_fedcba9876543210',
+            name: 'Acceptance approver',
+          ),
+        ),
       );
       expect(
         await approver.approveWork(
@@ -121,6 +141,8 @@ void main() {
       expect(exitCode, 0);
       expect(selectedModel, 'gemini-selected');
       expect(io.errors, isEmpty);
+      expect(io.output.join(), contains('Dextero/acceptance'));
+      expect(io.output.join(), contains('Acceptance CLI'));
       expect(io.output.join(), contains('gemini · gemini-selected'));
       expect(io.output.join(), contains('[you] Inspect the workspace'));
       expect(

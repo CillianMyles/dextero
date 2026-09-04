@@ -4,6 +4,7 @@ import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
+import '../controller_identity.dart';
 import 'chat_runtime.dart';
 
 /// The first typed control-plane slice exposed to trusted controllers.
@@ -14,33 +15,53 @@ final class ControlEndpoint extends Endpoint {
   bool get requireLogin => true;
 
   /// Describes the local host and its intentionally volatile MVP storage.
-  Future<HostStatus> status(Session session) async => _status();
+  Future<HostStatus> status(
+    Session session,
+    ControllerIdentity controller,
+  ) async => _status(controller);
 
   /// Selects the model before this process-local conversation has started.
-  Future<HostStatus> selectModel(Session session, String modelName) async {
+  Future<HostStatus> selectModel(
+    Session session,
+    ControllerIdentity controller,
+    String modelName,
+  ) async {
+    final validatedController = _validatedController(controller);
     await ChatRuntime.selectModel(modelName);
-    return _status();
+    return _status(validatedController);
   }
 
-  HostStatus _status() => HostStatus(
-    name: 'Dextero',
-    version: '0.0.1',
-    startedAt: _startedAt,
-    persistence: 'memory',
-    conversationId: ChatRuntime.conversationId,
-    retentionNotice: 'History is retained only until the server restarts.',
-    databaseRequired: false,
-    streamingAvailable: true,
-    modelProvider: ChatRuntime.modelProvider,
-    modelName: ChatRuntime.modelName,
-    availableModels: ChatRuntime.availableModels,
-  );
+  HostStatus _status(ControllerIdentity controller) {
+    final validatedController = _validatedController(controller);
+    final identity = ChatRuntime.hostIdentity;
+    return HostStatus(
+      name: 'Dextero',
+      version: '0.0.1',
+      deviceId: identity.deviceId,
+      projectId: identity.projectId,
+      projectName: identity.projectName,
+      workspaceId: identity.workspaceId,
+      workspaceName: identity.workspaceName,
+      controller: validatedController,
+      startedAt: _startedAt,
+      persistence: 'memory',
+      conversationId: ChatRuntime.conversationId,
+      retentionNotice: 'History is retained only until the server restarts.',
+      databaseRequired: false,
+      streamingAvailable: true,
+      modelProvider: ChatRuntime.modelProvider,
+      modelName: ChatRuntime.modelName,
+      availableModels: ChatRuntime.availableModels,
+    );
+  }
 
   /// Canonically accepts a user message before starting assistant work.
   Future<ChatSubmission> submitMessage(
     Session session,
+    ControllerIdentity controller,
     ChatSubmitRequest request,
   ) async {
+    _validatedController(controller);
     final submission = await ChatRuntime.submit(
       conversationId: request.conversationId,
       message: request.message,
@@ -58,38 +79,65 @@ final class ControlEndpoint extends Endpoint {
   /// Requests cancellation of the matching active run.
   Future<bool> cancelRun(
     Session session,
+    ControllerIdentity controller,
     String conversationId,
     String runId,
-  ) => ChatRuntime.service.cancel(conversationId: conversationId, runId: runId);
+  ) {
+    _validatedController(controller);
+    return ChatRuntime.service.cancel(
+      conversationId: conversationId,
+      runId: runId,
+    );
+  }
 
   /// Approves one pending tool action for the matching active run.
   Future<bool> approveWork(
     Session session,
+    ControllerIdentity controller,
     String conversationId,
     String runId,
     String approvalId,
-  ) => ChatRuntime.service.approve(
-    conversationId: conversationId,
-    runId: runId,
-    approvalId: approvalId,
-  );
+  ) {
+    _validatedController(controller);
+    return ChatRuntime.service.approve(
+      conversationId: conversationId,
+      runId: runId,
+      approvalId: approvalId,
+    );
+  }
 
   /// Returns the complete process-local history for one conversation.
   Future<List<ChatEntry>> history(
     Session session,
+    ControllerIdentity controller,
     String conversationId,
-  ) async => (await ChatRuntime.service.store.history(
-    conversationId,
-  )).map(_toProtocolEntry).toList(growable: false);
+  ) async {
+    _validatedController(controller);
+    return (await ChatRuntime.service.store.history(
+      conversationId,
+    )).map(_toProtocolEntry).toList(growable: false);
+  }
 
   /// Replays entries after the cursor, then streams future appends.
   Stream<ChatEntry> streamHistory(
     Session session,
+    ControllerIdentity controller,
     String conversationId,
     int afterSequence,
-  ) => ChatRuntime.service.store
-      .watch(conversationId, afterSequence: afterSequence)
-      .map(_toProtocolEntry);
+  ) {
+    _validatedController(controller);
+    return ChatRuntime.service.store
+        .watch(conversationId, afterSequence: afterSequence)
+        .map(_toProtocolEntry);
+  }
+
+  ControllerIdentity _validatedController(ControllerIdentity controller) {
+    final validated = ControllerIdentities.validated(
+      id: controller.id,
+      name: controller.name,
+    );
+    return ControllerIdentity(id: validated.id, name: validated.name);
+  }
 
   ChatEntry _toProtocolEntry(core.ChatHistoryEntry entry) => ChatEntry(
     eventVersion: entry.eventVersion,

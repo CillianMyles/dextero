@@ -156,8 +156,27 @@ void main() {
         .toList();
     expect(records, isNotEmpty);
     expect(records.every((record) => record['schema_version'] == 1), isTrue);
-    expect(records.every((record) => record['type'] == 'chat_event'), isTrue);
+    expect(records.first['type'], 'host_status');
+    expect(records.first['controller_id'], 'controller_0123456789abcdef');
+    expect(
+      records.skip(1).every((record) => record['type'] == 'chat_event'),
+      isTrue,
+    );
     expect(io.output.join(), isNot(contains('Dextero is working')));
+  });
+
+  test('emits only the identity status JSONL record at end of input', () async {
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: _FakeClient(),
+      io: io,
+      outputMode: TerminalOutputMode.jsonl,
+    ).run();
+
+    expect(result, 0);
+    expect(io.output, hasLength(1));
+    expect(jsonDecode(io.output.single)['type'], 'host_status');
   });
 }
 
@@ -328,6 +347,15 @@ final class _FakeIo implements TerminalIo {
 HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
+  deviceId: 'device_0123456789abcdef',
+  projectId: 'project_0123456789abcdef',
+  projectName: 'Dextero',
+  workspaceId: 'workspace_0123456789abcdef',
+  workspaceName: 'main',
+  controller: ControllerIdentity(
+    id: 'controller_0123456789abcdef',
+    name: 'Test CLI',
+  ),
   startedAt: DateTime.utc(2026),
   persistence: 'memory',
   conversationId: 'conversation-1',

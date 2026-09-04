@@ -14,6 +14,8 @@ const _controlUrl = String.fromEnvironment(
   'DEXTERO_CONTROL_URL',
   defaultValue: 'http://localhost:8080/',
 );
+const _controllerId = String.fromEnvironment('DEXTERO_CONTROLLER_ID');
+const _controllerName = String.fromEnvironment('DEXTERO_CONTROLLER_NAME');
 
 void main() {
   runApp(
@@ -21,6 +23,9 @@ void main() {
       controller: DexteroController.fromEnvironment({
         if (_controlToken.isNotEmpty) 'DEXTERO_CONTROL_TOKEN': _controlToken,
         'DEXTERO_CONTROL_URL': _controlUrl,
+        if (_controllerId.isNotEmpty) 'DEXTERO_CONTROLLER_ID': _controllerId,
+        if (_controllerName.isNotEmpty)
+          'DEXTERO_CONTROLLER_NAME': _controllerName,
       }),
     ),
   );
@@ -180,6 +185,21 @@ class _Header extends StatelessWidget {
           child: const _StatusBadge(
             icon: LucideIcons.database,
             label: 'Until restart',
+          ),
+        ),
+      if (status != null)
+        ShadTooltip(
+          builder: (context) => Text(
+            'Controller: ${status.controller.name}\n'
+            '${status.controller.id}\n'
+            'Device: ${status.deviceId}\n'
+            'Project: ${status.projectId}\n'
+            'Workspace: ${status.workspaceId}',
+          ),
+          child: _StatusBadge(
+            key: const Key('identity-status'),
+            icon: LucideIcons.fingerprint,
+            label: '${status.projectName} · ${status.workspaceName}',
           ),
         ),
       _StatusBadge(

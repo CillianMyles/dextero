@@ -1,0 +1,4 @@
+class: ControllerIdentity
+fields:
+  id: String
+  name: String

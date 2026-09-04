@@ -33,6 +33,7 @@ final class TerminalChat {
   final List<ChatEntry> _entries = [];
   final Set<String> _plainRenderedEntryIds = {};
   var _plainHeaderRendered = false;
+  var _jsonlStatusRendered = false;
   late HostStatus _status;
 
   Future<int> run({
@@ -95,7 +96,7 @@ final class TerminalChat {
       }
 
       while (true) {
-        _io.write('you> ');
+        if (outputMode == TerminalOutputMode.human) _io.write('you> ');
         final line = _io.readLine();
         if (line == null || line.trim() == '/exit') break;
         if (line.trim().isEmpty) continue;
@@ -170,6 +171,10 @@ final class TerminalChat {
 
   void _render() {
     if (outputMode == TerminalOutputMode.jsonl) {
+      if (!_jsonlStatusRendered) {
+        _jsonlStatusRendered = true;
+        _io.writeln(_jsonlRenderer.hostStatus(_status));
+      }
       for (final entry in _entries) {
         if (!_plainRenderedEntryIds.add(entry.entryId)) continue;
         _io.writeln(_jsonlRenderer.entry(entry));
@@ -181,6 +186,8 @@ final class TerminalChat {
       _io.writeln(
         '${_status.name} ${_status.version} — '
         '${_status.modelProvider} · ${_status.modelName}'
+        ' — ${_status.projectName}/${_status.workspaceName}'
+        ' — ${_status.controller.name}'
         '${_entries.isEmpty ? ' — no messages yet' : ''}',
       );
     }

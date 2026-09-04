@@ -29,6 +29,9 @@ Future<void> run(List<String> arguments) async {
   final workspace = Directory(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
   ).absolute.path;
+  final hostIdentity = await LocalIdentityRegistry.fromEnvironment(
+    Platform.environment,
+  ).resolve(workspace);
   final bindAddress = _parseBindAddress(
     Platform.environment['DEXTERO_BIND_ADDRESS'] ?? '127.0.0.1',
   );
@@ -46,6 +49,7 @@ Future<void> run(List<String> arguments) async {
     token: token,
     chatService: service,
     defaultConversationId: conversation.id,
+    hostIdentity: hostIdentity,
     modelProvider: agentConfiguration.providerName,
     modelName: agentConfiguration.modelName,
     bindAddress: bindAddress,
@@ -68,6 +72,7 @@ Future<Serverpod> startControlServer({
   required String token,
   required ChatService chatService,
   required String defaultConversationId,
+  required HostIdentity hostIdentity,
   List<String> arguments = const [],
   int? apiPort,
   bool runInGuardedZone = true,
@@ -87,6 +92,7 @@ Future<Serverpod> startControlServer({
   ChatRuntime.configure(
     chatService: chatService,
     defaultConversationId: defaultConversationId,
+    hostIdentity: hostIdentity,
     modelProvider: modelProvider,
     modelName: modelName,
     availableModels: availableModels,

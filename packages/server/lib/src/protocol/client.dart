@@ -14,12 +14,14 @@
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
 import 'dart:async' as _i2;
 import 'package:dextero_server/src/protocol/control/host_status.dart' as _i3;
-import 'package:dextero_server/src/protocol/control/chat_submission.dart'
+import 'package:dextero_server/src/protocol/control/controller_identity.dart'
     as _i4;
-import 'package:dextero_server/src/protocol/control/chat_submit_request.dart'
+import 'package:dextero_server/src/protocol/control/chat_submission.dart'
     as _i5;
-import 'package:dextero_server/src/protocol/control/chat_entry.dart' as _i6;
-import 'protocol.dart' as _i7;
+import 'package:dextero_server/src/protocol/control/chat_submit_request.dart'
+    as _i6;
+import 'package:dextero_server/src/protocol/control/chat_entry.dart' as _i7;
+import 'protocol.dart' as _i8;
 
 /// The first typed control-plane slice exposed to trusted controllers.
 /// {@category Endpoint}
@@ -30,56 +32,77 @@ class EndpointControl extends _i1.EndpointRef {
   String get name => 'control';
 
   /// Describes the local host and its intentionally volatile MVP storage.
-  _i2.Future<_i3.HostStatus> status() =>
-      caller.callServerEndpoint<_i3.HostStatus>('control', 'status', {});
+  _i2.Future<_i3.HostStatus> status(_i4.ControllerIdentity controller) =>
+      caller.callServerEndpoint<_i3.HostStatus>('control', 'status', {
+        'controller': controller,
+      });
 
   /// Selects the model before this process-local conversation has started.
-  _i2.Future<_i3.HostStatus> selectModel(String modelName) =>
-      caller.callServerEndpoint<_i3.HostStatus>('control', 'selectModel', {
-        'modelName': modelName,
-      });
+  _i2.Future<_i3.HostStatus> selectModel(
+    _i4.ControllerIdentity controller,
+    String modelName,
+  ) => caller.callServerEndpoint<_i3.HostStatus>('control', 'selectModel', {
+    'controller': controller,
+    'modelName': modelName,
+  });
 
   /// Canonically accepts a user message before starting assistant work.
-  _i2.Future<_i4.ChatSubmission> submitMessage(_i5.ChatSubmitRequest request) =>
-      caller.callServerEndpoint<_i4.ChatSubmission>(
-        'control',
-        'submitMessage',
-        {'request': request},
-      );
+  _i2.Future<_i5.ChatSubmission> submitMessage(
+    _i4.ControllerIdentity controller,
+    _i6.ChatSubmitRequest request,
+  ) => caller.callServerEndpoint<_i5.ChatSubmission>(
+    'control',
+    'submitMessage',
+    {'controller': controller, 'request': request},
+  );
 
   /// Requests cancellation of the matching active run.
-  _i2.Future<bool> cancelRun(String conversationId, String runId) =>
-      caller.callServerEndpoint<bool>('control', 'cancelRun', {
-        'conversationId': conversationId,
-        'runId': runId,
-      });
+  _i2.Future<bool> cancelRun(
+    _i4.ControllerIdentity controller,
+    String conversationId,
+    String runId,
+  ) => caller.callServerEndpoint<bool>('control', 'cancelRun', {
+    'controller': controller,
+    'conversationId': conversationId,
+    'runId': runId,
+  });
 
   /// Approves one pending tool action for the matching active run.
   _i2.Future<bool> approveWork(
+    _i4.ControllerIdentity controller,
     String conversationId,
     String runId,
     String approvalId,
   ) => caller.callServerEndpoint<bool>('control', 'approveWork', {
+    'controller': controller,
     'conversationId': conversationId,
     'runId': runId,
     'approvalId': approvalId,
   });
 
   /// Returns the complete process-local history for one conversation.
-  _i2.Future<List<_i6.ChatEntry>> history(String conversationId) =>
-      caller.callServerEndpoint<List<_i6.ChatEntry>>('control', 'history', {
-        'conversationId': conversationId,
-      });
+  _i2.Future<List<_i7.ChatEntry>> history(
+    _i4.ControllerIdentity controller,
+    String conversationId,
+  ) => caller.callServerEndpoint<List<_i7.ChatEntry>>('control', 'history', {
+    'controller': controller,
+    'conversationId': conversationId,
+  });
 
   /// Replays entries after the cursor, then streams future appends.
-  _i2.Stream<_i6.ChatEntry> streamHistory(
+  _i2.Stream<_i7.ChatEntry> streamHistory(
+    _i4.ControllerIdentity controller,
     String conversationId,
     int afterSequence,
   ) => caller
-      .callStreamingServerEndpoint<_i2.Stream<_i6.ChatEntry>, _i6.ChatEntry>(
+      .callStreamingServerEndpoint<_i2.Stream<_i7.ChatEntry>, _i7.ChatEntry>(
         'control',
         'streamHistory',
-        {'conversationId': conversationId, 'afterSequence': afterSequence},
+        {
+          'controller': controller,
+          'conversationId': conversationId,
+          'afterSequence': afterSequence,
+        },
         {},
       );
 }
@@ -99,7 +122,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i7.Protocol(),
+         _i8.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,

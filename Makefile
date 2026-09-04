@@ -8,6 +8,7 @@ ENV_FILE ?= .env
 -include $(ENV_FILE)
 export DEXTERO_MODEL_PROVIDER DEXTERO_CODEX_MODEL DEXTERO_CODEX_MODELS
 export GEMINI_API_KEY DEXTERO_GEMINI_MODEL DEXTERO_GEMINI_MODELS
+export DEXTERO_CONTROLLER_ID DEXTERO_CONTROLLER_NAME DEXTERO_STATE_DIRECTORY
 
 .DEFAULT_GOAL := help
 
@@ -118,7 +119,9 @@ app: $(DEV_TOKEN_FILE) ## Run the Flutter client (Chrome by default; set APP_DEV
 	 cd packages/app && \
 	 $(FLUTTER) run -d "$(APP_DEVICE)" \
 	   --dart-define="DEXTERO_CONTROL_TOKEN=$$token" \
-	   --dart-define="DEXTERO_CONTROL_URL=$(CONTROL_URL)"
+	   --dart-define="DEXTERO_CONTROL_URL=$(CONTROL_URL)" \
+	   --dart-define="DEXTERO_CONTROLLER_ID=$(DEXTERO_CONTROLLER_ID)" \
+	   --dart-define="DEXTERO_CONTROLLER_NAME=$(DEXTERO_CONTROLLER_NAME)"
 
 app-web: ## Run the Flutter web client in Chrome (start the server separately).
 	@$(MAKE) --no-print-directory app APP_DEVICE=chrome
@@ -198,7 +201,9 @@ dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default
 	 cd packages/app && \
 	 $(FLUTTER) run -d "$(APP_DEVICE)" \
 	   --dart-define="DEXTERO_CONTROL_TOKEN=$$token" \
-	   --dart-define="DEXTERO_CONTROL_URL=$(CONTROL_URL)"
+	   --dart-define="DEXTERO_CONTROL_URL=$(CONTROL_URL)" \
+	   --dart-define="DEXTERO_CONTROLLER_ID=$(DEXTERO_CONTROLLER_ID)" \
+	   --dart-define="DEXTERO_CONTROLLER_NAME=$(DEXTERO_CONTROLLER_NAME)"
 
 dev-web: ## Start the server and Flutter web client together.
 	@$(MAKE) --no-print-directory dev APP_DEVICE=chrome

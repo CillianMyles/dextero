@@ -12,6 +12,7 @@ abstract final class ChatRuntime {
   static String? _modelName;
   static List<String>? _availableModels;
   static ModelSelector? _modelSelector;
+  static HostIdentity? _hostIdentity;
   static Future<void> _operationLock = Future.value();
 
   static ChatService get service =>
@@ -32,9 +33,14 @@ abstract final class ChatRuntime {
       _availableModels ??
       (throw StateError('The chat runtime is not initialized.'));
 
+  static HostIdentity get hostIdentity =>
+      _hostIdentity ??
+      (throw StateError('The chat runtime is not initialized.'));
+
   static void configure({
     required ChatService chatService,
     required String defaultConversationId,
+    required HostIdentity hostIdentity,
     String modelProvider = 'codex',
     String modelName = 'default',
     List<String>? availableModels,
@@ -69,6 +75,7 @@ abstract final class ChatRuntime {
     }
     _service = chatService;
     _conversationId = defaultConversationId;
+    _hostIdentity = hostIdentity;
     _modelProvider = modelProvider;
     _modelName = modelName;
     _availableModels = models;

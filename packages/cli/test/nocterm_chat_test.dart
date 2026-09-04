@@ -277,6 +277,15 @@ final class _FakeClient implements TerminalChatClient {
 HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   name: 'Dextero',
   version: '0.0.1',
+  deviceId: 'device_0123456789abcdef',
+  projectId: 'project_0123456789abcdef',
+  projectName: 'Dextero',
+  workspaceId: 'workspace_0123456789abcdef',
+  workspaceName: 'main',
+  controller: ControllerIdentity(
+    id: 'controller_0123456789abcdef',
+    name: 'Test TUI',
+  ),
   startedAt: DateTime.utc(2026),
   persistence: 'memory',
   conversationId: 'conversation-1',

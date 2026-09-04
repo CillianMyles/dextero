@@ -8,6 +8,21 @@ final class JsonlRenderer {
 
   static const schemaVersion = 1;
 
+  String hostStatus(HostStatus status) => jsonEncode({
+    'schema_version': schemaVersion,
+    'type': 'host_status',
+    'device_id': status.deviceId,
+    'project_id': status.projectId,
+    'project_name': status.projectName,
+    'workspace_id': status.workspaceId,
+    'workspace_name': status.workspaceName,
+    'controller_id': status.controller.id,
+    'controller_name': status.controller.name,
+    'conversation_id': status.conversationId,
+    'model_provider': status.modelProvider,
+    'model_name': status.modelName,
+  });
+
   String entry(ChatEntry entry) => jsonEncode({
     'schema_version': schemaVersion,
     'type': 'chat_event',

@@ -29,6 +29,9 @@ cli ─┘
 The app and CLI use the generated client without importing or launching the
 server runtime. User messages are stored before assistant work begins; replies,
 tool activity, lifecycle, and errors append to the same ordered history.
+The host also publishes stable local device, project, workspace, and controller
+identities so later permission grants can be attributed without using display
+names or filesystem paths as security keys.
 
 ## Run
 
@@ -136,6 +139,10 @@ Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
 dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"
 ```
 
+The first JSONL record describes the host, project, workspace, and controller
+identities. Human and full-screen terminal headers show their display names;
+the Flutter identity badge shows the stable IDs in its tooltip.
+
 Run all checks:
 
 ```sh
@@ -151,6 +158,10 @@ or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. File edits pause for explicit approval, but process tools
 do not yet have the policy coverage planned for Milestone 3. Every `edit_file`
 invocation requests a fresh approval; decisions are not currently remembered.
+Controller IDs are persisted by each client and sent with every control call.
+They provide stable attribution but are self-asserted, not cryptographic proof
+of a device. Until pairing exists, the server must not use them alone to grant
+authority.
 
 The host binds to `127.0.0.1` by default. Set `BIND_ADDRESS` to a numeric IP
 only when a protected local-network controller or tunnel needs direct access:
@@ -180,7 +191,8 @@ history, or tool subprocess environments.
 
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
 typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
-and `cancelRun` operations.
+and `cancelRun` operations. Each operation requires a typed controller identity;
+host status returns the stable local device, project, and workspace identities.
 Generated server, client, and test code is committed. After changing an
 endpoint or `.spy.yaml` model, run:
 

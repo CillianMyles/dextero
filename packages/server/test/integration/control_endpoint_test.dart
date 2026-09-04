@@ -9,6 +9,18 @@ import 'package:test/test.dart';
 import 'test_tools/serverpod_test_tools.dart';
 import 'test_tools/test_server_config.dart';
 
+final _hostIdentity = core.HostIdentity(
+  deviceId: 'device_0123456789abcdef',
+  projectId: 'project_0123456789abcdef',
+  projectName: 'Dextero',
+  workspaceId: 'workspace_0123456789abcdef',
+  workspaceName: 'main',
+);
+final _controllerIdentity = ControllerIdentity(
+  id: 'controller_0123456789abcdef',
+  name: 'Test controller',
+);
+
 void main() {
   late core.InMemoryChatHistoryStore store;
   late core.ChatService service;
@@ -23,6 +35,7 @@ void main() {
     ChatRuntime.configure(
       chatService: service,
       defaultConversationId: conversationId,
+      hostIdentity: _hostIdentity,
       availableModels: const ['default', core.codexSparkModel],
       modelSelector: (modelName) async {
         await service.selectAgent(
@@ -46,7 +59,7 @@ void main() {
 
     test('rejects unauthenticated status calls', () async {
       await expectLater(
-        endpoints.control.status(sessionBuilder),
+        endpoints.control.status(sessionBuilder, _controllerIdentity),
         throwsA(isA<ServerpodUnauthenticatedException>()),
       );
     });
@@ -64,9 +77,16 @@ void main() {
     });
 
     test('reports the default volatile conversation', () async {
-      final status = await endpoints.control.status(authenticatedSession);
+      final status = await endpoints.control.status(
+        authenticatedSession,
+        _controllerIdentity,
+      );
 
       expect(status.name, 'Dextero');
+      expect(status.deviceId, _hostIdentity.deviceId);
+      expect(status.projectId, _hostIdentity.projectId);
+      expect(status.workspaceId, _hostIdentity.workspaceId);
+      expect(status.controller.id, _controllerIdentity.id);
       expect(status.persistence, 'memory');
       expect(status.conversationId, conversationId);
       expect(status.retentionNotice, contains('server restarts'));
@@ -78,9 +98,20 @@ void main() {
       expect(status.startedAt.isUtc, isTrue);
     });
 
+    test('rejects malformed self-asserted controller identities', () async {
+      await expectLater(
+        endpoints.control.status(
+          authenticatedSession,
+          ControllerIdentity(id: 'controller_bad', name: 'Unknown'),
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('selects an advertised model before the first message', () async {
       final status = await endpoints.control.selectModel(
         authenticatedSession,
+        _controllerIdentity,
         core.codexSparkModel,
       );
 
@@ -91,12 +122,14 @@ void main() {
     test('rejects a stale client model before accepting its message', () async {
       await endpoints.control.selectModel(
         authenticatedSession,
+        _controllerIdentity,
         core.codexSparkModel,
       );
 
       await expectLater(
         endpoints.control.submitMessage(
           authenticatedSession,
+          _controllerIdentity,
           ChatSubmitRequest(
             conversationId: conversationId,
             message: 'Use the stale choice',
@@ -117,6 +150,7 @@ void main() {
     test('rejects model changes after the first message', () async {
       final submission = await endpoints.control.submitMessage(
         authenticatedSession,
+        _controllerIdentity,
         ChatSubmitRequest(
           conversationId: conversationId,
           message: 'Start',
@@ -135,6 +169,7 @@ void main() {
       await expectLater(
         endpoints.control.selectModel(
           authenticatedSession,
+          _controllerIdentity,
           core.codexSparkModel,
         ),
         throwsStateError,
@@ -146,6 +181,7 @@ void main() {
       () async {
         final submission = await endpoints.control.submitMessage(
           authenticatedSession,
+          _controllerIdentity,
           ChatSubmitRequest(
             conversationId: conversationId,
             message: 'Inspect the workspace',
@@ -167,10 +203,16 @@ void main() {
 
         final history = await endpoints.control.history(
           authenticatedSession,
+          _controllerIdentity,
           conversationId,
         );
         final streamed = await endpoints.control
-            .streamHistory(authenticatedSession, conversationId, -1)
+            .streamHistory(
+              authenticatedSession,
+              _controllerIdentity,
+              conversationId,
+              -1,
+            )
             .take(history.length)
             .toList();
 
@@ -221,6 +263,7 @@ void main() {
       await expectLater(
         endpoints.control.submitMessage(
           authenticatedSession,
+          _controllerIdentity,
           ChatSubmitRequest(
             conversationId: conversationId,
             message: '   ',
@@ -230,14 +273,22 @@ void main() {
         throwsArgumentError,
       );
       expect(
-        await endpoints.control.history(authenticatedSession, conversationId),
+        await endpoints.control.history(
+          authenticatedSession,
+          _controllerIdentity,
+          conversationId,
+        ),
         isEmpty,
       );
     });
 
     test('rejects unknown conversation identifiers', () async {
       await expectLater(
-        endpoints.control.history(authenticatedSession, 'missing'),
+        endpoints.control.history(
+          authenticatedSession,
+          _controllerIdentity,
+          'missing',
+        ),
         throwsStateError,
       );
     });
@@ -256,9 +307,11 @@ void main() {
       ChatRuntime.configure(
         chatService: service,
         defaultConversationId: conversationId,
+        hostIdentity: _hostIdentity,
       );
       final submission = await endpoints.control.submitMessage(
         authenticatedSession,
+        _controllerIdentity,
         ChatSubmitRequest(
           conversationId: conversationId,
           message: 'Long task',
@@ -270,6 +323,7 @@ void main() {
       expect(
         await endpoints.control.cancelRun(
           authenticatedSession,
+          _controllerIdentity,
           conversationId,
           submission.runId,
         ),
@@ -293,9 +347,11 @@ void main() {
       ChatRuntime.configure(
         chatService: service,
         defaultConversationId: conversationId,
+        hostIdentity: _hostIdentity,
       );
       final submission = await endpoints.control.submitMessage(
         authenticatedSession,
+        _controllerIdentity,
         ChatSubmitRequest(
           conversationId: conversationId,
           message: 'Edit README.md',
@@ -314,6 +370,7 @@ void main() {
       expect(
         await endpoints.control.approveWork(
           authenticatedSession,
+          _controllerIdentity,
           conversationId,
           submission.runId,
           pending.approvalId!,
@@ -332,6 +389,7 @@ void main() {
       expect(agent.executed, isTrue);
       final history = await endpoints.control.history(
         authenticatedSession,
+        _controllerIdentity,
         conversationId,
       );
       expect(
@@ -343,6 +401,7 @@ void main() {
       expect(
         await endpoints.control.approveWork(
           authenticatedSession,
+          _controllerIdentity,
           conversationId,
           submission.runId,
           pending.approvalId!,
