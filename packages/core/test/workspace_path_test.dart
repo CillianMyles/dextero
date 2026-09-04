@@ -65,4 +65,27 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
   }, skip: Platform.isWindows);
+
+  test(
+    'does not create a dangling outside edit target before rejection',
+    () async {
+      final selected = File('${workspace.path}/selected.txt');
+      await selected.writeAsString('selected');
+      final outside = File('${sandbox.path}/outside/missing.txt');
+      final path = WorkspacePath(
+        workspace.path,
+        beforeFileOpen: (path) async {
+          await File(path).delete();
+          await Link(path).create(outside.path);
+        },
+      );
+
+      await expectLater(
+        path.openExistingFile('selected.txt', mode: FileMode.append),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(await outside.exists(), isFalse);
+    },
+    skip: Platform.isWindows,
+  );
 }

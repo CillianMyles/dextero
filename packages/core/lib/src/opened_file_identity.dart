@@ -19,10 +19,20 @@ final class OpenedFileIdentity {
   final String _expectedIdentity;
   final int _validationHandle;
 
-  static Future<OpenedFileIdentity> capturePath(String path) async {
+  /// A path that opens the retained object without revisiting the user path.
+  String get openPath {
+    if (Platform.isLinux) return '/proc/self/fd/$_validationHandle';
+    if (Platform.isMacOS) return '/dev/fd/$_validationHandle';
+    return _expectedPath;
+  }
+
+  static Future<OpenedFileIdentity> capturePath(
+    String path, {
+    required bool writable,
+  }) async {
     if (Platform.isWindows) return _captureWindowsPath(path);
     if (Platform.isMacOS || Platform.isLinux) {
-      return _capturePosixPath(path);
+      return _capturePosixPath(path, writable: writable);
     }
     throw UnsupportedError(
       'Opened-file identity is unsupported on ${Platform.operatingSystem}.',
@@ -51,12 +61,18 @@ final class OpenedFileIdentity {
             '${Platform.operatingSystem}.',
           );
     final actualPath = await _descriptorPath(descriptor);
-    if (actualIdentity != _expectedIdentity ||
-        !_samePath(actualPath, _expectedPath)) {
-      throw FileSystemException(
-        'Opened file changed after path validation',
-        _expectedPath,
-      );
+    final currentPath = await _capturePosixPath(_expectedPath, writable: false);
+    try {
+      if (actualIdentity != _expectedIdentity ||
+          !_samePath(actualPath, _expectedPath) ||
+          currentPath._expectedIdentity != _expectedIdentity) {
+        throw FileSystemException(
+          'Opened file changed after path validation',
+          _expectedPath,
+        );
+      }
+    } finally {
+      currentPath.close();
     }
   }
 
@@ -97,11 +113,14 @@ final class OpenedFileIdentity {
   }
 }
 
-Future<OpenedFileIdentity> _capturePosixPath(String path) async {
+Future<OpenedFileIdentity> _capturePosixPath(
+  String path, {
+  required bool writable,
+}) async {
   final pointer = path.toNativeUtf8();
   int? descriptor;
   try {
-    descriptor = _openDescriptor()(pointer, 0);
+    descriptor = _openDescriptor()(pointer, writable ? 2 : 0);
     if (descriptor < 0) {
       throw FileSystemException('Cannot inspect validated file', path);
     }

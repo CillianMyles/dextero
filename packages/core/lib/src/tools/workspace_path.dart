@@ -65,10 +65,13 @@ final class WorkspacePath {
       relativePath,
       expectedType: FileSystemEntityType.file,
     );
-    final openedIdentity = await OpenedFileIdentity.capturePath(path);
+    final openedIdentity = await OpenedFileIdentity.capturePath(
+      path,
+      writable: mode != FileMode.read,
+    );
     try {
       await _beforeFileOpen?.call(path);
-      final file = await File(path).open(mode: mode);
+      final file = await File(openedIdentity.openPath).open(mode: mode);
       try {
         await openedIdentity.verify(file);
         await _boundary?.validate();
