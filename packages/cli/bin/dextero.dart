@@ -47,6 +47,8 @@ Future<int> run(
   var jsonl = false;
   String? modelName;
   String? cancelRunId;
+  String? approveRunId;
+  String? approvalId;
   final message = <String>[];
   for (var index = 0; index < arguments.length; index++) {
     final argument = arguments[index];
@@ -65,16 +67,31 @@ Future<int> run(
           return 64;
         }
         cancelRunId = arguments[++index];
+      case '--approve':
+        if (index + 2 >= arguments.length) {
+          io.error('Usage: dextero --approve <run-id> <approval-id>');
+          return 64;
+        }
+        approveRunId = arguments[++index];
+        approvalId = arguments[++index];
       default:
         message.add(argument);
     }
   }
-  if (cancelRunId != null && message.isNotEmpty) {
-    io.error('A cancellation request cannot include a message.');
+  final actionCount = [
+    cancelRunId,
+    approveRunId,
+  ].where((value) => value != null).length;
+  if (actionCount > 1) {
+    io.error('Cancellation and approval requests cannot be combined.');
     return 64;
   }
-  if (cancelRunId != null && modelName != null) {
-    io.error('A cancellation request cannot select a model.');
+  if (actionCount != 0 && message.isNotEmpty) {
+    io.error('A cancellation or approval request cannot include a message.');
+    return 64;
+  }
+  if (actionCount != 0 && modelName != null) {
+    io.error('A cancellation or approval request cannot select a model.');
     return 64;
   }
   final client = clientFactory(serverUrl: rawUrl, token: token);
@@ -82,7 +99,7 @@ Future<int> run(
       io.hasOutputTerminal &&
       !jsonl &&
       message.isEmpty &&
-      cancelRunId == null) {
+      actionCount == 0) {
     return tuiRunner(client: client, modelName: modelName);
   }
   final chat = TerminalChat(
@@ -93,6 +110,8 @@ Future<int> run(
   return chat.run(
     initialMessage: message.isEmpty ? null : message.join(' '),
     cancelRunId: cancelRunId,
+    approveRunId: approveRunId,
+    approvalId: approvalId,
     modelName: modelName,
   );
 }

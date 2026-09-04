@@ -22,6 +22,7 @@ void main() {
         runId: 'run-1',
         toolCallId: 'call-1',
         toolName: 'read_file',
+        approvalId: 'approval-1',
       ),
     );
     final event = jsonDecode(rendered) as Map<String, Object?>;
@@ -33,6 +34,7 @@ void main() {
     expect(event['kind'], 'toolCall');
     expect(event['created_at'], '2026-09-01T20:30:00.000Z');
     expect(event['tool_name'], 'read_file');
+    expect(event['approval_id'], 'approval-1');
     expect(event, isNot(contains('unused')));
   });
 
@@ -45,6 +47,43 @@ void main() {
       'schema_version': 1,
       'type': 'client_error',
       'message': 'Bad state: offline',
+    });
+  });
+
+  test('renders versioned approval and cancellation results', () {
+    final renderer = const JsonlRenderer();
+    final approval = jsonDecode(
+      renderer.approvalResult(
+        conversationId: 'conversation-1',
+        runId: 'run-1',
+        approvalId: 'approval-1',
+        accepted: false,
+      ),
+    );
+    final cancellation = jsonDecode(
+      renderer.cancellationResult(
+        conversationId: 'conversation-1',
+        runId: 'run-2',
+        accepted: true,
+      ),
+    );
+
+    expect(approval, {
+      'schema_version': 1,
+      'type': 'approval_result',
+      'conversation_id': 'conversation-1',
+      'run_id': 'run-1',
+      'approval_id': 'approval-1',
+      'accepted': false,
+      'status': 'not_pending',
+    });
+    expect(cancellation, {
+      'schema_version': 1,
+      'type': 'cancellation_result',
+      'conversation_id': 'conversation-1',
+      'run_id': 'run-2',
+      'accepted': true,
+      'status': 'cancellation_requested',
     });
   });
 }

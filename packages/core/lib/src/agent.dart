@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'cancellation.dart';
+import 'approval.dart';
 import 'model.dart';
 import 'safe_metadata.dart';
 import 'tool.dart';
@@ -42,9 +43,11 @@ final class AgentLoop {
   AgentLoop({
     required AgentModel model,
     required List<Tool> tools,
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
     this.maxTurns = 12,
   }) : _model = model,
-       _tools = {for (final tool in tools) tool.definition.name: tool} {
+       _tools = {for (final tool in tools) tool.definition.name: tool},
+       approvalRequiredTools = Set.unmodifiable(approvalRequiredTools) {
     if (_tools.length != tools.length) {
       throw ArgumentError('Tool names must be unique.');
     }
@@ -55,12 +58,14 @@ final class AgentLoop {
 
   final AgentModel _model;
   final Map<String, Tool> _tools;
+  final Set<String> approvalRequiredTools;
   final int maxTurns;
 
   Future<AgentRun> run(
     String prompt, {
     CancellationToken? cancellationToken,
     AgentLoopActivitySink? onActivity,
+    ToolApprovalRequester? onApprovalRequest,
   }) async {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
@@ -76,14 +81,20 @@ final class AgentLoop {
         cancellationToken: cancellationToken,
       );
       cancellationToken?.throwIfCancellationRequested();
+      final toolCalls = [
+        for (final call in response.toolCalls)
+          ToolCall(
+            id: call.id,
+            name: call.name,
+            arguments: snapshotJsonMap(call.arguments),
+            providerMetadata: snapshotJsonMap(call.providerMetadata),
+          ),
+      ];
       messages.add(
-        AgentMessage.assistant(
-          content: response.content,
-          toolCalls: response.toolCalls,
-        ),
+        AgentMessage.assistant(content: response.content, toolCalls: toolCalls),
       );
 
-      if (response.toolCalls.isEmpty) {
+      if (toolCalls.isEmpty) {
         final output = response.content?.trim();
         if (output == null || output.isEmpty) {
           throw StateError('Model returned neither tool calls nor final text.');
@@ -95,7 +106,7 @@ final class AgentLoop {
         );
       }
 
-      for (final call in response.toolCalls) {
+      for (final call in toolCalls) {
         await onActivity?.call(
           AgentLoopActivity(
             kind: AgentLoopActivityKind.toolCallStarted,
@@ -107,6 +118,7 @@ final class AgentLoop {
         final result = await _execute(
           call,
           cancellationToken: cancellationToken,
+          onApprovalRequest: onApprovalRequest,
           onOutput: (update) => onActivity?.call(
             AgentLoopActivity(
               kind: AgentLoopActivityKind.toolOutput,
@@ -142,6 +154,7 @@ final class AgentLoop {
     ToolCall call, {
     CancellationToken? cancellationToken,
     ToolOutputSink? onOutput,
+    ToolApprovalRequester? onApprovalRequest,
   }) async {
     cancellationToken?.throwIfCancellationRequested();
     final tool = _tools[call.name];
@@ -153,9 +166,40 @@ final class AgentLoop {
       );
     }
 
+    var arguments = call.arguments;
+    if (approvalRequiredTools.contains(call.name)) {
+      if (onApprovalRequest == null) {
+        return ToolResult(
+          callId: call.id,
+          content: 'Approval is unavailable for ${call.name}.',
+          isError: true,
+        );
+      }
+      arguments = snapshotJsonMap(call.arguments);
+      final approval = onApprovalRequest(
+        ToolApprovalRequest(
+          toolCallId: call.id,
+          toolName: call.name,
+          summary: SafeMetadata.approvalRequest(call.name, arguments),
+        ),
+      );
+      final approved = await switch (cancellationToken) {
+        null => approval,
+        final token => token.waitFor(approval),
+      };
+      cancellationToken?.throwIfCancellationRequested();
+      if (!approved) {
+        return ToolResult(
+          callId: call.id,
+          content: '${call.name} was not approved.',
+          isError: true,
+        );
+      }
+    }
+
     try {
       final content = await tool.call(
-        call.arguments,
+        arguments,
         cancellationToken: cancellationToken,
         onOutput: onOutput,
       );

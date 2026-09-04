@@ -62,6 +62,18 @@ final class ControlEndpoint extends Endpoint {
     String runId,
   ) => ChatRuntime.service.cancel(conversationId: conversationId, runId: runId);
 
+  /// Approves one pending tool action for the matching active run.
+  Future<bool> approveWork(
+    Session session,
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) => ChatRuntime.service.approve(
+    conversationId: conversationId,
+    runId: runId,
+    approvalId: approvalId,
+  );
+
   /// Returns the complete process-local history for one conversation.
   Future<List<ChatEntry>> history(
     Session session,
@@ -95,5 +107,6 @@ final class ControlEndpoint extends Endpoint {
     runId: entry.runId,
     toolCallId: entry.toolCallId,
     toolName: entry.toolName,
+    approvalId: entry.approvalId,
   );
 }

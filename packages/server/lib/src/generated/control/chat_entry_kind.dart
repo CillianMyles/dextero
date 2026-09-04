@@ -20,6 +20,7 @@ enum ChatEntryKind implements _i1.SerializableModel {
   toolCall,
   toolOutput,
   toolResult,
+  approval,
   lifecycle,
   error;
 
@@ -37,6 +38,8 @@ enum ChatEntryKind implements _i1.SerializableModel {
         return ChatEntryKind.toolOutput;
       case 'toolResult':
         return ChatEntryKind.toolResult;
+      case 'approval':
+        return ChatEntryKind.approval;
       case 'lifecycle':
         return ChatEntryKind.lifecycle;
       case 'error':

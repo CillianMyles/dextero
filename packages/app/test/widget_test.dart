@@ -408,9 +408,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(api.cancellations, [('conversation-1', 'run-1')]);
+    expect(controller.canCancel, isFalse);
+    expect(await controller.cancelActiveRun(), isFalse);
+    expect(api.cancellations, hasLength(1));
     api.emit(
       _entry(
         sequence: 2,
+        entryId: 'entry-delayed-approval',
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.pending,
+        content: 'edit_file requires approval for README.md',
+        toolCallId: 'edit-call-delayed',
+        toolName: 'edit_file',
+        approvalId: 'approval-delayed',
+        family: ChatEventFamily.approval,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(controller.pendingApproval, isNull);
+    expect(controller.canApprove, isFalse);
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, isEmpty);
+    api.emit(
+      _entry(
+        sequence: 3,
         entryId: 'entry-cancelled',
         kind: ChatEntryKind.lifecycle,
         status: ChatEntryStatus.cancelled,
@@ -421,6 +444,231 @@ void main() {
 
     expect(controller.busy, isFalse);
     expect(find.byKey(const Key('send-message')), findsOneWidget);
+  });
+
+  testWidgets('keeps an accepted approval resolved while history catches up', (
+    tester,
+  ) async {
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-approval-pending',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.pending,
+          content:
+              'edit_file requires approval for README.md\n'
+              '--- old text\n-old\n+++ new text\n+new',
+          toolCallId: 'edit-call-1',
+          toolName: 'edit_file',
+          approvalId: 'approval-1',
+          family: ChatEventFamily.approval,
+        ),
+      ],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('approval-prompt')), findsOneWidget);
+    expect(find.text('Approval required'), findsNWidgets(2));
+    expect(
+      find.text(
+        'edit_file requires approval for README.md\n'
+        '--- old text\n-old\n+++ new text\n+new',
+      ),
+      findsNWidgets(2),
+    );
+
+    await tester.tap(find.byKey(const Key('approve-work')));
+    await tester.pumpAndSettle();
+
+    expect(api.approvals, [('conversation-1', 'run-1', 'approval-1')]);
+    expect(controller.pendingApproval, isNull);
+    expect(controller.canApprove, isFalse);
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, hasLength(1));
+    api.emit(
+      _entry(
+        sequence: 1,
+        entryId: 'entry-approval-approved',
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.approved,
+        content: 'edit_file approved',
+        toolCallId: 'edit-call-1',
+        toolName: 'edit_file',
+        approvalId: 'approval-1',
+        family: ChatEventFamily.approval,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(find.text('Action approved'), findsOneWidget);
+  });
+
+  testWidgets('distinguishes approved and cancelled approval history', (
+    tester,
+  ) async {
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-approval-approved',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.approved,
+          content: 'edit_file approved',
+          approvalId: 'approval-1',
+          family: ChatEventFamily.approval,
+        ),
+        _entry(
+          sequence: 1,
+          entryId: 'entry-approval-cancelled',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.cancelled,
+          content: 'edit_file approval cancelled',
+          approvalId: 'approval-2',
+          family: ChatEventFamily.approval,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Action approved'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.shieldCheck), findsOneWidget);
+    expect(find.text('Approval cancelled'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.circleStop), findsOneWidget);
+  });
+
+  testWidgets('keeps approval disabled through accepted cancellation', (
+    tester,
+  ) async {
+    final cancelled = Completer<bool>();
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      canceller: (_, _) => cancelled.future,
+      initialHistory: [_pendingApprovalEntry()],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('cancel-run')));
+    await tester.pump();
+
+    expect(controller.cancelling, isTrue);
+    expect(controller.canApprove, isFalse);
+    expect(
+      tester.widget<ShadButton>(find.byKey(const Key('approve-work'))).enabled,
+      isFalse,
+    );
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, isEmpty);
+
+    cancelled.complete(true);
+    await tester.pumpAndSettle();
+
+    expect(controller.pendingApproval, isNull);
+    expect(controller.canApprove, isFalse);
+    expect(find.byKey(const Key('approval-prompt')), findsNothing);
+    expect(await controller.approvePendingWork(), isFalse);
+    expect(api.approvals, isEmpty);
+
+    api.emit(
+      _entry(
+        sequence: 1,
+        entryId: 'entry-approval-cancelled',
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.cancelled,
+        content: 'edit_file approval cancelled',
+        toolCallId: 'edit-call-1',
+        toolName: 'edit_file',
+        approvalId: 'approval-1',
+        family: ChatEventFamily.approval,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(controller.pendingApproval, isNull);
+  });
+
+  testWidgets('disables cancellation while approval is in flight', (
+    tester,
+  ) async {
+    final approved = Completer<bool>();
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      approver: (_, _, _) => approved.future,
+      initialHistory: [_pendingApprovalEntry()],
+    );
+    final controller = DexteroController(api: api);
+
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('approve-work')));
+    await tester.pump();
+
+    expect(controller.approving, isTrue);
+    expect(controller.canCancel, isFalse);
+    expect(
+      tester
+          .widget<ShadIconButton>(find.byKey(const Key('cancel-run')))
+          .enabled,
+      isFalse,
+    );
+    expect(await controller.cancelActiveRun(), isFalse);
+    expect(api.cancellations, isEmpty);
+
+    approved.complete(true);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('keeps a large approval preview bounded and scrollable', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 0,
+          entryId: 'entry-large-approval',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.pending,
+          content: List.generate(300, (index) => '-line $index').join('\n'),
+          toolCallId: 'edit-call-large',
+          toolName: 'edit_file',
+          approvalId: 'approval-large',
+          family: ChatEventFamily.approval,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    final preview = find.byKey(const Key('approval-preview'));
+    expect(preview, findsOneWidget);
+    expect(
+      find.descendant(
+        of: preview,
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.getSize(preview).height, lessThanOrEqualTo(144));
+    expect(find.byKey(const Key('approve-work')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('explains configuration and server failures', (tester) async {
@@ -452,15 +700,25 @@ final class _FakeChatApi implements ChatApi {
   _FakeChatApi({
     required Future<HostStatus> status,
     this.submitter,
+    this.canceller,
+    this.approver,
     this.initialHistory = const [],
   }) : statusFuture = status;
 
   final Future<HostStatus> statusFuture;
   final Future<ChatSubmission> Function(ChatSubmitRequest request)? submitter;
+  final Future<bool> Function(String conversationId, String runId)? canceller;
+  final Future<bool> Function(
+    String conversationId,
+    String runId,
+    String approvalId,
+  )?
+  approver;
   final List<ChatEntry> initialHistory;
   final submissions = <ChatSubmitRequest>[];
   final modelSelections = <String>[];
   final cancellations = <(String, String)>[];
+  final approvals = <(String, String, String)>[];
   final _stream = StreamController<ChatEntry>.broadcast();
 
   void emit(ChatEntry entry) => _stream.add(entry);
@@ -469,9 +727,20 @@ final class _FakeChatApi implements ChatApi {
   Future<void> close() async {}
 
   @override
-  Future<bool> cancelRun(String conversationId, String runId) async {
+  Future<bool> cancelRun(String conversationId, String runId) {
     cancellations.add((conversationId, runId));
-    return true;
+    return canceller?.call(conversationId, runId) ?? Future.value(true);
+  }
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) {
+    approvals.add((conversationId, runId, approvalId));
+    return approver?.call(conversationId, runId, approvalId) ??
+        Future.value(true);
   }
 
   @override
@@ -526,6 +795,18 @@ ChatSubmission _submission(String message) => ChatSubmission(
   ),
 );
 
+ChatEntry _pendingApprovalEntry() => _entry(
+  sequence: 0,
+  entryId: 'entry-approval-pending',
+  kind: ChatEntryKind.approval,
+  status: ChatEntryStatus.pending,
+  content: 'edit_file requires approval for README.md',
+  toolCallId: 'edit-call-1',
+  toolName: 'edit_file',
+  approvalId: 'approval-1',
+  family: ChatEventFamily.approval,
+);
+
 ChatEntry _entry({
   required int sequence,
   required String entryId,
@@ -534,6 +815,7 @@ ChatEntry _entry({
   required String content,
   String? toolCallId,
   String? toolName,
+  String? approvalId,
   String correlationId = 'app-test-1',
   String? runId = 'run-1',
   bool truncated = false,
@@ -556,4 +838,5 @@ ChatEntry _entry({
   runId: runId,
   toolCallId: toolCallId,
   toolName: toolName,
+  approvalId: approvalId,
 );

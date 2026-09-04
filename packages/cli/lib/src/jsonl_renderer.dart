@@ -26,11 +26,40 @@ final class JsonlRenderer {
     if (entry.runId != null) 'run_id': entry.runId,
     if (entry.toolCallId != null) 'tool_call_id': entry.toolCallId,
     if (entry.toolName != null) 'tool_name': entry.toolName,
+    if (entry.approvalId != null) 'approval_id': entry.approvalId,
   });
 
   String error(Object error) => jsonEncode({
     'schema_version': schemaVersion,
     'type': 'client_error',
     'message': error.toString(),
+  });
+
+  String approvalResult({
+    required String conversationId,
+    required String runId,
+    required String approvalId,
+    required bool accepted,
+  }) => jsonEncode({
+    'schema_version': schemaVersion,
+    'type': 'approval_result',
+    'conversation_id': conversationId,
+    'run_id': runId,
+    'approval_id': approvalId,
+    'accepted': accepted,
+    'status': accepted ? 'approved' : 'not_pending',
+  });
+
+  String cancellationResult({
+    required String conversationId,
+    required String runId,
+    required bool accepted,
+  }) => jsonEncode({
+    'schema_version': schemaVersion,
+    'type': 'cancellation_result',
+    'conversation_id': conversationId,
+    'run_id': runId,
+    'accepted': accepted,
+    'status': accepted ? 'cancellation_requested' : 'not_active',
   });
 }

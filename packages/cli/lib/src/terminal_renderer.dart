@@ -11,10 +11,31 @@ final class TerminalRenderer {
       ChatEntryKind.toolCall ||
       ChatEntryKind.toolOutput ||
       ChatEntryKind.toolResult => entry.toolName ?? entry.kind.name,
+      ChatEntryKind.approval => 'approval',
       ChatEntryKind.lifecycle => entry.status.name,
       ChatEntryKind.error => 'error',
     };
-    return '[${safeText(label)}] ${safeText(entry.content)}';
+    return '[${safeText(label)}] ${entryContent(entry)}';
+  }
+
+  String entryContent(ChatEntry entry) {
+    final content = safeText(entry.content);
+    if (entry.kind != ChatEntryKind.approval ||
+        entry.status != ChatEntryStatus.pending ||
+        entry.runId == null ||
+        entry.approvalId == null) {
+      return content;
+    }
+    final runId = safeText(entry.runId!);
+    final approvalId = safeText(entry.approvalId!);
+    final truncationWarning = entry.truncated
+        ? 'WARNING: Approval preview truncated; part of the proposed edit is not shown.\n'
+        : '';
+    return '$content\n'
+        '$truncationWarning'
+        'Run ID: $runId\n'
+        'Approval ID: $approvalId\n'
+        'Approve: make approve RUN_ID=$runId APPROVAL_ID=$approvalId';
   }
 
   String safeText(String value) => value

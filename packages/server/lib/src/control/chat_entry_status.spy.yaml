@@ -3,8 +3,10 @@ serialized: byName
 values:
   - submitted
   - queued
+  - pending
   - running
   - warning
+  - approved
   - completed
   - failed
   - cancelled

@@ -102,6 +102,7 @@ final class AgentRuntimeConfiguration {
           workingDirectory: workspace,
         ),
         tools: tools,
+        approvalRequiredTools: const {'edit_file'},
       ),
       AgentProvider.gemini => ModelConversationAgent(
         model: GeminiModel(
@@ -110,6 +111,7 @@ final class AgentRuntimeConfiguration {
         ),
         tools: tools,
         providerName: 'Gemini',
+        approvalRequiredTools: const {'edit_file'},
       ),
     };
   }

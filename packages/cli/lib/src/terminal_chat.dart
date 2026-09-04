@@ -38,6 +38,8 @@ final class TerminalChat {
   Future<int> run({
     String? initialMessage,
     String? cancelRunId,
+    String? approveRunId,
+    String? approvalId,
     String? modelName,
   }) async {
     var failed = false;
@@ -52,11 +54,37 @@ final class TerminalChat {
           cancelRunId,
         );
         _io.writeln(
-          cancelled
+          outputMode == TerminalOutputMode.jsonl
+              ? _jsonlRenderer.cancellationResult(
+                  conversationId: _status.conversationId,
+                  runId: cancelRunId,
+                  accepted: cancelled,
+                )
+              : cancelled
               ? 'Cancellation requested for $cancelRunId.'
               : 'Run $cancelRunId is not active.',
         );
         return cancelled ? 0 : 1;
+      }
+      if (approveRunId != null && approvalId != null) {
+        final approved = await _client.approveWork(
+          _status.conversationId,
+          approveRunId,
+          approvalId,
+        );
+        _io.writeln(
+          outputMode == TerminalOutputMode.jsonl
+              ? _jsonlRenderer.approvalResult(
+                  conversationId: _status.conversationId,
+                  runId: approveRunId,
+                  approvalId: approvalId,
+                  accepted: approved,
+                )
+              : approved
+              ? 'Approved $approvalId for $approveRunId.'
+              : 'Approval $approvalId is not pending for $approveRunId.',
+        );
+        return approved ? 0 : 1;
       }
       _entries.addAll(await _client.history(_status.conversationId));
       _entries.sort((left, right) => left.sequence.compareTo(right.sequence));

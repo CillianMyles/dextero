@@ -96,6 +96,8 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
 
   Future<void> _cancel() => widget.controller.cancelActiveRun();
 
+  Future<void> _approve() => widget.controller.approvePendingWork();
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -130,12 +132,22 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                         scrollController: _scrollController,
                       ),
                     ),
+                    if (controller.pendingApproval case final approval?) ...[
+                      const SizedBox(height: 12),
+                      _ApprovalPrompt(
+                        approval: approval,
+                        enabled: controller.canApprove,
+                        approving: controller.approving,
+                        onApprove: _approve,
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _Composer(
                       messageController: _messageController,
                       enabled: controller.canSubmit,
                       canSend: canSend,
                       submitting: controller.submitting,
+                      canCancel: controller.canCancel,
                       cancelling: controller.cancelling,
                       working: controller.busy && !controller.submitting,
                       onSend: _send,
@@ -470,6 +482,7 @@ class _ChatEntryCard extends StatelessWidget {
         entry: entry,
         user: false,
       ),
+      ChatEntryKind.approval => _ActivityRow(entry: entry),
       _ => _ActivityRow(entry: entry),
     };
   }
@@ -564,7 +577,10 @@ class _ActivityRow extends StatelessWidget {
     final isError =
         entry.kind == ChatEntryKind.error ||
         entry.status == ChatEntryStatus.failed;
-    final isWarning = entry.status == ChatEntryStatus.warning;
+    final isWarning =
+        entry.status == ChatEntryStatus.warning ||
+        (entry.kind == ChatEntryKind.approval &&
+            entry.status == ChatEntryStatus.cancelled);
     final background = isError
         ? scheme.destructive.withValues(alpha: 0.08)
         : isWarning
@@ -735,6 +751,8 @@ class _ActivityRow extends StatelessWidget {
                   ),
                   if (entry.toolCallId case final toolCallId?)
                     _TechnicalDetail(label: 'Tool call', value: toolCallId),
+                  if (entry.approvalId case final approvalId?)
+                    _TechnicalDetail(label: 'Approval ID', value: approvalId),
                 ],
               ),
             ),
@@ -749,6 +767,12 @@ class _ActivityRow extends StatelessWidget {
     ChatEntryKind.toolCall => '${_toolLabel(entry.toolName)} started',
     ChatEntryKind.toolOutput => '${_toolLabel(entry.toolName)} output',
     ChatEntryKind.toolResult => '${_toolLabel(entry.toolName)} result',
+    ChatEntryKind.approval => switch (entry.status) {
+      ChatEntryStatus.pending => 'Approval required',
+      ChatEntryStatus.approved => 'Action approved',
+      ChatEntryStatus.cancelled => 'Approval cancelled',
+      _ => 'Approval update',
+    },
     ChatEntryKind.error => 'Agent error',
     ChatEntryKind.lifecycle => switch (entry.status) {
       ChatEntryStatus.queued => 'Queued',
@@ -783,6 +807,12 @@ class _ActivityRow extends StatelessWidget {
       entry.status == ChatEntryStatus.failed
           ? LucideIcons.circleAlert
           : LucideIcons.checkCircle2,
+    ChatEntryKind.approval => switch (entry.status) {
+      ChatEntryStatus.pending => LucideIcons.shieldAlert,
+      ChatEntryStatus.approved => LucideIcons.shieldCheck,
+      ChatEntryStatus.cancelled => LucideIcons.circleStop,
+      _ => LucideIcons.info,
+    },
     ChatEntryKind.error => LucideIcons.circleAlert,
     _ => switch (entry.status) {
       ChatEntryStatus.queued => LucideIcons.clock3,
@@ -793,6 +823,79 @@ class _ActivityRow extends StatelessWidget {
       _ => LucideIcons.info,
     },
   };
+}
+
+class _ApprovalPrompt extends StatelessWidget {
+  const _ApprovalPrompt({
+    required this.approval,
+    required this.enabled,
+    required this.approving,
+    required this.onApprove,
+  });
+
+  final ChatEntry approval;
+  final bool enabled;
+  final bool approving;
+  final Future<void> Function() onApprove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final warning = DexteroDesign.warning(theme.brightness);
+    return Container(
+      key: const Key('approval-prompt'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: warning.withValues(alpha: 0.08),
+        border: Border.all(color: warning.withValues(alpha: 0.28)),
+        borderRadius: theme.radius,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(LucideIcons.shieldAlert, size: 18, color: warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Approval required',
+                  style: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                ConstrainedBox(
+                  key: const Key('approval-preview'),
+                  constraints: const BoxConstraints(maxHeight: 144),
+                  child: SingleChildScrollView(
+                    primary: false,
+                    child: SelectableText(
+                      approval.content,
+                      style: theme.textTheme.small.copyWith(
+                        color: theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ShadButton(
+            key: const Key('approve-work'),
+            enabled: enabled,
+            onPressed: enabled ? onApprove : null,
+            child: approving
+                ? const ShadSpinner(size: 14)
+                : const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ActivityBadge extends StatelessWidget {
@@ -857,6 +960,7 @@ class _Composer extends StatelessWidget {
     required this.enabled,
     required this.canSend,
     required this.submitting,
+    required this.canCancel,
     required this.cancelling,
     required this.working,
     required this.onSend,
@@ -867,6 +971,7 @@ class _Composer extends StatelessWidget {
   final bool enabled;
   final bool canSend;
   final bool submitting;
+  final bool canCancel;
   final bool cancelling;
   final bool working;
   final Future<void> Function() onSend;
@@ -915,8 +1020,8 @@ class _Composer extends StatelessWidget {
                 child: ShadIconButton.destructive(
                   key: const Key('cancel-run'),
                   semanticLabel: 'Cancel run',
-                  enabled: !cancelling,
-                  onPressed: cancelling ? null : onCancel,
+                  enabled: canCancel,
+                  onPressed: canCancel ? onCancel : null,
                   icon: cancelling
                       ? const ShadSpinner(size: 16)
                       : const Icon(LucideIcons.square),

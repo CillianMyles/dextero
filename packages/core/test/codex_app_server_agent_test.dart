@@ -150,6 +150,119 @@ void main() {
     );
   });
 
+  test('waits for approval before calling a gated dynamic tool', () async {
+    final transport = _ScriptedTransport(
+      toolName: 'edit_file',
+      arguments: const {
+        'path': 'README.md',
+        'oldText': 'old heading',
+        'newText': 'new heading',
+      },
+    );
+    final tool = _CountingEditTool();
+    final requested = Completer<ToolApprovalRequest>();
+    final approval = Completer<bool>();
+
+    final future = CodexAppServerAgent(transportFactory: () async => transport)
+        .run(
+          'edit it',
+          tools: [tool],
+          onApprovalRequest: (request) {
+            requested.complete(request);
+            return approval.future;
+          },
+        );
+    final request = await requested.future;
+
+    expect(request.toolCallId, 'call-1');
+    expect(request.summary.text, contains('edit_file requires approval'));
+    expect(request.summary.text, contains('-old heading'));
+    expect(request.summary.text, contains('+new heading'));
+    expect(tool.calls, 0);
+
+    approval.complete(true);
+    final run = await future;
+
+    expect(run.output, 'The tool said hello.');
+    expect(tool.calls, 1);
+  });
+
+  test(
+    'executes the dynamic-tool argument snapshot shown for approval',
+    () async {
+      final nested = <String, Object?>{'value': 'before'};
+      final arguments = <String, Object?>{
+        'path': 'README.md',
+        'oldText': 'old heading',
+        'newText': 'new heading',
+        'metadata': nested,
+      };
+      final transport = _ScriptedTransport(
+        toolName: 'edit_file',
+        arguments: arguments,
+      );
+      final tool = _CountingEditTool();
+      final requested = Completer<ToolApprovalRequest>();
+      final approval = Completer<bool>();
+
+      final future =
+          CodexAppServerAgent(transportFactory: () async => transport).run(
+            'edit it',
+            tools: [tool],
+            onApprovalRequest: (request) {
+              requested.complete(request);
+              return approval.future;
+            },
+          );
+      final request = await requested.future;
+      expect(request.summary.text, contains('"README.md"'));
+      expect(request.summary.text, contains('+new heading'));
+
+      arguments['path'] = 'pubspec.yaml';
+      arguments['newText'] = 'swapped after approval';
+      nested['value'] = 'after';
+      approval.complete(true);
+      await future;
+
+      expect(tool.arguments?['path'], 'README.md');
+      expect(tool.arguments?['newText'], 'new heading');
+      expect(tool.arguments?['metadata'], {'value': 'before'});
+    },
+  );
+
+  test('cancellation interrupts a pending dynamic-tool approval', () async {
+    final transport = _ScriptedTransport(
+      toolName: 'edit_file',
+      arguments: const {
+        'path': 'README.md',
+        'oldText': 'old heading',
+        'newText': 'new heading',
+      },
+    );
+    final tool = _CountingEditTool();
+    final requested = Completer<void>();
+    final approval = Completer<bool>();
+    final cancellation = CancellationController();
+
+    final future = CodexAppServerAgent(transportFactory: () async => transport)
+        .run(
+          'edit it',
+          tools: [tool],
+          cancellationToken: cancellation.token,
+          onApprovalRequest: (_) {
+            requested.complete();
+            return approval.future;
+          },
+        );
+    await requested.future;
+
+    expect(cancellation.cancel(), isTrue);
+    await expectLater(future, throwsA(isA<RunCancelledException>()));
+    expect(tool.calls, 0);
+    expect(approval.isCompleted, isFalse);
+    expect(transport.closed, isTrue);
+  });
+
   test('records a complete command and its bounded output', () async {
     final transport = _ScriptedTransport(
       toolName: 'run_command',
@@ -336,6 +449,29 @@ final class _CommandTool implements Tool {
     'stderr': 'warning\n',
     'truncated': false,
   };
+}
+
+final class _CountingEditTool implements Tool {
+  var calls = 0;
+  JsonMap? arguments;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'edit_file',
+    description: 'Edit a file.',
+    inputSchema: {'type': 'object'},
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) {
+    calls++;
+    this.arguments = arguments;
+    return {'path': arguments['path']};
+  }
 }
 
 base class _FakeTransport implements CodexAppServerTransport {

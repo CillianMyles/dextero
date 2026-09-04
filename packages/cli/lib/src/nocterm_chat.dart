@@ -397,7 +397,7 @@ final class _EntryView extends StatelessComponent {
   @override
   Component build(BuildContext context) {
     final presentation = _presentation(entry);
-    final content = renderer.safeText(entry.content);
+    final content = renderer.entryContent(entry);
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 1),
       child: Row(
@@ -455,6 +455,24 @@ final class _EntryView extends StatelessComponent {
             ? Colors.brightRed
             : Colors.brightGreen,
       ),
+      ChatEntryKind.approval => switch (entry.status) {
+        ChatEntryStatus.pending => (
+          symbol: '?',
+          label: 'approval',
+          color: Colors.brightYellow,
+        ),
+        ChatEntryStatus.approved => (
+          symbol: '✓',
+          label: 'approved',
+          color: Colors.brightGreen,
+        ),
+        ChatEntryStatus.cancelled => (
+          symbol: '×',
+          label: 'cancelled',
+          color: Colors.brightYellow,
+        ),
+        _ => (symbol: '!', label: 'approval', color: Colors.brightYellow),
+      },
       ChatEntryKind.lifecycle => (
         symbol: '·',
         label: entry.status.name,

@@ -73,6 +73,82 @@ void main() {
     expect(client.requests, isEmpty);
   });
 
+  test('shows how to resume a truncated pending approval', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(110, 24),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient(
+      historyEntries: [
+        _entry(
+          sequence: 0,
+          id: 'approval-pending',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.pending,
+          content: 'edit_file requires approval for README.md',
+          approvalId: 'approval-7',
+          truncated: true,
+        ),
+      ],
+    );
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.terminalState.containsText('Run ID: run-1'), isTrue);
+    expect(
+      tester.terminalState.containsText('Approval ID: approval-7'),
+      isTrue,
+    );
+    expect(
+      tester.terminalState.containsText(
+        'make approve RUN_ID=run-1 APPROVAL_ID=approval-7',
+      ),
+      isTrue,
+    );
+    expect(
+      tester.terminalState.containsText(
+        'WARNING: Approval preview truncated; part of the proposed edit is not shown.',
+      ),
+      isTrue,
+    );
+  });
+
+  test('distinguishes approved and cancelled approval history', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(100, 24),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient(
+      historyEntries: [
+        _entry(
+          sequence: 0,
+          id: 'approval-approved',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.approved,
+          content: 'edit_file approved',
+          approvalId: 'approval-1',
+        ),
+        _entry(
+          sequence: 1,
+          id: 'approval-cancelled',
+          kind: ChatEntryKind.approval,
+          status: ChatEntryStatus.cancelled,
+          content: 'edit_file approval cancelled',
+          approvalId: 'approval-2',
+        ),
+      ],
+    );
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.terminalState.containsText('✓ approved'), isTrue);
+    expect(tester.terminalState.containsText('× cancelled'), isTrue);
+  });
+
   test('selects a model before the first message', () async {
     final tester = await nocterm.NoctermTester.create();
     addTearDown(tester.dispose);
@@ -136,6 +212,13 @@ final class _FakeClient implements TerminalChatClient {
 
   @override
   Future<bool> cancelRun(String conversationId, String runId) async => true;
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async => true;
 
   @override
   Future<List<ChatEntry>> history(String conversationId) async => [
@@ -211,6 +294,8 @@ ChatEntry _entry({
   required ChatEntryKind kind,
   required ChatEntryStatus status,
   required String content,
+  String? approvalId,
+  bool truncated = false,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: id,
@@ -223,6 +308,7 @@ ChatEntry _entry({
   source: kind == ChatEntryKind.userMessage
       ? ChatEntrySource.user
       : ChatEntrySource.model,
-  truncated: false,
+  truncated: truncated,
   runId: 'run-1',
+  approvalId: approvalId,
 );

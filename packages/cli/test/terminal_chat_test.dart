@@ -1,6 +1,7 @@
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_server/dextero_client.dart';
 import 'package:test/test.dart';
+
 import 'dart:convert';
 
 void main() {
@@ -100,6 +101,45 @@ void main() {
     expect(io.output.join(), contains('Cancellation requested'));
   });
 
+  test('approves a pending action by run and approval id', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: client,
+      io: io,
+    ).run(approveRunId: 'run-42', approvalId: 'approval-7');
+
+    expect(result, 0);
+    expect(client.approvals, [('conversation-1', 'run-42', 'approval-7')]);
+    expect(client.requests, isEmpty);
+    expect(io.output.join(), contains('Approved approval-7'));
+  });
+
+  test('emits accepted and rejected approvals as JSONL', () async {
+    for (final accepted in [true, false]) {
+      final client = _FakeClient(approvalAccepted: accepted);
+      final io = _FakeIo(lines: const []);
+
+      final result = await TerminalChat(
+        client: client,
+        io: io,
+        outputMode: TerminalOutputMode.jsonl,
+      ).run(approveRunId: 'run-42', approvalId: 'approval-7');
+
+      expect(result, accepted ? 0 : 1);
+      expect(jsonDecode(io.output.single), {
+        'schema_version': 1,
+        'type': 'approval_result',
+        'conversation_id': 'conversation-1',
+        'run_id': 'run-42',
+        'approval_id': 'approval-7',
+        'accepted': accepted,
+        'status': accepted ? 'approved' : 'not_pending',
+      });
+    }
+  });
+
   test('emits only stable JSONL events in automation mode', () async {
     final client = _FakeClient();
     final io = _FakeIo(lines: const []);
@@ -126,15 +166,18 @@ final class _FakeClient implements TerminalChatClient {
     this.fail = false,
     this.endBeforeTerminal = false,
     this.statusError,
+    this.approvalAccepted = true,
   });
 
   final bool fail;
   final bool endBeforeTerminal;
   final Object? statusError;
+  final bool approvalAccepted;
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
   bool closed = false;
   final cancellations = <(String, String)>[];
+  final approvals = <(String, String, String)>[];
   final modelSelections = <String>[];
 
   @override
@@ -146,6 +189,16 @@ final class _FakeClient implements TerminalChatClient {
   Future<bool> cancelRun(String conversationId, String runId) async {
     cancellations.add((conversationId, runId));
     return true;
+  }
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async {
+    approvals.add((conversationId, runId, approvalId));
+    return approvalAccepted;
   }
 
   @override

@@ -29,6 +29,9 @@ Future<void> run(List<String> arguments) async {
   final workspace = Directory(
     Platform.environment['DEXTERO_WORKSPACE'] ?? Directory.current.path,
   ).absolute.path;
+  final bindAddress = _parseBindAddress(
+    Platform.environment['DEXTERO_BIND_ADDRESS'] ?? '127.0.0.1',
+  );
   final agentConfiguration = AgentRuntimeConfiguration.fromEnvironment(
     Platform.environment,
   );
@@ -45,6 +48,7 @@ Future<void> run(List<String> arguments) async {
     defaultConversationId: conversation.id,
     modelProvider: agentConfiguration.providerName,
     modelName: agentConfiguration.modelName,
+    bindAddress: bindAddress,
     availableModels: agentConfiguration.availableModels,
     modelSelector: (modelName) => service.selectAgent(
       conversationId: conversation.id,
@@ -69,6 +73,7 @@ Future<Serverpod> startControlServer({
   bool runInGuardedZone = true,
   String modelProvider = 'codex',
   String modelName = 'default',
+  InternetAddress? bindAddress,
   List<String>? availableModels,
   ModelSelector? modelSelector,
 }) async {
@@ -104,6 +109,45 @@ Future<Serverpod> startControlServer({
     config: config,
     authenticationHandler: DexteroTokenAuthenticator(token).authenticate,
   );
-  await pod.start(runInGuardedZone: runInGuardedZone);
+  final effectiveBindAddress = bindAddress ?? InternetAddress.loopbackIPv4;
+  await IOOverrides.runWithIOOverrides(
+    () => pod.start(runInGuardedZone: runInGuardedZone),
+    _ServerBindOverrides(effectiveBindAddress),
+  );
   return pod;
+}
+
+InternetAddress _parseBindAddress(String value) {
+  final normalized = value.trim();
+  final address = InternetAddress.tryParse(normalized);
+  if (address == null) {
+    throw ArgumentError.value(
+      value,
+      'DEXTERO_BIND_ADDRESS',
+      'must be an IPv4 or IPv6 address',
+    );
+  }
+  return address;
+}
+
+/// Constrains Serverpod 3's internal `anyIPv6` listener to an explicit address.
+final class _ServerBindOverrides extends IOOverrides {
+  _ServerBindOverrides(this.address);
+
+  final InternetAddress address;
+
+  @override
+  Future<ServerSocket> serverSocketBind(
+    dynamic ignoredAddress,
+    int port, {
+    int backlog = 0,
+    bool v6Only = false,
+    bool shared = false,
+  }) => super.serverSocketBind(
+    address,
+    port,
+    backlog: backlog,
+    v6Only: address.type == InternetAddressType.IPv6 && v6Only,
+    shared: shared,
+  );
 }

@@ -7,5 +7,6 @@ values:
   - toolCall
   - toolOutput
   - toolResult
+  - approval
   - lifecycle
   - error

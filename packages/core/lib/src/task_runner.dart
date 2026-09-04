@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'approval.dart';
 import 'codex_app_server_agent.dart';
 import 'tool.dart';
 import 'tools/edit_file_tool.dart';
@@ -38,15 +39,20 @@ final class CodexTaskRunner implements TaskRunner {
     required String workspace,
     String? model,
     String codexExecutable = 'codex',
+    CodexTransportFactory? transportFactory,
+    ToolApprovalRequester? onApprovalRequest,
   }) : workspace = Directory(workspace).absolute.path,
+       _onApprovalRequest = onApprovalRequest,
        _agent = CodexAppServerAgent(
          model: model,
          workingDirectory: Directory(workspace).absolute.path,
          codexExecutable: codexExecutable,
+         transportFactory: transportFactory,
        );
 
   final String workspace;
   final CodexAppServerAgent _agent;
+  final ToolApprovalRequester? _onApprovalRequest;
 
   static int _taskSequence = 0;
 
@@ -77,7 +83,12 @@ final class CodexTaskRunner implements TaskRunner {
     yield event(CoreTaskEventKind.running, 'Codex is working');
 
     try {
-      final run = await _agent.run(normalizedPrompt, tools: _tools());
+      final run = await _agent.run(
+        normalizedPrompt,
+        tools: _tools(),
+        approvalRequiredTools: const {'edit_file'},
+        onApprovalRequest: _onApprovalRequest,
+      );
       yield event(CoreTaskEventKind.output, run.output);
       yield event(
         CoreTaskEventKind.completed,
