@@ -1,4 +1,4 @@
 interface:
   display_name: "Review PR"
-  short_description: "Review PRs from problem to correctness"
+  short_description: "Review PRs with bounded, severity-aware rounds"
   default_prompt: "Use $review-pr to explain and review this pull request from problem through implementation correctness."

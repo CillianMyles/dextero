@@ -13,6 +13,14 @@ For every change:
 Do not report the work complete before the commit and push succeed unless the
 user explicitly asks to stop earlier.
 
+## Automated review loop
+
+Before requesting automated PR review or addressing automated review feedback,
+read and follow `.agents/REVIEW_POLICY.md`. A PR gets at most three automated
+review rounds unless a human explicitly extends the budget. P0 and P1 findings
+remain blocking; deferrable P2 findings go to the roadmap as **Address later**;
+P3 findings do not justify another round.
+
 ## Delivery
 
 Build user-facing capabilities as tracer bullets through every layer:

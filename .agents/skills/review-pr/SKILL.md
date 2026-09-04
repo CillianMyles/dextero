@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: "Explain and review a pull request in problem-first order: establish why the change is needed, judge whether the approach is reasonable, then inspect implementation correctness. Use when understanding or reviewing someone else's PR; do not use merely to draft its description."
+description: "Explain and review a pull request in problem-first order within the repository's automated-review budget: establish why the change is needed, judge whether the approach is reasonable, then inspect implementation correctness. Use when understanding or reviewing someone else's PR; do not use merely to draft its description."
 ---
 
 # Review PR
@@ -12,6 +12,22 @@ problem and intent -> approach and tradeoffs -> implementation correctness
 ```
 
 Do not begin a line-by-line correctness review until the problem and approach are understood. Clean code does not make an unnecessary or structurally wrong change reasonable.
+
+## Check the review budget first
+
+Read `.agents/REVIEW_POLICY.md` in full. Inspect the complete PR discussion for
+review-round markers and identify the current head before doing a substantive
+review.
+
+- If the current head has a requested marker without a completed result,
+  perform that round, including round three. If three rounds were spent on
+  other heads or the current head was already reviewed, stop without inspecting
+  the diff and report that a human must explicitly extend the budget.
+- If this review was not already marked, record the next requested marker
+  before inspecting the diff. When direct PR write access is unavailable, put
+  the requested marker first in the review output so the coder can persist it.
+- Do not review a head that is known to fail required checks, duplicates an
+  earlier round, or is changing under an active review.
 
 ## Gather evidence
 
@@ -74,10 +90,16 @@ Make the explanation easy to scan, in this order:
 
 For each finding, include:
 
-- severity and a precise code location;
+- a P0-P3 severity from `.agents/REVIEW_POLICY.md` and a precise code location;
 - the triggering scenario;
 - the concrete impact;
 - the reasoning or evidence;
 - a concise fix direction when useful.
 
 Keep blocking findings separate from non-blocking questions and nits. Do not manufacture findings to make the review look complete. If no correctness issues remain, say so explicitly and still note meaningful test gaps or unresolved assumptions.
+
+On round three, apply the policy's terminal outcome. Never recommend a fourth
+automated review. Supply paste-ready **Address later** roadmap entries for
+deferrable P2 findings when you cannot update `ROADMAP.md` directly; leave any
+P0 or P1 as a human decision rather than continuing the automated loop. End the
+result by repeating the round marker with `state=completed`.
