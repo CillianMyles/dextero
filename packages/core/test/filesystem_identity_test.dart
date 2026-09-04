@@ -1,9 +1,33 @@
 import 'dart:io';
 
 import 'package:dextero_core/src/filesystem_identity.dart';
+import 'package:dextero_core/src/trusted_executable.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('accepts a non-FHS executable from an absolute host PATH', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-non-fhs-probe-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final bin = await Directory(
+      '${sandbox.path}/nix/store/bin',
+    ).create(recursive: true);
+    final executable = await File('${bin.path}/stat').create();
+
+    expect(
+      await resolveTrustedExecutable(
+        workspace,
+        operatingSystemExecutableCandidates(
+          'stat',
+          environment: {'PATH': bin.path},
+        ),
+      ),
+      await executable.resolveSymbolicLinks(),
+    );
+  });
+
   test('rejects an unavailable Linux filesystem birth time', () {
     expect(
       () => normalizeFilesystemIdentity(

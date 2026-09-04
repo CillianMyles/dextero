@@ -6,6 +6,31 @@ import 'package:test/test.dart';
 
 void main() {
   test(
+    'rejects an identity registry inside the controlled workspace',
+    () async {
+      final workspace = await Directory.systemTemp.createTemp(
+        'dextero-contained-state-',
+      );
+      addTearDown(() => workspace.delete(recursive: true));
+      final stateDirectory = Directory('${workspace.path}/.dextero-state');
+
+      await expectLater(
+        LocalIdentityRegistry(
+          stateFile: File('${stateDirectory.path}/identities.json'),
+        ).resolve(workspace.path),
+        throwsA(
+          isA<ArgumentError>().having(
+            (error) => error.message,
+            'message',
+            contains('outside the controlled workspace'),
+          ),
+        ),
+      );
+      expect(await stateDirectory.exists(), isFalse);
+    },
+  );
+
+  test(
     'keeps device, project, and workspace identities across reloads',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(

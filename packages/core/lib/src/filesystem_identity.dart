@@ -12,9 +12,10 @@ Future<String> resolveFilesystemIdentity(Directory directory) async {
     ]);
     arguments = ['-f', '%d:%i:%B', directory.path];
   } else if (Platform.isLinux) {
-    executable = await resolveTrustedExecutable(directory, const [
+    executable = await resolveTrustedExecutable(directory, [
       '/usr/bin/stat',
       '/bin/stat',
+      ...operatingSystemExecutableCandidates('stat'),
     ]);
     // `%w` retains sub-second birth-time precision, unlike integer `%W`.
     arguments = ['-c', '%d:%i:%w', directory.path];

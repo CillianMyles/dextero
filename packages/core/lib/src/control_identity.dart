@@ -38,7 +38,7 @@ final class LocalIdentityRegistry {
   LocalIdentityRegistry({
     required File stateFile,
     IdentifierGenerator? identifiers,
-  }) : _stateFile = stateFile,
+  }) : _stateFile = stateFile.absolute,
        _identifiers = identifiers ?? SecureIdentifierGenerator();
 
   factory LocalIdentityRegistry.fromEnvironment(Map<String, String> values) {
@@ -67,6 +67,7 @@ final class LocalIdentityRegistry {
       );
     }
     final workspacePath = await workspaceDirectory.resolveSymbolicLinks();
+    await _validateStateLocation(workspacePath);
     final project = await _findProject(Directory(workspacePath));
     return _withInProcessLock(_stateFile.absolute.path, () async {
       await _stateFile.parent.create(recursive: true);
@@ -133,6 +134,28 @@ final class LocalIdentityRegistry {
         await lock.close();
       }
     });
+  }
+
+  Future<void> _validateStateLocation(String workspacePath) async {
+    var statePath = await _prospectiveCanonicalPath(_stateFile);
+    if (paths.equals(statePath, workspacePath) ||
+        paths.isWithin(workspacePath, statePath)) {
+      throw ArgumentError.value(
+        _stateFile.path,
+        'stateFile',
+        'must be outside the controlled workspace',
+      );
+    }
+    await _stateFile.parent.create(recursive: true);
+    statePath = await _prospectiveCanonicalPath(_stateFile);
+    if (paths.equals(statePath, workspacePath) ||
+        paths.isWithin(workspacePath, statePath)) {
+      throw ArgumentError.value(
+        _stateFile.path,
+        'stateFile',
+        'must be outside the controlled workspace',
+      );
+    }
   }
 
   Future<_IdentityState> _readState() async {
@@ -542,7 +565,13 @@ Future<void> _validateGitDirectoryOwnership({
 }
 
 List<String> _trustedGitCandidates() {
-  if (!Platform.isWindows) return const ['/usr/bin/git', '/bin/git'];
+  if (!Platform.isWindows) {
+    return [
+      '/usr/bin/git',
+      '/bin/git',
+      ...operatingSystemExecutableCandidates('git'),
+    ];
+  }
   final candidates = <String>[];
   for (final name in const ['PROGRAMFILES', 'PROGRAMFILES(X86)']) {
     final root = operatingSystemEnvironmentValue(name);
@@ -550,6 +579,7 @@ List<String> _trustedGitCandidates() {
     candidates.add('$root\\Git\\cmd\\git.exe');
     candidates.add('$root\\Git\\bin\\git.exe');
   }
+  candidates.addAll(operatingSystemExecutableCandidates('git'));
   return candidates;
 }
 
@@ -561,6 +591,22 @@ Map<String, String> _gitProbeEnvironment() {
     if (value != null) environment[name] = value;
   }
   return environment;
+}
+
+Future<String> _prospectiveCanonicalPath(File file) async {
+  final type = await FileSystemEntity.type(file.path, followLinks: false);
+  if (type != FileSystemEntityType.notFound) {
+    return file.resolveSymbolicLinks();
+  }
+  var ancestor = file.parent;
+  while (!await ancestor.exists()) {
+    final parent = ancestor.parent;
+    if (parent.path == ancestor.path) break;
+    ancestor = parent;
+  }
+  final canonicalAncestor = await ancestor.resolveSymbolicLinks();
+  final remainder = paths.relative(file.path, from: ancestor.path);
+  return paths.normalize(paths.join(canonicalAncestor, remainder));
 }
 
 Map<String, String> _stringMap(Object? value) {
