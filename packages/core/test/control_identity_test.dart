@@ -243,6 +243,33 @@ void main() {
     );
   });
 
+  test('does not follow marker lock symlinks from Git metadata', () async {
+    if (Platform.isWindows) return;
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-symbolic-marker-lock-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final gitDirectory = await Directory('${workspace.path}/.git').create();
+    final outside = File('${sandbox.path}/outside-lock');
+    final lockLink = Link(
+      '${gitDirectory.path}/dextero-project-identity-v1.lock',
+    );
+    await lockLink.create(outside.path);
+
+    final identity = await LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    ).resolve(workspace.path);
+
+    expect(identity.projectId, startsWith('project_'));
+    expect(await outside.exists(), isFalse);
+    expect(
+      await FileSystemEntity.type(lockLink.path, followLinks: false),
+      FileSystemEntityType.link,
+    );
+  });
+
   test('accepts a standard separate Git directory', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-separate-gitdir-',

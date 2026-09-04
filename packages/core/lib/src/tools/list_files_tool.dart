@@ -6,10 +6,15 @@ import '../workspace_boundary.dart';
 import 'workspace_path.dart';
 
 final class ListFilesTool implements Tool {
-  ListFilesTool({required String root, WorkspaceBoundary? boundary})
-    : _workspace = WorkspacePath(root, boundary: boundary);
+  ListFilesTool({
+    required String root,
+    WorkspaceBoundary? boundary,
+    Future<void> Function()? beforeFinalValidation,
+  }) : _workspace = WorkspacePath(root, boundary: boundary),
+       _beforeFinalValidation = beforeFinalValidation;
 
   final WorkspacePath _workspace;
+  final Future<void> Function()? _beforeFinalValidation;
 
   @override
   ToolDefinition get definition => const ToolDefinition(
@@ -51,23 +56,26 @@ final class ListFilesTool implements Tool {
       expectedType: FileSystemEntityType.directory,
       allowRoot: true,
     );
-    final listed = <FileSystemEntity>[];
+    final rootPath = await _workspace.canonicalRoot();
+    final listed = <({String path, FileSystemEntityType type})>[];
     await for (final entity in Directory(
       directoryPath,
     ).list(recursive: recursive, followLinks: false)) {
-      listed.add(entity);
+      listed.add((
+        path: entity.path,
+        type: await FileSystemEntity.type(entity.path, followLinks: false),
+      ));
     }
+    await _beforeFinalValidation?.call();
     await _workspace.validateBoundary();
-    final rootPath = await _workspace.canonicalRoot();
     final entries = <JsonMap>[];
     for (final entity in listed) {
-      final type = await FileSystemEntity.type(entity.path, followLinks: false);
       final relativePath = entity.path.substring(
         rootPath.length + Platform.pathSeparator.length,
       );
       entries.add({
         'path': relativePath,
-        'type': switch (type) {
+        'type': switch (entity.type) {
           FileSystemEntityType.file => 'file',
           FileSystemEntityType.directory => 'directory',
           FileSystemEntityType.link => 'link',

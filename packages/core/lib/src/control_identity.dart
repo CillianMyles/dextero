@@ -252,8 +252,8 @@ final class LocalIdentityRegistry {
     final marker = await _withInProcessLock(
       'marker:${markerFile.absolute.path}',
       () async {
-        final lock = await File(
-          '${markerFile.path}.lock',
+        final lock = await _markerLockFile(
+          markerFile,
         ).open(mode: FileMode.append);
         var locked = false;
         try {
@@ -267,6 +267,15 @@ final class LocalIdentityRegistry {
       },
     );
     return marker;
+  }
+
+  File _markerLockFile(File markerFile) {
+    final markerPath = Platform.isWindows
+        ? markerFile.absolute.path.toLowerCase()
+        : markerFile.absolute.path;
+    return File(
+      '${_stateFile.path}.marker-${_stablePathHash(markerPath)}.lock',
+    );
   }
 
   Future<String> _readOrCreateMarker(File markerFile, String prefix) async {
@@ -619,6 +628,14 @@ Future<String> _prospectiveCanonicalPath(File file) async {
 Future<String> _prospectiveCanonicalEntryPath(File file) async {
   final parentPath = await _prospectiveCanonicalPath(File(file.parent.path));
   return paths.normalize(paths.join(parentPath, paths.basename(file.path)));
+}
+
+String _stablePathHash(String value) {
+  var hash = 0xcbf29ce484222325;
+  for (final byte in utf8.encode(value)) {
+    hash = ((hash ^ byte) * 0x100000001b3) & 0xffffffffffffffff;
+  }
+  return hash.toRadixString(16).padLeft(16, '0');
 }
 
 Map<String, String> _stringMap(Object? value) {

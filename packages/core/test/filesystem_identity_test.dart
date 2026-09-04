@@ -5,24 +5,30 @@ import 'package:dextero_core/src/trusted_executable.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('accepts a non-FHS executable from an absolute Unix PATH', () async {
+  test('skips a non-executable entry in an absolute Unix PATH', () async {
     if (Platform.isWindows) return;
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-non-fhs-probe-',
     );
     addTearDown(() => sandbox.delete(recursive: true));
     final workspace = await Directory('${sandbox.path}/workspace').create();
-    final bin = await Directory(
-      '${sandbox.path}/nix/store/bin',
+    final unusableBin = await Directory(
+      '${sandbox.path}/nix/store/unusable/bin',
     ).create(recursive: true);
-    final executable = await File('${bin.path}/stat').create();
+    await File('${unusableBin.path}/stat').create();
+    final usableBin = await Directory(
+      '${sandbox.path}/nix/store/usable/bin',
+    ).create(recursive: true);
+    final executable = await File('${usableBin.path}/stat').create();
+    final chmod = await Process.run('/bin/chmod', ['+x', executable.path]);
+    expect(chmod.exitCode, 0, reason: chmod.stderr as String);
 
     expect(
       await resolveTrustedExecutable(
         workspace,
         operatingSystemExecutableCandidates(
           'stat',
-          environment: {'PATH': bin.path},
+          environment: {'PATH': '${unusableBin.path}:${usableBin.path}'},
         ),
       ),
       await executable.resolveSymbolicLinks(),

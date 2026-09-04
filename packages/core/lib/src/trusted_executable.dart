@@ -1,5 +1,7 @@
+import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as paths;
 
 /// Resolves a fixed executable outside the directory controlled by the agent.
@@ -12,13 +14,31 @@ Future<String> resolveTrustedExecutable(
     final file = File(candidate);
     if (!file.isAbsolute || !await file.exists()) continue;
     final resolved = await file.resolveSymbolicLinks();
-    if (!_inside(resolved, controlledPath)) return resolved;
+    if (!_inside(resolved, controlledPath) && _isExecutable(resolved)) {
+      return resolved;
+    }
   }
   throw FileSystemException(
     'Cannot locate a trusted executable outside the controlled workspace',
     controlledDirectory.path,
   );
 }
+
+bool _isExecutable(String path) {
+  if (Platform.isWindows) return true;
+  final pointer = path.toNativeUtf8();
+  try {
+    return _access()(pointer, 1) == 0;
+  } finally {
+    calloc.free(pointer);
+  }
+}
+
+_AccessDart _access() => DynamicLibrary.process()
+    .lookupFunction<_AccessNative, _AccessDart>('access');
+
+typedef _AccessNative = Int32 Function(Pointer<Utf8>, Int32);
+typedef _AccessDart = int Function(Pointer<Utf8>, int);
 
 String? operatingSystemEnvironmentValue(String name) {
   for (final entry in Platform.environment.entries) {

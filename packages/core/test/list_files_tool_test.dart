@@ -74,6 +74,22 @@ void main() {
     });
   });
 
+  test('rejects replacement after materializing entry types', () async {
+    await File('${root.path}/entry').writeAsString('original');
+    final boundary = await WorkspaceBoundary.capture(root.path);
+    tool = ListFilesTool(
+      root: boundary.root,
+      boundary: boundary,
+      beforeFinalValidation: () async {
+        await root.delete(recursive: true);
+        await root.create();
+        await Directory('${root.path}/entry').create();
+      },
+    );
+
+    await expectLater(tool.call({}), throwsA(isA<FileSystemException>()));
+  });
+
   test('rejects a non-boolean recursive value', () async {
     await expectLater(tool.call({'recursive': 'yes'}), throwsFormatException);
   });
