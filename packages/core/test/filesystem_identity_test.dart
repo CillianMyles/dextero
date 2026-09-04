@@ -5,7 +5,8 @@ import 'package:dextero_core/src/trusted_executable.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('accepts a non-FHS executable from an absolute host PATH', () async {
+  test('accepts a non-FHS executable from an absolute Unix PATH', () async {
+    if (Platform.isWindows) return;
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-non-fhs-probe-',
     );
