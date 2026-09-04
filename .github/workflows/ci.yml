@@ -93,6 +93,7 @@ jobs:
         working-directory: packages/core
         run: >-
           dart test
+          test/filesystem_identity_test.dart
           test/run_command_tool_test.dart
           test/workspace_path_test.dart
 
