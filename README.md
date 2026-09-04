@@ -147,6 +147,8 @@ so linked worktrees share a project identity while a replacement checkout at
 the same path receives new project and workspace identities. The host registry
 also records the metadata directory's filesystem incarnation, so copying a
 repository does not copy its identity while moving it preserves the identity.
+Standard separate Git directories are supported; symbolic `.git` entries are
+rejected. Linux identity resolution requires filesystem birth-time metadata.
 Non-Git workspaces use filesystem incarnation metadata in the host-owned
 registry, so replacing the directory rotates both identities without writing
 identity metadata into the controlled workspace.

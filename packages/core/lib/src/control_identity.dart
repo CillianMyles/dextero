@@ -305,16 +305,26 @@ final class _ProjectLocation {
 Future<_ProjectLocation> _findProject(Directory workspace) async {
   var current = workspace;
   while (true) {
-    final dotGitDirectory = Directory(_join(current.path, '.git'));
-    if (await dotGitDirectory.exists()) {
+    final dotGitPath = _join(current.path, '.git');
+    final dotGitType = await FileSystemEntity.type(
+      dotGitPath,
+      followLinks: false,
+    );
+    if (dotGitType == FileSystemEntityType.link) {
+      throw FormatException(
+        'Symbolic Git metadata is unsupported: $dotGitPath',
+      );
+    }
+    if (dotGitType == FileSystemEntityType.directory) {
+      final dotGitDirectory = Directory(dotGitPath);
       return _ProjectLocation(
         root: current,
         repositoryDirectory: dotGitDirectory,
         checkoutDirectory: dotGitDirectory,
       );
     }
-    final dotGitFile = File(_join(current.path, '.git'));
-    if (await dotGitFile.exists()) {
+    if (dotGitType == FileSystemEntityType.file) {
+      final dotGitFile = File(dotGitPath);
       final firstLine = (await dotGitFile.readAsLines()).firstOrNull;
       if (firstLine == null || !firstLine.startsWith('gitdir: ')) {
         throw FormatException(
@@ -515,7 +525,7 @@ Future<String> _filesystemIncarnation(Directory directory) async {
     executable = '/usr/bin/stat';
     arguments = ['-f', '%d:%i:%B', directory.path];
   } else if (Platform.isLinux) {
-    executable = '/usr/bin/stat';
+    executable = 'stat';
     // `%w` retains sub-second birth-time precision, unlike integer `%W`.
     arguments = ['-c', '%d:%i:%w', directory.path];
   } else if (Platform.isWindows) {
@@ -547,6 +557,13 @@ Future<String> _filesystemIncarnation(Directory directory) async {
   if (result.exitCode != 0 || value.isEmpty) {
     throw FileSystemException(
       'Cannot resolve stable filesystem identity: ${result.stderr}',
+      directory.path,
+    );
+  }
+  if (Platform.isLinux && value.endsWith(':-')) {
+    throw FileSystemException(
+      'Cannot resolve stable filesystem identity: filesystem birth time is '
+      'unavailable',
       directory.path,
     );
   }

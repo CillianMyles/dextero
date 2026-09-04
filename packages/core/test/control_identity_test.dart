@@ -94,7 +94,25 @@ void main() {
     );
   });
 
-  test('accepts a configured separate Git directory', () async {
+  test('rejects a symbolic .git directory', () async {
+    if (Platform.isWindows) return;
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-symbolic-gitdir-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final gitDirectory = await Directory('${sandbox.path}/metadata').create();
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    await Link('${workspace.path}/.git').create(gitDirectory.path);
+
+    await expectLater(
+      LocalIdentityRegistry(
+        stateFile: File('${sandbox.path}/state/identities.json'),
+      ).resolve(workspace.path),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('accepts a standard separate Git directory', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-separate-gitdir-',
     );
@@ -411,6 +429,33 @@ void main() {
     expect(utc.exitCode, 0, reason: utc.stderr as String);
     expect(newYork.exitCode, 0, reason: newYork.stderr as String);
     expect(newYork.stdout, utc.stdout);
+  });
+
+  test('rejects an unavailable Linux filesystem birth time', () async {
+    if (!Platform.isLinux) return;
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-no-birth-time-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final fakeBin = await Directory('${sandbox.path}/bin').create();
+    final fakeStat = File('${fakeBin.path}/stat');
+    await fakeStat.writeAsString('#!/bin/sh\nprintf "7:9:-\\n"\n');
+    final chmod = await Process.run('chmod', ['+x', fakeStat.path]);
+    expect(chmod.exitCode, 0, reason: chmod.stderr as String);
+    final helper = File(
+      '${Directory.current.path}/test/fixtures/resolve_host_identity.dart',
+    );
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [helper.path, '${sandbox.path}/state/identities.json', workspace.path],
+      workingDirectory: Directory.current.path,
+      environment: {'PATH': fakeBin.path},
+    );
+
+    expect(result.exitCode, isNot(0));
+    expect(result.stderr, contains('filesystem birth time is unavailable'));
   });
 
   test('rejects malformed host identities', () {
