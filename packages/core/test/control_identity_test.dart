@@ -81,6 +81,29 @@ void main() {
     expect(replacement.workspaceId, isNot(first.workspaceId));
   });
 
+  test(
+    'does not reuse identities when a non-Git directory is replaced',
+    () async {
+      final sandbox = await Directory.systemTemp.createTemp(
+        'dextero-replaced-directory-',
+      );
+      addTearDown(() => sandbox.delete(recursive: true));
+      final workspace = await Directory('${sandbox.path}/workspace').create();
+      final registry = LocalIdentityRegistry(
+        stateFile: File('${sandbox.path}/state/identities.json'),
+        identifiers: _SequenceIdentifiers(),
+      );
+
+      final first = await registry.resolve(workspace.path);
+      await workspace.delete(recursive: true);
+      await workspace.create();
+      final replacement = await registry.resolve(workspace.path);
+
+      expect(replacement.projectId, isNot(first.projectId));
+      expect(replacement.workspaceId, isNot(first.workspaceId));
+    },
+  );
+
   test('does not reuse a linked worktree identity at the same path', () async {
     final sandbox = await Directory.systemTemp.createTemp(
       'dextero-replaced-worktree-',

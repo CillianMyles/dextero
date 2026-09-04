@@ -46,7 +46,7 @@ final class CliControllerIdentityStore {
       ).open(mode: FileMode.append);
       var locked = false;
       try {
-        await lock.lock(FileLock.exclusive);
+        await lock.lock(FileLock.blockingExclusive);
         locked = true;
         final existing = await _read(effectiveName);
         if (existing != null) return existing;

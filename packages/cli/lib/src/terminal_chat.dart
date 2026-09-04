@@ -49,6 +49,11 @@ final class TerminalChat {
       if (modelName != null && modelName != _status.modelName) {
         _status = await _client.selectModel(modelName);
       }
+      if (outputMode == TerminalOutputMode.jsonl &&
+          (cancelRunId != null ||
+              (approveRunId != null && approvalId != null))) {
+        _render();
+      }
       if (cancelRunId != null) {
         final cancelled = await _client.cancelRun(
           _status.conversationId,

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 import 'controller_identity_synchronizer.dart';
 
 IdentitySynchronizer createControllerIdentitySynchronizer() =>
@@ -18,14 +20,16 @@ final class _IoIdentitySynchronizer implements IdentitySynchronizer {
     _tail = completer.future;
     await previous;
     try {
+      final directory = await getApplicationSupportDirectory();
+      await directory.create(recursive: true);
       final lockFile = File(
-        '${Directory.systemTemp.path}${Platform.pathSeparator}'
+        '${directory.path}${Platform.pathSeparator}'
         'dextero-app-controller-identity-v1.lock',
       );
       final lock = await lockFile.open(mode: FileMode.append);
       var locked = false;
       try {
-        await lock.lock(FileLock.exclusive);
+        await lock.lock(FileLock.blockingExclusive);
         locked = true;
         return await action();
       } finally {

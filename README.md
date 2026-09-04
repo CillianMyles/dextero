@@ -145,6 +145,9 @@ the Flutter identity badge shows the stable IDs in its tooltip.
 Git repositories keep a local incarnation marker in their shared Git metadata,
 so linked worktrees share a project identity while a replacement checkout at
 the same path receives new project and workspace identities.
+Non-Git workspaces keep the equivalent marker in
+`.dextero/workspace-identity-v1` so replacing the directory also rotates both
+identities.
 
 Run all checks:
 

@@ -71,7 +71,7 @@ final class LocalIdentityRegistry {
       ).open(mode: FileMode.append);
       var locked = false;
       try {
-        await lock.lock(FileLock.exclusive);
+        await lock.lock(FileLock.blockingExclusive);
         locked = true;
         // Re-read after taking the lock so concurrent hosts merge their entries.
         final state = await _readState();
@@ -155,7 +155,15 @@ final class LocalIdentityRegistry {
 
   Future<String> _projectKey(_ProjectLocation project) async {
     final repositoryDirectory = project.repositoryDirectory;
-    if (repositoryDirectory == null) return project.root.path;
+    if (repositoryDirectory == null) {
+      final rootPath = await project.root.resolveSymbolicLinks();
+      final marker = await _identityMarker(
+        directory: Directory(_join(rootPath, '.dextero')),
+        filename: 'workspace-identity-v1',
+        prefix: 'directory',
+      );
+      return '$rootPath::$marker';
+    }
 
     final repositoryPath = await repositoryDirectory.resolveSymbolicLinks();
     final marker = await _identityMarker(
@@ -172,7 +180,7 @@ final class LocalIdentityRegistry {
     String workspacePath,
   ) async {
     final checkoutDirectory = project.checkoutDirectory;
-    if (checkoutDirectory == null) return workspacePath;
+    if (checkoutDirectory == null) return '$projectKey::$workspacePath';
 
     final checkoutPath = await checkoutDirectory.resolveSymbolicLinks();
     final marker = await _identityMarker(
@@ -188,6 +196,7 @@ final class LocalIdentityRegistry {
     required String filename,
     required String prefix,
   }) async {
+    await directory.create(recursive: true);
     final markerFile = File(_join(directory.path, filename));
     final marker = await _withInProcessLock(
       'marker:${markerFile.absolute.path}',
@@ -197,7 +206,7 @@ final class LocalIdentityRegistry {
         ).open(mode: FileMode.append);
         var locked = false;
         try {
-          await lock.lock(FileLock.exclusive);
+          await lock.lock(FileLock.blockingExclusive);
           locked = true;
           return await _readOrCreateMarker(markerFile, prefix);
         } finally {

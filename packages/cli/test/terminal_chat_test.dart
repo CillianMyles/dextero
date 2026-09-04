@@ -128,7 +128,9 @@ void main() {
       ).run(approveRunId: 'run-42', approvalId: 'approval-7');
 
       expect(result, accepted ? 0 : 1);
-      expect(jsonDecode(io.output.single), {
+      expect(io.output, hasLength(2));
+      expect(jsonDecode(io.output.first)['type'], 'host_status');
+      expect(jsonDecode(io.output.last), {
         'schema_version': 1,
         'type': 'approval_result',
         'conversation_id': 'conversation-1',
@@ -138,6 +140,28 @@ void main() {
         'status': accepted ? 'approved' : 'not_pending',
       });
     }
+  });
+
+  test('emits identity before a JSONL cancellation result', () async {
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(
+      client: _FakeClient(),
+      io: io,
+      outputMode: TerminalOutputMode.jsonl,
+    ).run(cancelRunId: 'run-42');
+
+    expect(result, 0);
+    expect(io.output, hasLength(2));
+    expect(jsonDecode(io.output.first)['type'], 'host_status');
+    expect(jsonDecode(io.output.last), {
+      'schema_version': 1,
+      'type': 'cancellation_result',
+      'conversation_id': 'conversation-1',
+      'run_id': 'run-42',
+      'accepted': true,
+      'status': 'cancellation_requested',
+    });
   });
 
   test('emits only stable JSONL events in automation mode', () async {

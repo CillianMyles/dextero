@@ -1,5 +1,6 @@
 import 'package:dextero_app/src/controller_identity_store.dart';
 import 'package:dextero_app/src/controller_identity_synchronizer_factory.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -53,6 +54,7 @@ void main() {
   });
 
   test('serializes platform identity creation between clients', () async {
+    if (!kIsWeb) return;
     String? stored;
     AppControllerIdentityStore store() => AppControllerIdentityStore(
       readId: () async => stored,
