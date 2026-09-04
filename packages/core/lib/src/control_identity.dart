@@ -304,6 +304,11 @@ Future<_ProjectLocation> _findProject(Directory workspace) async {
       final gitDirectory = Directory(
         _resolvePath(current.path, firstLine.substring('gitdir: '.length)),
       );
+      await _validateGitDirectoryOwnership(
+        workspaceRoot: current,
+        dotGitFile: dotGitFile,
+        gitDirectory: gitDirectory,
+      );
       final commonDirectoryFile = File(_join(gitDirectory.path, 'commondir'));
       final commonDirectory = await commonDirectoryFile.exists()
           ? Directory(
@@ -324,6 +329,62 @@ Future<_ProjectLocation> _findProject(Directory workspace) async {
     current = parent;
   }
   return _ProjectLocation(root: workspace);
+}
+
+Future<void> _validateGitDirectoryOwnership({
+  required Directory workspaceRoot,
+  required File dotGitFile,
+  required Directory gitDirectory,
+}) async {
+  if (!await gitDirectory.exists()) {
+    throw FormatException('Git directory does not exist: ${gitDirectory.path}');
+  }
+
+  final backPointerFile = File(_join(gitDirectory.path, 'gitdir'));
+  if (await backPointerFile.exists()) {
+    final value = (await backPointerFile.readAsString()).trim();
+    if (value.isEmpty) {
+      throw FormatException(
+        'Malformed Git back-pointer: ${backPointerFile.path}',
+      );
+    }
+    final expected = await dotGitFile.resolveSymbolicLinks();
+    final actualFile = File(_resolvePath(gitDirectory.path, value));
+    if (!await actualFile.exists() ||
+        await actualFile.resolveSymbolicLinks() != expected) {
+      throw FormatException(
+        'Git directory ${gitDirectory.path} does not belong to '
+        '${workspaceRoot.path}',
+      );
+    }
+    return;
+  }
+
+  // Submodules and repositories created with --separate-git-dir declare their
+  // worktree in Git config instead of using a linked-worktree back-pointer.
+  final result = await Process.run('git', [
+    '--git-dir',
+    gitDirectory.path,
+    'config',
+    '--path',
+    '--get',
+    'core.worktree',
+  ]);
+  if (result.exitCode == 0) {
+    final configured = (result.stdout as String).trim();
+    if (configured.isNotEmpty) {
+      final expected = await workspaceRoot.resolveSymbolicLinks();
+      final candidate = Directory(_resolvePath(gitDirectory.path, configured));
+      if (await candidate.exists() &&
+          await candidate.resolveSymbolicLinks() == expected) {
+        return;
+      }
+    }
+  }
+  throw FormatException(
+    'Git directory ${gitDirectory.path} does not belong to '
+    '${workspaceRoot.path}',
+  );
 }
 
 Map<String, String> _stringMap(Object? value) {
@@ -450,6 +511,8 @@ Future<String> _filesystemIncarnation(Directory directory) async {
     arguments,
     environment: Platform.isWindows
         ? {'DEXTERO_IDENTITY_PATH': directory.path}
+        : Platform.isLinux
+        ? const {'LC_ALL': 'C', 'TZ': 'UTC'}
         : null,
   );
   final value = (result.stdout as String).trim();

@@ -47,6 +47,9 @@ void main() {
       '${worktree.path}/.git',
     ).writeAsString('gitdir: ${worktreeGit.path}\n');
     await File('${worktreeGit.path}/commondir').writeAsString('../..\n');
+    await File(
+      '${worktreeGit.path}/gitdir',
+    ).writeAsString('${worktree.path}/.git\n');
     final registry = LocalIdentityRegistry(
       stateFile: File('${sandbox.path}/state/identities.json'),
       identifiers: _SequenceIdentifiers(),
@@ -57,6 +60,69 @@ void main() {
 
     expect(feature.projectId, primary.projectId);
     expect(feature.workspaceId, isNot(primary.workspaceId));
+  });
+
+  test('rejects a gitdir owned by another checkout', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-forged-gitdir-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final project = await Directory('${sandbox.path}/project').create();
+    final commonGit = await Directory('${project.path}/.git').create();
+    final owner = await Directory('${sandbox.path}/owner').create();
+    final ownerGit = await Directory(
+      '${commonGit.path}/worktrees/owner',
+    ).create(recursive: true);
+    await File(
+      '${owner.path}/.git',
+    ).writeAsString('gitdir: ${ownerGit.path}\n');
+    await File('${ownerGit.path}/commondir').writeAsString('../..\n');
+    await File('${ownerGit.path}/gitdir').writeAsString('${owner.path}/.git\n');
+    final forged = await Directory('${sandbox.path}/forged').create();
+    await File(
+      '${forged.path}/.git',
+    ).writeAsString('gitdir: ${ownerGit.path}\n');
+    final registry = LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    );
+
+    await registry.resolve(owner.path);
+    await expectLater(
+      registry.resolve(forged.path),
+      throwsA(isA<FormatException>()),
+    );
+  });
+
+  test('accepts a configured separate Git directory', () async {
+    final sandbox = await Directory.systemTemp.createTemp(
+      'dextero-separate-gitdir-',
+    );
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final gitDirectory = await Directory('${sandbox.path}/metadata').create();
+    await Directory('${gitDirectory.path}/objects').create();
+    await Directory('${gitDirectory.path}/refs/heads').create(recursive: true);
+    await File(
+      '${workspace.path}/.git',
+    ).writeAsString('gitdir: ${gitDirectory.path}\n');
+    await File(
+      '${gitDirectory.path}/HEAD',
+    ).writeAsString('ref: refs/heads/main\n');
+    await File('${gitDirectory.path}/config').writeAsString('''
+[core]
+  repositoryformatversion = 0
+  bare = false
+  worktree = ../workspace
+''');
+
+    final identity = await LocalIdentityRegistry(
+      stateFile: File('${sandbox.path}/state/identities.json'),
+      identifiers: _SequenceIdentifiers(),
+    ).resolve(workspace.path);
+
+    expect(identity.projectId, startsWith('project_'));
+    expect(identity.workspaceId, startsWith('workspace_'));
   });
 
   test('does not reuse identities when a Git checkout is replaced', () async {
@@ -196,6 +262,9 @@ void main() {
         '${worktree.path}/.git',
       ).writeAsString('gitdir: ${worktreeGit.path}\n');
       await File('${worktreeGit.path}/commondir').writeAsString('../..\n');
+      await File(
+        '${worktreeGit.path}/gitdir',
+      ).writeAsString('${worktree.path}/.git\n');
     }
 
     await createWorktreeMetadata();
@@ -258,6 +327,31 @@ void main() {
       LocalIdentityRegistry(stateFile: stateFile).resolve(workspace.path),
       throwsA(isA<FormatException>()),
     );
+  });
+
+  test('keeps Linux filesystem identity stable across timezones', () async {
+    if (!Platform.isLinux) return;
+    final sandbox = await Directory.systemTemp.createTemp('dextero-timezone-');
+    addTearDown(() => sandbox.delete(recursive: true));
+    final workspace = await Directory('${sandbox.path}/workspace').create();
+    final stateFile = File('${sandbox.path}/state/identities.json');
+    final helper = File(
+      '${Directory.current.path}/test/fixtures/resolve_host_identity.dart',
+    );
+
+    Future<ProcessResult> resolveWithTimezone(String timezone) => Process.run(
+      Platform.resolvedExecutable,
+      [helper.path, stateFile.path, workspace.path],
+      workingDirectory: Directory.current.path,
+      environment: {'TZ': timezone},
+    );
+
+    final utc = await resolveWithTimezone('UTC');
+    final newYork = await resolveWithTimezone('America/New_York');
+
+    expect(utc.exitCode, 0, reason: utc.stderr as String);
+    expect(newYork.exitCode, 0, reason: newYork.stderr as String);
+    expect(newYork.stdout, utc.stdout);
   });
 
   test('rejects malformed host identities', () {
