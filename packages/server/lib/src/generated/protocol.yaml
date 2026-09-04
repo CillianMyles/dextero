@@ -3,5 +3,6 @@ control:
   - selectModel:
   - submitMessage:
   - cancelRun:
+  - approveWork:
   - history:
   - streamHistory:

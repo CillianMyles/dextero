@@ -15,3 +15,4 @@ fields:
   runId: String?
   toolCallId: String?
   toolName: String?
+  approvalId: String?

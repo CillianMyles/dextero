@@ -16,6 +16,12 @@ abstract interface class ChatApi {
 
   Future<bool> cancelRun(String conversationId, String runId);
 
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  );
+
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence);
 
   Future<void> close();
@@ -48,6 +54,13 @@ final class ServerpodChatApi implements ChatApi {
   @override
   Future<bool> cancelRun(String conversationId, String runId) =>
       _client.control.cancelRun(conversationId, runId);
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) => _client.control.approveWork(conversationId, runId, approvalId);
 
   @override
   Stream<ChatEntry> streamHistory(String conversationId, int afterSequence) =>
@@ -89,12 +102,15 @@ final class DexteroController extends ChangeNotifier {
   final bool configured;
   final List<ChatEntry> _entries = [];
   final Set<String> _terminalRunIds = {};
+  final Set<String> _locallyResolvedApprovalIds = {};
+  final Set<String> _locallyCancelledRunIds = {};
   StreamSubscription<ChatEntry>? _historySubscription;
   HostStatus? _hostStatus;
   ChatLoadState _loadState = ChatLoadState.loading;
   String? _error;
   bool _submitting = false;
   bool _cancelling = false;
+  bool _approving = false;
   bool _selectingModel = false;
   String? _activeRunId;
   bool _initialized = false;
@@ -104,13 +120,43 @@ final class DexteroController extends ChangeNotifier {
   String? get error => _error;
   bool get submitting => _submitting;
   bool get cancelling => _cancelling;
+  bool get approving => _approving;
   bool get selectingModel => _selectingModel;
   bool get busy => _submitting || _activeRunId != null;
-  bool get canCancel => _activeRunId != null && !_cancelling;
+  bool get canCancel =>
+      _activeRunId != null &&
+      !_locallyCancelledRunIds.contains(_activeRunId) &&
+      !_cancelling &&
+      !_approving;
+  bool get canApprove => pendingApproval != null && !_cancelling && !_approving;
   bool get canSubmit => _hostStatus != null && !busy && !_selectingModel;
   bool get canSelectModel =>
       _hostStatus != null && _entries.isEmpty && !busy && !_selectingModel;
   List<ChatEntry> get entries => List.unmodifiable(_entries);
+
+  ChatEntry? get pendingApproval {
+    final resolved =
+        _entries
+            .where(
+              (entry) =>
+                  entry.kind == ChatEntryKind.approval &&
+                  entry.status != ChatEntryStatus.pending,
+            )
+            .map((entry) => entry.approvalId)
+            .whereType<String>()
+            .toSet()
+          ..addAll(_locallyResolvedApprovalIds);
+    for (final entry in _entries.reversed) {
+      if (entry.kind == ChatEntryKind.approval &&
+          entry.status == ChatEntryStatus.pending &&
+          entry.approvalId != null &&
+          !_locallyCancelledRunIds.contains(entry.runId) &&
+          !resolved.contains(entry.approvalId)) {
+        return entry;
+      }
+    }
+    return null;
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -144,7 +190,7 @@ final class DexteroController extends ChangeNotifier {
   Future<bool> cancelActiveRun() async {
     final status = _hostStatus;
     final runId = _activeRunId;
-    if (status == null || runId == null || _cancelling) return false;
+    if (status == null || runId == null || !canCancel) return false;
 
     _cancelling = true;
     _error = null;
@@ -153,6 +199,8 @@ final class DexteroController extends ChangeNotifier {
       final accepted = await _api.cancelRun(status.conversationId, runId);
       if (!accepted) {
         _error = 'The run had already finished before cancellation.';
+      } else {
+        _locallyCancelledRunIds.add(runId);
       }
       return accepted;
     } on Object catch (error) {
@@ -160,6 +208,44 @@ final class DexteroController extends ChangeNotifier {
       return false;
     } finally {
       _cancelling = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> approvePendingWork() async {
+    final status = _hostStatus;
+    final approval = pendingApproval;
+    final runId = approval?.runId;
+    final approvalId = approval?.approvalId;
+    if (status == null || runId == null || approvalId == null || !canApprove) {
+      return false;
+    }
+
+    _approving = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final accepted = await _api.approveWork(
+        status.conversationId,
+        runId,
+        approvalId,
+      );
+      if (!accepted) {
+        _error = 'The action no longer needs approval.';
+      } else if (!_entries.any(
+        (entry) =>
+            entry.kind == ChatEntryKind.approval &&
+            entry.status != ChatEntryStatus.pending &&
+            entry.approvalId == approvalId,
+      )) {
+        _locallyResolvedApprovalIds.add(approvalId);
+      }
+      return accepted;
+    } on Object catch (error) {
+      _error = 'Approval failed: $error';
+      return false;
+    } finally {
+      _approving = false;
       notifyListeners();
     }
   }
@@ -295,6 +381,12 @@ final class DexteroController extends ChangeNotifier {
   void _addEntry(ChatEntry entry) {
     if (_entries.any((existing) => existing.entryId == entry.entryId)) return;
     _entries.add(entry);
+    final approvalId = entry.approvalId;
+    if (entry.kind == ChatEntryKind.approval &&
+        entry.status != ChatEntryStatus.pending &&
+        approvalId != null) {
+      _locallyResolvedApprovalIds.remove(approvalId);
+    }
     _entries.sort((left, right) => left.sequence.compareTo(right.sequence));
     _loadState = ChatLoadState.ready;
   }
@@ -328,6 +420,13 @@ final class _UnavailableChatApi implements ChatApi {
   @override
   Future<bool> cancelRun(String conversationId, String runId) async =>
       _unavailable();
+
+  @override
+  Future<bool> approveWork(
+    String conversationId,
+    String runId,
+    String approvalId,
+  ) async => _unavailable();
 
   @override
   Future<HostStatus> status() async => _unavailable();

@@ -16,8 +16,10 @@ import 'package:serverpod/serverpod.dart' as _i1;
 enum ChatEntryStatus implements _i1.SerializableModel {
   submitted,
   queued,
+  pending,
   running,
   warning,
+  approved,
   completed,
   failed,
   cancelled;
@@ -28,10 +30,14 @@ enum ChatEntryStatus implements _i1.SerializableModel {
         return ChatEntryStatus.submitted;
       case 'queued':
         return ChatEntryStatus.queued;
+      case 'pending':
+        return ChatEntryStatus.pending;
       case 'running':
         return ChatEntryStatus.running;
       case 'warning':
         return ChatEntryStatus.warning;
+      case 'approved':
+        return ChatEntryStatus.approved;
       case 'completed':
         return ChatEntryStatus.completed;
       case 'failed':

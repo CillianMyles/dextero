@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dextero_core/dextero_core.dart';
 import 'package:test/test.dart';
 
@@ -87,6 +89,151 @@ void main() {
     ]);
   });
 
+  test('waits for approval before executing a gated tool', () async {
+    final approval = Completer<bool>();
+    final requested = Completer<ToolApprovalRequest>();
+    final tool = _CountingTool();
+    final model = _QueueModel([
+      const ModelTurn(
+        toolCalls: [
+          ToolCall(
+            id: 'call-edit-1',
+            name: 'edit_file',
+            arguments: {
+              'path': 'README.md',
+              'oldText': 'old heading',
+              'newText': 'new heading',
+            },
+          ),
+        ],
+      ),
+      const ModelTurn(content: 'edited'),
+    ]);
+
+    final future = AgentLoop(model: model, tools: [tool]).run(
+      'edit',
+      onApprovalRequest: (request) {
+        requested.complete(request);
+        return approval.future;
+      },
+    );
+    final request = await requested.future;
+
+    expect(request.toolCallId, 'call-edit-1');
+    expect(request.summary.text, contains('edit_file requires approval'));
+    expect(request.summary.text, contains('-old heading'));
+    expect(request.summary.text, contains('+new heading'));
+    expect(tool.calls, 0);
+
+    approval.complete(true);
+    final run = await future;
+
+    expect(run.output, 'edited');
+    expect(tool.calls, 1);
+  });
+
+  test('executes the exact argument snapshot shown for approval', () async {
+    final nested = <String, Object?>{'value': 'before'};
+    final arguments = <String, Object?>{
+      'path': 'README.md',
+      'oldText': 'old heading',
+      'newText': 'new heading',
+      'metadata': nested,
+    };
+    final approval = Completer<bool>();
+    final requested = Completer<ToolApprovalRequest>();
+    final tool = _CountingTool();
+    final model = _QueueModel([
+      ModelTurn(
+        toolCalls: [
+          ToolCall(id: 'call-edit-1', name: 'edit_file', arguments: arguments),
+        ],
+      ),
+      const ModelTurn(content: 'edited'),
+    ]);
+
+    final future = AgentLoop(model: model, tools: [tool]).run(
+      'edit',
+      onApprovalRequest: (request) {
+        requested.complete(request);
+        return approval.future;
+      },
+    );
+    final request = await requested.future;
+    expect(request.summary.text, contains('"README.md"'));
+    expect(request.summary.text, contains('+new heading'));
+
+    arguments['path'] = 'pubspec.yaml';
+    arguments['newText'] = 'swapped after approval';
+    nested['value'] = 'after';
+    approval.complete(true);
+    final run = await future;
+
+    expect(tool.arguments?['path'], 'README.md');
+    expect(tool.arguments?['newText'], 'new heading');
+    expect(tool.arguments?['metadata'], {'value': 'before'});
+    final recordedCall = run.messages
+        .singleWhere((message) => message.toolCalls.isNotEmpty)
+        .toolCalls
+        .single;
+    expect(recordedCall.arguments['path'], 'README.md');
+    expect(recordedCall.arguments['metadata'], {'value': 'before'});
+  });
+
+  test('cancellation interrupts a pending approval callback', () async {
+    final approval = Completer<bool>();
+    final requested = Completer<void>();
+    final cancellation = CancellationController();
+    final tool = _CountingTool();
+    final model = _QueueModel([
+      const ModelTurn(
+        toolCalls: [
+          ToolCall(
+            id: 'call-edit-1',
+            name: 'edit_file',
+            arguments: {
+              'path': 'README.md',
+              'oldText': 'old heading',
+              'newText': 'new heading',
+            },
+          ),
+        ],
+      ),
+    ]);
+
+    final future = AgentLoop(model: model, tools: [tool]).run(
+      'edit',
+      cancellationToken: cancellation.token,
+      onApprovalRequest: (_) {
+        requested.complete();
+        return approval.future;
+      },
+    );
+    await requested.future;
+
+    expect(cancellation.cancel(), isTrue);
+    await expectLater(future, throwsA(isA<RunCancelledException>()));
+    expect(tool.calls, 0);
+    expect(approval.isCompleted, isFalse);
+  });
+
+  test('exported conversation agents gate edit_file by default', () {
+    final modelAgent = ModelConversationAgent(
+      model: _QueueModel([]),
+      tools: const [],
+      providerName: 'test',
+    );
+    final codexAgent = CodexConversationAgent(
+      agent: CodexAppServerAgent(
+        transportFactory: () async => throw StateError('not started'),
+      ),
+      tools: const [],
+    );
+
+    expect(modelAgent.approvalRequiredTools, defaultApprovalRequiredTools);
+    expect(codexAgent.approvalRequiredTools, defaultApprovalRequiredTools);
+  });
+
   test('rejects duplicate tool names', () {
     expect(
       () =>
@@ -171,6 +318,29 @@ final class _FailingTool implements Tool {
     CancellationToken? cancellationToken,
     ToolOutputSink? onOutput,
   }) => throw StateError('exploded');
+}
+
+final class _CountingTool implements Tool {
+  var calls = 0;
+  JsonMap? arguments;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'edit_file',
+    description: 'Edit a file.',
+    inputSchema: {'type': 'object'},
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) {
+    calls++;
+    this.arguments = arguments;
+    return {'path': arguments['path']};
+  }
 }
 
 final class _QueueModel implements AgentModel {

@@ -34,6 +34,7 @@ abstract class ChatEntry implements _i1.SerializableModel {
     this.runId,
     this.toolCallId,
     this.toolName,
+    this.approvalId,
   }) : eventVersion = eventVersion ?? 1,
        family = family ?? _i2.ChatEventFamily.task;
 
@@ -53,6 +54,7 @@ abstract class ChatEntry implements _i1.SerializableModel {
     String? runId,
     String? toolCallId,
     String? toolName,
+    String? approvalId,
   }) = _ChatEntryImpl;
 
   factory ChatEntry.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -82,6 +84,7 @@ abstract class ChatEntry implements _i1.SerializableModel {
       runId: jsonSerialization['runId'] as String?,
       toolCallId: jsonSerialization['toolCallId'] as String?,
       toolName: jsonSerialization['toolName'] as String?,
+      approvalId: jsonSerialization['approvalId'] as String?,
     );
   }
 
@@ -115,6 +118,8 @@ abstract class ChatEntry implements _i1.SerializableModel {
 
   String? toolName;
 
+  String? approvalId;
+
   /// Returns a shallow copy of this [ChatEntry]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -134,6 +139,7 @@ abstract class ChatEntry implements _i1.SerializableModel {
     String? runId,
     String? toolCallId,
     String? toolName,
+    String? approvalId,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -154,6 +160,7 @@ abstract class ChatEntry implements _i1.SerializableModel {
       if (runId != null) 'runId': runId,
       if (toolCallId != null) 'toolCallId': toolCallId,
       if (toolName != null) 'toolName': toolName,
+      if (approvalId != null) 'approvalId': approvalId,
     };
   }
 
@@ -182,6 +189,7 @@ class _ChatEntryImpl extends ChatEntry {
     String? runId,
     String? toolCallId,
     String? toolName,
+    String? approvalId,
   }) : super._(
          eventVersion: eventVersion,
          family: family,
@@ -198,6 +206,7 @@ class _ChatEntryImpl extends ChatEntry {
          runId: runId,
          toolCallId: toolCallId,
          toolName: toolName,
+         approvalId: approvalId,
        );
 
   /// Returns a shallow copy of this [ChatEntry]
@@ -220,6 +229,7 @@ class _ChatEntryImpl extends ChatEntry {
     Object? runId = _Undefined,
     Object? toolCallId = _Undefined,
     Object? toolName = _Undefined,
+    Object? approvalId = _Undefined,
   }) {
     return ChatEntry(
       eventVersion: eventVersion ?? this.eventVersion,
@@ -237,6 +247,7 @@ class _ChatEntryImpl extends ChatEntry {
       runId: runId is String? ? runId : this.runId,
       toolCallId: toolCallId is String? ? toolCallId : this.toolCallId,
       toolName: toolName is String? ? toolName : this.toolName,
+      approvalId: approvalId is String? ? approvalId : this.approvalId,
     );
   }
 }

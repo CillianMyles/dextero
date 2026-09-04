@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'approval.dart';
 import 'cancellation.dart';
 import 'chat_history.dart';
 import 'safe_metadata.dart';
@@ -49,6 +50,16 @@ abstract interface class ConversationAgent {
   });
 }
 
+/// Optional conversation-agent contract for pausing before gated tool calls.
+abstract interface class ApprovalAwareConversationAgent {
+  Future<ConversationAgentResult> runWithApproval(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+    ToolApprovalRequester? onApprovalRequest,
+  });
+}
+
 final class ChatSubmission {
   const ChatSubmission({
     required this.conversationId,
@@ -78,6 +89,7 @@ final class ChatService {
   final IdentifierGenerator _identifiers;
   final Map<String, ConversationAgent> _agents = {};
   final Map<String, _ActiveRun> _activeRuns = {};
+  final Map<String, _PendingApproval> _pendingApprovals = {};
   Future<void> _submissionLock = Future.value();
 
   ChatHistoryStore get store => _store;
@@ -178,6 +190,44 @@ final class ChatService {
     return active.cancellation.cancel();
   });
 
+  /// Approves the matching pending tool action exactly once.
+  Future<bool> approve({
+    required String conversationId,
+    required String runId,
+    required String approvalId,
+  }) => _withSubmissionLock(() async {
+    if (await _store.conversation(conversationId) == null) {
+      throw StateError('Unknown conversation: $conversationId');
+    }
+    final pending = _pendingApprovals[approvalId];
+    if (pending == null ||
+        pending.conversationId != conversationId ||
+        pending.runId != runId) {
+      return false;
+    }
+    final active = _activeRuns[conversationId];
+    if (active == null ||
+        active.runId != runId ||
+        active.cancellation.token.isCancellationRequested) {
+      return false;
+    }
+    await _append(
+      conversationId,
+      runId,
+      pending.correlationId,
+      kind: ChatEntryKind.approval,
+      status: ChatEntryStatus.approved,
+      content: '${pending.request.toolName} approved',
+      source: ChatEntrySource.user,
+      toolCallId: pending.request.toolCallId,
+      toolName: pending.request.toolName,
+      approvalId: approvalId,
+    );
+    _pendingApprovals.remove(approvalId);
+    pending.decision.complete(true);
+    return true;
+  });
+
   Future<void> _process({
     required String conversationId,
     required String runId,
@@ -199,21 +249,35 @@ final class ChatService {
         source: ChatEntrySource.dextero,
       );
       cancellationToken.throwIfCancellationRequested();
-      final result = await agent.run(
-        prompt,
-        cancellationToken: cancellationToken,
-        onEvent: (event) async {
-          cancellationToken.throwIfCancellationRequested();
-          if (event.kind == ConversationAgentEventKind.assistantMessage) {
-            assistantRecorded = true;
-          }
-          if (event.kind == ConversationAgentEventKind.error &&
-              !event.retrying) {
-            terminalAgentErrorRecorded = true;
-          }
-          await _recordAgentEvent(conversationId, runId, correlationId, event);
-        },
-      );
+      FutureOr<void> recordEvent(ConversationAgentEvent event) async {
+        cancellationToken.throwIfCancellationRequested();
+        if (event.kind == ConversationAgentEventKind.assistantMessage) {
+          assistantRecorded = true;
+        }
+        if (event.kind == ConversationAgentEventKind.error && !event.retrying) {
+          terminalAgentErrorRecorded = true;
+        }
+        await _recordAgentEvent(conversationId, runId, correlationId, event);
+      }
+
+      final result = agent is ApprovalAwareConversationAgent
+          ? await (agent as ApprovalAwareConversationAgent).runWithApproval(
+              prompt,
+              cancellationToken: cancellationToken,
+              onEvent: recordEvent,
+              onApprovalRequest: (request) => _requestApproval(
+                conversationId: conversationId,
+                runId: runId,
+                correlationId: correlationId,
+                request: request,
+                cancellationToken: cancellationToken,
+              ),
+            )
+          : await agent.run(
+              prompt,
+              cancellationToken: cancellationToken,
+              onEvent: recordEvent,
+            );
       cancellationToken.throwIfCancellationRequested();
       if (!assistantRecorded) {
         final output = SafeMetadata.message(result.output);
@@ -275,6 +339,73 @@ final class ChatService {
         final active = _activeRuns[conversationId];
         if (active?.runId == runId) _activeRuns.remove(conversationId);
       });
+    }
+  }
+
+  Future<bool> _requestApproval({
+    required String conversationId,
+    required String runId,
+    required String correlationId,
+    required ToolApprovalRequest request,
+    required CancellationToken cancellationToken,
+  }) async {
+    cancellationToken.throwIfCancellationRequested();
+    final approvalId = _identifiers.next('approval');
+    final normalizedRequest = ToolApprovalRequest(
+      toolCallId: SafeMetadata.identifier(request.toolCallId),
+      toolName: SafeMetadata.toolName(request.toolName),
+      summary: request.summary,
+    );
+    final pending = _PendingApproval(
+      conversationId: conversationId,
+      runId: runId,
+      correlationId: correlationId,
+      request: normalizedRequest,
+    );
+    await _withSubmissionLock(() async {
+      cancellationToken.throwIfCancellationRequested();
+      _pendingApprovals[approvalId] = pending;
+      await _append(
+        conversationId,
+        runId,
+        correlationId,
+        kind: ChatEntryKind.approval,
+        status: ChatEntryStatus.pending,
+        content: normalizedRequest.summary.text,
+        source: ChatEntrySource.dextero,
+        truncated: normalizedRequest.summary.truncated,
+        toolCallId: normalizedRequest.toolCallId,
+        toolName: normalizedRequest.toolName,
+        approvalId: approvalId,
+      );
+    });
+    try {
+      return await Future.any<bool>([
+        pending.decision.future,
+        cancellationToken.whenCancelled.then<bool>(
+          (_) => throw const RunCancelledException(),
+        ),
+      ]);
+    } on RunCancelledException {
+      await _withSubmissionLock(() async {
+        if (_pendingApprovals.remove(approvalId) == pending) {
+          await _append(
+            conversationId,
+            runId,
+            correlationId,
+            kind: ChatEntryKind.approval,
+            status: ChatEntryStatus.cancelled,
+            content: '${normalizedRequest.toolName} approval cancelled',
+            source: ChatEntrySource.dextero,
+            toolCallId: normalizedRequest.toolCallId,
+            toolName: normalizedRequest.toolName,
+            approvalId: approvalId,
+          );
+        }
+      });
+      rethrow;
+    } finally {
+      _pendingApprovals.remove(approvalId);
     }
   }
 
@@ -345,6 +476,7 @@ final class ChatService {
     bool truncated = false,
     String? toolCallId,
     String? toolName,
+    String? approvalId,
   }) => _store.append(
     conversationId,
     PendingChatEntry(
@@ -357,6 +489,7 @@ final class ChatService {
       runId: runId,
       toolCallId: toolCallId,
       toolName: toolName,
+      approvalId: approvalId,
     ),
   );
 
@@ -394,4 +527,19 @@ final class _ActiveRun {
 
   final String runId;
   final CancellationController cancellation;
+}
+
+final class _PendingApproval {
+  _PendingApproval({
+    required this.conversationId,
+    required this.runId,
+    required this.correlationId,
+    required this.request,
+  });
+
+  final String conversationId;
+  final String runId;
+  final String correlationId;
+  final ToolApprovalRequest request;
+  final Completer<bool> decision = Completer<bool>();
 }

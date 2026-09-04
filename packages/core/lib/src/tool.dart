@@ -5,6 +5,24 @@ import 'cancellation.dart';
 typedef JsonMap = Map<String, Object?>;
 typedef ToolOutputSink = FutureOr<void> Function(ToolOutputUpdate update);
 
+/// Copies JSON-like input into recursively immutable maps and lists.
+JsonMap snapshotJsonMap(JsonMap value) => Map.unmodifiable({
+  for (final entry in value.entries) entry.key: _snapshotJsonValue(entry.value),
+});
+
+Object? _snapshotJsonValue(Object? value) {
+  if (value is Map) {
+    return Map.unmodifiable({
+      for (final entry in value.entries)
+        entry.key: _snapshotJsonValue(entry.value),
+    });
+  }
+  if (value is List) {
+    return List.unmodifiable(value.map(_snapshotJsonValue));
+  }
+  return value;
+}
+
 final class ToolOutputUpdate {
   const ToolOutputUpdate({required this.stream, required this.byteCount});
 

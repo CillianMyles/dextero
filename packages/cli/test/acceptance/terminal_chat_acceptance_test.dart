@@ -11,14 +11,20 @@ void main() {
     () async {
       const token = 'acceptance-token-0123456789-0123456789';
       final store = InMemoryChatHistoryStore();
+      final editTool = _AcceptanceEditFileTool();
       final service = ChatService(
         store: store,
         agent: ModelConversationAgent(
           model: GeminiModel(
             transport: _AcceptanceGeminiTransport(defaultGeminiModel),
           ),
-          tools: [_AcceptanceRunCommandTool(), _AcceptanceReadFileTool()],
+          tools: [
+            _AcceptanceRunCommandTool(),
+            _AcceptanceReadFileTool(),
+            editTool,
+          ],
           providerName: 'Gemini',
+          approvalRequiredTools: const {'edit_file'},
         ),
       );
       final conversation = await service.createConversation();
@@ -44,14 +50,32 @@ void main() {
                 model: modelName,
                 transport: _AcceptanceGeminiTransport(modelName),
               ),
-              tools: [_AcceptanceRunCommandTool(), _AcceptanceReadFileTool()],
+              tools: [
+                _AcceptanceRunCommandTool(),
+                _AcceptanceReadFileTool(),
+                editTool,
+              ],
               providerName: 'Gemini',
+              approvalRequiredTools: const {'edit_file'},
             ),
           );
           selectedModel = modelName;
         },
         apiPort: apiPort,
         runInGuardedZone: false,
+      );
+      final loopbackConnection = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        pod.server.port,
+      );
+      await loopbackConnection.close();
+      await expectLater(
+        Socket.connect(
+          InternetAddress.loopbackIPv6,
+          pod.server.port,
+          timeout: const Duration(milliseconds: 250),
+        ),
+        throwsA(isA<SocketException>()),
       );
       addTearDown(() async {
         await pod.shutdown(exitProcess: false);
@@ -67,10 +91,32 @@ void main() {
         correlationIdFactory: () => 'acceptance-cli-1',
       );
 
-      final exitCode = await chat.run(
+      final chatFuture = chat.run(
         initialMessage: 'Inspect the workspace',
         modelName: 'gemini-selected',
       );
+      final pending = await store
+          .watch(conversation.id)
+          .firstWhere(
+            (entry) =>
+                entry.kind == ChatEntryKind.approval &&
+                entry.status == ChatEntryStatus.pending,
+          );
+      expect(editTool.calls, 0);
+      final approver = ServerpodTerminalChatClient(
+        serverUrl: 'http://localhost:${pod.server.port}/',
+        token: token,
+      );
+      expect(
+        await approver.approveWork(
+          conversation.id,
+          pending.runId!,
+          pending.approvalId!,
+        ),
+        isTrue,
+      );
+      await approver.close();
+      final exitCode = await chatFuture;
 
       expect(exitCode, 0);
       expect(selectedModel, 'gemini-selected');
@@ -91,6 +137,23 @@ void main() {
         contains('[read_file] read_file failed: File not found: missing.txt'),
       );
       expect(io.output.join(), contains('[dextero] Workspace\nready'));
+      expect(
+        io.output.join(),
+        contains('[approval] edit_file requires approval for "README.md"'),
+      );
+      expect(io.output.join(), contains('--- old text\n-old'));
+      expect(io.output.join(), contains('+++ new text\n+new'));
+      expect(io.output.join(), contains('Run ID: ${pending.runId}'));
+      expect(io.output.join(), contains('Approval ID: ${pending.approvalId}'));
+      expect(
+        io.output.join(),
+        contains(
+          'make approve RUN_ID=${pending.runId} '
+          'APPROVAL_ID=${pending.approvalId}',
+        ),
+      );
+      expect(io.output.join(), contains('[approval] edit_file approved'));
+      expect(editTool.calls, 1);
       final history = await store.history(conversation.id);
       expect(history.map((entry) => entry.sequence), [
         0,
@@ -103,6 +166,10 @@ void main() {
         7,
         8,
         9,
+        10,
+        11,
+        12,
+        13,
       ]);
       expect(history.map((entry) => entry.kind), [
         ChatEntryKind.userMessage,
@@ -112,6 +179,10 @@ void main() {
         ChatEntryKind.toolOutput,
         ChatEntryKind.toolResult,
         ChatEntryKind.toolCall,
+        ChatEntryKind.toolResult,
+        ChatEntryKind.toolCall,
+        ChatEntryKind.approval,
+        ChatEntryKind.approval,
         ChatEntryKind.toolResult,
         ChatEntryKind.assistantMessage,
         ChatEntryKind.lifecycle,
@@ -183,7 +254,32 @@ final class _AcceptanceGeminiTransport implements GeminiTransport {
         ],
       };
     }
-    expect(toolResponse['id'], 'acceptance-tool-2');
+    if (turn == 2) {
+      expect(toolResponse['id'], 'acceptance-tool-2');
+      return {
+        'candidates': [
+          {
+            'content': {
+              'parts': [
+                {
+                  'functionCall': {
+                    'id': 'acceptance-tool-3',
+                    'name': 'edit_file',
+                    'args': {
+                      'path': 'README.md',
+                      'oldText': 'old',
+                      'newText': 'new',
+                    },
+                  },
+                  'thoughtSignature': 'acceptance-signature-3',
+                },
+              ],
+            },
+          },
+        ],
+      };
+    }
+    expect(toolResponse['id'], 'acceptance-tool-3');
     return {
       'candidates': [
         {
@@ -261,6 +357,33 @@ final class _AcceptanceReadFileTool implements Tool {
     CancellationToken? cancellationToken,
     ToolOutputSink? onOutput,
   }) => throw const _AcceptanceToolError('File not found: missing.txt');
+}
+
+final class _AcceptanceEditFileTool implements Tool {
+  var calls = 0;
+
+  @override
+  ToolDefinition get definition => const ToolDefinition(
+    name: 'edit_file',
+    description: 'Edit a file.',
+    inputSchema: {
+      'type': 'object',
+      'properties': {
+        'path': {'type': 'string'},
+      },
+      'additionalProperties': false,
+    },
+  );
+
+  @override
+  Object? call(
+    JsonMap arguments, {
+    CancellationToken? cancellationToken,
+    ToolOutputSink? onOutput,
+  }) {
+    calls++;
+    return {'path': arguments['path']};
+  }
 }
 
 final class _AcceptanceToolError implements Exception {

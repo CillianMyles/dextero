@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'approval.dart';
 import 'cancellation.dart';
 import 'chat_service.dart';
 import 'process_environment.dart';
@@ -153,6 +154,8 @@ final class CodexAppServerAgent {
   Future<CodexAgentRun> run(
     String prompt, {
     required List<Tool> tools,
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
+    ToolApprovalRequester? onApprovalRequest,
     CodexAgentActivitySink? onActivity,
     CancellationToken? cancellationToken,
   }) async {
@@ -163,6 +166,7 @@ final class CodexAppServerAgent {
     if (toolsByName.length != tools.length) {
       throw ArgumentError('Tool names must be unique.');
     }
+    final gatedTools = Set<String>.unmodifiable(approvalRequiredTools);
 
     final transport = await _transportFactory();
     final messages = StreamIterator(transport.messages);
@@ -280,6 +284,8 @@ final class CodexAppServerAgent {
             requestId: message['id'],
             params: params,
             tools: toolsByName,
+            approvalRequiredTools: gatedTools,
+            onApprovalRequest: onApprovalRequest,
             cancellationToken: cancellationToken,
             onActivity: onActivity,
           );
@@ -451,6 +457,8 @@ final class CodexAppServerAgent {
     required Object? requestId,
     required Object? params,
     required Map<String, Tool> tools,
+    required Set<String> approvalRequiredTools,
+    ToolApprovalRequester? onApprovalRequest,
     CancellationToken? cancellationToken,
     CodexAgentActivitySink? onActivity,
   }) async {
@@ -472,26 +480,50 @@ final class CodexAppServerAgent {
       } else if (rawArguments is! Map) {
         content = 'Tool arguments must be a JSON object.';
       } else {
-        arguments = rawArguments.cast<String, Object?>();
-        try {
-          content = await tool.call(
-            arguments,
-            cancellationToken: cancellationToken,
-            onOutput: (update) => onActivity?.call(
-              CodexAgentActivity(
-                kind: CodexAgentActivityKind.toolOutput,
-                summary: SafeMetadata.text(
-                  '$toolName ${update.stream}: ${update.byteCount} bytes',
+        arguments = snapshotJsonMap(rawArguments.cast<String, Object?>());
+        if (approvalRequiredTools.contains(name) && onApprovalRequest == null) {
+          content = 'Approval is unavailable for $name.';
+        } else {
+          try {
+            var approved = true;
+            if (approvalRequiredTools.contains(name)) {
+              final approval = onApprovalRequest!(
+                ToolApprovalRequest(
+                  toolCallId: callId,
+                  toolName: name,
+                  summary: SafeMetadata.approvalRequest(name, arguments),
                 ),
-                toolCallId: callId,
-                toolName: toolName,
-              ),
-            ),
-          );
-          cancellationToken?.throwIfCancellationRequested();
-          success = true;
-        } on Object catch (error) {
-          content = error.toString();
+              );
+              approved = await switch (cancellationToken) {
+                null => approval,
+                final token => token.waitFor(approval),
+              };
+            }
+            cancellationToken?.throwIfCancellationRequested();
+            if (!approved) {
+              content = '$name was not approved.';
+            } else {
+              content = await tool.call(
+                arguments,
+                cancellationToken: cancellationToken,
+                onOutput: (update) => onActivity?.call(
+                  CodexAgentActivity(
+                    kind: CodexAgentActivityKind.toolOutput,
+                    summary: SafeMetadata.text(
+                      '$toolName ${update.stream}: ${update.byteCount} bytes',
+                    ),
+                    toolCallId: callId,
+                    toolName: toolName,
+                  ),
+                ),
+              );
+              cancellationToken?.throwIfCancellationRequested();
+              success = true;
+            }
+          } on Object catch (error) {
+            cancellationToken?.throwIfCancellationRequested();
+            content = error.toString();
+          }
         }
       }
     }
@@ -637,25 +669,43 @@ final class CodexAppServerAgent {
   }
 }
 
-final class CodexConversationAgent implements ConversationAgent {
+final class CodexConversationAgent
+    implements ConversationAgent, ApprovalAwareConversationAgent {
   CodexConversationAgent({
     required CodexAppServerAgent agent,
     required List<Tool> tools,
+    Set<String> approvalRequiredTools = defaultApprovalRequiredTools,
   }) : _agent = agent,
-       _tools = List.unmodifiable(tools);
+       _tools = List.unmodifiable(tools),
+       approvalRequiredTools = Set.unmodifiable(approvalRequiredTools);
 
   final CodexAppServerAgent _agent;
   final List<Tool> _tools;
+  final Set<String> approvalRequiredTools;
 
   @override
   Future<ConversationAgentResult> run(
     String prompt, {
     required ConversationAgentEventSink onEvent,
     required CancellationToken cancellationToken,
+  }) => runWithApproval(
+    prompt,
+    onEvent: onEvent,
+    cancellationToken: cancellationToken,
+  );
+
+  @override
+  Future<ConversationAgentResult> runWithApproval(
+    String prompt, {
+    required ConversationAgentEventSink onEvent,
+    required CancellationToken cancellationToken,
+    ToolApprovalRequester? onApprovalRequest,
   }) async {
     final result = await _agent.run(
       prompt,
       tools: _tools,
+      approvalRequiredTools: approvalRequiredTools,
+      onApprovalRequest: onApprovalRequest,
       cancellationToken: cancellationToken,
       onActivity: (activity) => onEvent(
         ConversationAgentEvent(

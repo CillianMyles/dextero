@@ -15,16 +15,23 @@ DART ?= dart
 FLUTTER ?= flutter
 SERVERPOD ?= serverpod
 CONTROL_URL_SOURCE := $(origin CONTROL_URL)
-CONTROL_URL ?= http://localhost:8080/
-ANDROID_CONTROL_URL := $(if $(filter undefined,$(CONTROL_URL_SOURCE)),http://10.0.2.2:8080/,$(CONTROL_URL))
-SERVER_READY_URL ?= http://localhost:8080/
+BIND_ADDRESS ?= 127.0.0.1
+BIND_ADDRESS_IS_IPV6 := $(findstring :,$(BIND_ADDRESS))
+BIND_ADDRESS_IS_WILDCARD := $(filter 0.0.0.0 ::,$(BIND_ADDRESS))
+LOOPBACK_READY_HOST := $(if $(BIND_ADDRESS_IS_IPV6),[::1],127.0.0.1)
+SERVER_READY_HOST := $(if $(BIND_ADDRESS_IS_WILDCARD),$(LOOPBACK_READY_HOST),$(if $(BIND_ADDRESS_IS_IPV6),[$(BIND_ADDRESS)],$(BIND_ADDRESS)))
+CONTROL_URL ?= http://$(SERVER_READY_HOST):8080/
+ANDROID_ALIAS_COMPATIBLE_BIND := $(filter 127.0.0.1 0.0.0.0,$(BIND_ADDRESS))
+ANDROID_CONTROL_URL := $(if $(filter undefined,$(CONTROL_URL_SOURCE)),$(if $(ANDROID_ALIAS_COMPATIBLE_BIND),http://10.0.2.2:8080/,$(CONTROL_URL)),$(CONTROL_URL))
+SERVER_READY_URL ?= http://$(SERVER_READY_HOST):8080/
 WORKSPACE ?= $(CURDIR)
 APP_DEVICE ?= chrome
 DEV_TOKEN_FILE := .dart_tool/dev-token
 
 .PHONY: help doctor bootstrap tools token generate format format-check analyze \
 	test test-core test-server test-app test-app-web test-cli check server app \
-	app-web app-android app-ios app-linux app-macos app-windows cli core dev \
+	app-web app-android app-ios app-linux app-macos app-windows cli cancel \
+	approve core dev \
 	dev-web dev-android dev-ios dev-linux dev-macos dev-windows \
 	validate-android-control-url validate-ios-control-url
 
@@ -102,6 +109,7 @@ check: format-check analyze test ## Run the same quality gate expected before re
 
 server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and Codex-backed core.
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
+	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \
 	 DEXTERO_WORKSPACE="$(WORKSPACE)" \
 	 $(DART) run packages/server/bin/server.dart
 
@@ -130,12 +138,10 @@ app-ios dev-ios: validate-ios-control-url
 
 validate-ios-control-url:
 	@url="$(CONTROL_URL)"; \
-	if [[ "$$url" =~ ^https:// ]] || \
-	   [[ "$$url" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?(/.*)?$$ ]]; then \
+	if [[ "$$url" =~ ^https:// ]]; then \
 	  exit 0; \
 	fi; \
-	echo "iOS CONTROL_URL must use HTTPS or an HTTP loopback host for the simulator."; \
-	exit 2
+	$(DART) run tool/validate_ios_control_url.dart "$$url"
 
 app-android: ## Run the Flutter Android client (set DEVICE to a connected device ID).
 	@test -n "$(DEVICE)" || { echo "Set DEVICE to an Android device ID from 'flutter devices'."; exit 2; }
@@ -160,6 +166,20 @@ cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	 $(DART) run packages/cli/bin/dextero.dart \
 	 $(if $(MODEL),--model "$(MODEL)",) $(if $(PROMPT),"$(PROMPT)",)
 
+cancel: $(DEV_TOKEN_FILE) ## Cancel a run (set RUN_ID).
+	@test -n "$(RUN_ID)" || { echo "Set RUN_ID to the run identifier."; exit 2; }
+	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
+	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
+	 $(DART) run packages/cli/bin/dextero.dart --cancel "$(RUN_ID)"
+
+approve: $(DEV_TOKEN_FILE) ## Approve a pending edit (set RUN_ID and APPROVAL_ID).
+	@test -n "$(RUN_ID)" || { echo "Set RUN_ID to the run identifier."; exit 2; }
+	@test -n "$(APPROVAL_ID)" || { echo "Set APPROVAL_ID to the approval identifier."; exit 2; }
+	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
+	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
+	 $(DART) run packages/cli/bin/dextero.dart \
+	 --approve "$(RUN_ID)" "$(APPROVAL_ID)"
+
 core: ## Run the core directly through the configured provider without Serverpod.
 	@$(DART) run packages/core/bin/dextero_core.dart $(if $(PROMPT),"$(PROMPT)",)
 
@@ -169,6 +189,7 @@ dev: $(DEV_TOKEN_FILE) ## Start the server and Flutter client (Chrome by default
 	 cleanup() { kill $$server_pid 2>/dev/null || true; }; \
 	 trap cleanup EXIT INT TERM; \
 	 DEXTERO_CONTROL_TOKEN="$$token" DEXTERO_WORKSPACE="$(WORKSPACE)" \
+	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \
 	   $(DART) run packages/server/bin/server.dart & server_pid=$$!; \
 	 until curl --silent --output /dev/null "$(SERVER_READY_URL)"; do \
 	   kill -0 $$server_pid 2>/dev/null || { echo "Server exited before becoming ready"; exit 1; }; \

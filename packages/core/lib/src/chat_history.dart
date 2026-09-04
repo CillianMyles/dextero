@@ -9,6 +9,7 @@ enum ChatEntryKind {
   toolCall,
   toolOutput,
   toolResult,
+  approval,
   lifecycle,
   error,
 }
@@ -28,8 +29,10 @@ enum ChatEventFamily {
 enum ChatEntryStatus {
   submitted,
   queued,
+  pending,
   running,
   warning,
+  approved,
   completed,
   failed,
   cancelled,
@@ -62,6 +65,7 @@ final class ChatHistoryEntry {
     this.runId,
     this.toolCallId,
     this.toolName,
+    this.approvalId,
   }) : _family = family;
 
   final int eventVersion;
@@ -81,6 +85,7 @@ final class ChatHistoryEntry {
   final String? runId;
   final String? toolCallId;
   final String? toolName;
+  final String? approvalId;
 }
 
 final class PendingChatEntry {
@@ -94,6 +99,7 @@ final class PendingChatEntry {
     this.runId,
     this.toolCallId,
     this.toolName,
+    this.approvalId,
     this.family,
   });
 
@@ -106,6 +112,7 @@ final class PendingChatEntry {
   final String? runId;
   final String? toolCallId;
   final String? toolName;
+  final String? approvalId;
   final ChatEventFamily? family;
 }
 
@@ -119,6 +126,7 @@ ChatEventFamily eventFamilyFor(ChatEntryKind kind, ChatEntryStatus status) {
     ChatEntryKind.toolCall ||
     ChatEntryKind.toolOutput ||
     ChatEntryKind.toolResult => ChatEventFamily.tool,
+    ChatEntryKind.approval => ChatEventFamily.approval,
     ChatEntryKind.lifecycle => ChatEventFamily.task,
     ChatEntryKind.error => ChatEventFamily.error,
   };
@@ -217,6 +225,7 @@ final class InMemoryChatHistoryStore implements ChatHistoryStore {
       runId: entry.runId,
       toolCallId: entry.toolCallId,
       toolName: entry.toolName,
+      approvalId: entry.approvalId,
     );
     state.entries.add(canonical);
     state.changes.add(canonical);
