@@ -1,246 +1,232 @@
 # Roadmap
 
-Milestones are directional, not release-date promises.
+Milestones are directional, not release-date promises. The next priorities are
+durable conversations, multiple workspaces, and a useful persistent workspace
+page. Broader permissions and memory follow the needs of those workflows;
+additional authority still requires the corresponding controls.
 
-## Foundation — working today
+## Foundation — completed
 
-- [x] JSON-shaped tool definitions, calls, and results
-- [x] Provider-neutral model interface
-- [x] Bounded model → tool → model loop
-- [x] Workspace-confined file reading and deterministic file listing
-- [x] Exact single-match file editing
-- [x] Direct argv-based process execution
-- [x] Explicit shell execution with timeout and output caps
-- [x] Codex app-server specialist adapter
-- [x] Deterministic demos and focused tool/protocol tests
-- [x] Native Dart AOT compilation spike
-- [x] Initial macOS Flutter app and terminal-client control-plane spike
-- [x] Nocterm full-screen terminal UI spike
+- [x] Provider-neutral model interface and bounded model → tool → model loop.
+- [x] Workspace-confined file reading, deterministic listing, and exact
+  single-match editing.
+- [x] Direct argv-based commands and explicit shell execution with timeouts,
+  environment filtering, output caps, and bounded background execution.
+- [x] Codex app-server specialist adapter and Gemini function-calling adapter.
+- [x] Deterministic demos, focused tool/protocol tests, and an AOT spike.
+- [x] Flutter controller and terminal clients, including a Nocterm TUI spike.
 
-## Milestone 1 — chat and typed control backbone
+## Milestones 1–2 — chat and typed control backbone, completed
 
-Make every task observable and controllable before adding more authority.
+- [x] Append-only user, assistant, tool, lifecycle, and error history with
+  stable conversation, entry, run, tool-call, and correlation IDs.
+- [x] Versioned event families, readable tool summaries, streaming model
+  output, incremental tool activity, and a stable JSONL interface.
+- [x] Cancellation propagation and child-process-tree cleanup.
+- [x] Database-free Serverpod host with generated submit, history,
+  cursor-stream, approval, and cancellation contracts.
+- [x] Explicit one-shot file-edit approvals in Flutter and terminal clients.
+- [x] Bootstrap authentication, local development defaults, and explicit
+  network binding.
+- [x] Provider-qualified Gemini/Codex model selection before the first
+  message through Flutter and terminal clients.
+- [x] Layered tests and network acceptance coverage.
 
-- [x] Establish append-only user, assistant, tool, lifecycle, and error history
-  with stable conversation, entry, run, tool-call, and correlation IDs.
-- [x] Adapt real Codex activity into readable tool summaries, including the
-  command and output details needed to understand what happened.
-- [x] Expose typed submit, history, and cursor-stream operations through the
-  Flutter and terminal chats.
-- [x] Test the path at every layer, including a terminal-to-server network
-  acceptance test.
-- [x] Define versioned events for task, model, tool, approval, artifact, usage,
-  warning, and error lifecycles.
-- [x] Support streaming model output and incremental tool output.
-- [x] Add cancellation propagation and reliable child-process-tree cleanup.
-- [x] Add timeouts, output limits, environment filtering, and bounded background
-  execution to all process tools.
-- [x] Provide a stable JSONL interface for automation and tests.
+**Established outcome:** Flutter and terminal clients can observe the same
+ordered activity, approve a gated edit, cancel work, and receive its result.
+Durable history and model context across submissions are the next milestone.
+See [README.md](README.md) for current behaviour and security limitations.
 
-History is currently in memory behind a persistence interface and is lost when
-the server restarts.
+## Milestone 3 — durable conversations and context
 
-Milestone 1 treats activity history as an observability feature, not a security
-or retention boundary. A lifetime bound on the number of retained activity
-events is outside this milestone.
+Return to a conversation after restarting Dextero and continue it meaningfully.
 
-**Exit condition:** a task can be watched and cancelled through one typed event
-contract without relying on terminal scraping.
+- [ ] Run a bounded storage spike comparing Serverpod's newer SQLite support
+  with SQLite/Drift behind the existing persistence interface. Verify the
+  required Serverpod version, host-side ORM support, migrations, transactions,
+  packaging, restart recovery, and diagnostic limitations before choosing.
+  This reopens the SQLite/Drift choice recorded in VISION.md; reconcile that
+  deployment guidance when the spike concludes.
+- [ ] Keep authoritative data on the computer running Dextero. Client caches
+  and offline synchronization are separate, later work. Require an explicit
+  deployment decision before adding a local Postgres service.
+- [ ] Keep conversation rules, context assembly, and storage interfaces in
+  core; implement durable stores, migrations, and host lifecycle in server,
+  with generated contracts shared by Flutter and CLI/TUI.
+- [ ] Persist conversations, messages, run state, activity events, provider
+  and model selection, and provenance. Preserve source messages and structured
+  context needed by the model separately from bounded display summaries.
+- [ ] Supply earlier conversation context on follow-up submissions for both
+  Gemini and Codex. Define bounded context assembly and persist any provider
+  session references needed for continuity without making them the only copy
+  of user history. Report context limits explicitly until compaction exists.
+- [ ] Restore conversations on startup and expose creation, listing,
+  reopening, and paginated history through the typed API, Flutter, and CLI/TUI.
+- [ ] Commit accepted messages before starting work and publish history
+  events only after durable append. Preserve cursor order across reconnects.
+- [ ] Mark unfinished runs interrupted after restart; invalidate pending
+  approvals and require a fresh decision before retrying an action. Do not
+  automatically replay side effects whose outcome is uncertain.
+- [ ] Add migrations, backup/restore, export, and explicit deletion paths.
+- [ ] Correlate host diagnostics with conversation and run IDs. Evaluate
+  Serverpod Insights as an operator view; keep durable task history independent
+  of diagnostic log retention and database-backend limitations.
+- [ ] Test context continuity, durable appends, cursor recovery, migrations,
+  and interrupted work through core, server, Flutter, CLI/TUI, and a host
+  restart acceptance test.
 
-## Milestone 2 — local Serverpod vertical slice
+**Exit condition:** restart the host, reopen the same conversation from either
+client, and ask a follow-up that correctly uses earlier messages. History and
+model selection survive; interrupted work and expired approvals are explicit.
+Semantic search and automatic task resumption are not required for this exit.
 
-Prove the product architecture with the smallest useful remote controller.
+## Milestone 4 — multiple workspaces
 
-- [x] Add a database-free Serverpod Mini service with a generated conversation
-  contract for submitting, inspecting, and streaming history.
-- [x] Expose an endpoint to cancel work.
-- [x] Expose endpoints to approve work.
-- [x] Use that contract from the Flutter and terminal chats.
-- [x] Add one understandable approval interaction to the app.
-- [x] Start with in-memory task state and document the restart limitation.
-- [x] Add local-only development defaults and explicit network binding.
+A workspace is a persistent place for an ongoing activity, such as Fitness.
+It contains conversations and shared records; it is not one endless chat or a
+filesystem directory. The first UI may expose one default conversation while
+the model supports multiple conversations per workspace.
 
-Current security boundary: control endpoints require a bootstrap bearer token,
-the host binds to IPv4 loopback by default, and `edit_file` requires explicit
-approval for every invocation. Approval decisions are not remembered.
-Non-loopback binding is opt-in and must remain firewalled until device pairing
-is available.
+- [ ] Introduce stable workspace identities, names, ordering, and archive
+  state; associate conversations and their records with a workspace.
+- [ ] Add workspace creation, renaming, archiving, and switching to the typed
+  API, Flutter sidebar, and CLI/TUI.
+- [ ] Make provider/model selection and agent context belong to individual
+  conversations. Switching workspaces must not mix context, streams, drafts,
+  active runs, or pending approvals, or cancel work merely by navigating away.
+- [ ] Show which workspace needs attention while allowing users to return to
+  its active work. Persist the last selected workspace as a client preference.
+- [ ] Keep product workspace identity separate from filesystem execution roots
+  and capability grants. Creating a workspace grants no new tool authority;
+  cross-workspace context sharing must be deliberate.
+- [ ] Test persistence, concurrent conversations, navigation during runs and
+  approvals, and context isolation across both clients and the network path.
 
-**Exit condition:** a Flutter client can continue the local conversation,
-observe typed activity, approve a gated action, cancel it, and receive the
-result from a local Dextero host.
+**Exit condition:** create Fitness and another workspace, converse in both,
+switch between them, and restart. Each retains its own conversations and
+configuration, with no context or approval leakage between them.
 
-## Milestone 3 — permissions, approvals, and audit
+## Milestone 5 — first persistent workspace page
 
-Turn current guardrails into enforceable product boundaries.
+Prove one useful workspace before building a general page-building platform.
+Use Fitness as the first example: a weekly plan, workout log, and progress view.
 
-- [ ] Establish stable controller/device and project/workspace identities
-  before allowing remembered grants.
-- [ ] Define capability grants scoped by principal, task, project or global
-  context, resource, operation, constraints, and duration.
-- [ ] Offer explicit approve-once, task, project, and global choices while
-  keeping one-shot approval as the default.
-- [ ] Evaluate grants locally with deterministic precedence, default-deny
-  behaviour, and an explanation of the rule that allowed or blocked an action.
-- [ ] Classify actions by risk and map them to configurable approval policies.
-- [ ] Persist grants, approval decisions, revocations, and security audit events
-  in a minimal SQLite/Drift policy store with migrations and recovery tests.
-- [ ] Record immutable, structured audit events for grants, actions, results,
-  and denials.
-- [ ] Expose active grants for inspection and immediate revocation through the
-  typed contract, Flutter app, and CLI/TUI.
-- [ ] Separate the user task timeline from an operator diagnostics view that
-  preserves model, message, tool, result, and response events in order.
-- [ ] Introduce network egress policy and platform sandbox adapter interfaces.
-- [ ] Add approval expiry, denial, cancellation, reconnect, restart, and
-  revocation behaviour.
-- [ ] Ensure remote controllers cannot bypass local policy.
+- [ ] Add a resizable desktop layout with workspace navigation, chat on the
+  left, and a persistent page on the right. Use chat/page switching on narrow
+  screens; start with an audit of the existing design system.
+- [ ] Persist domain records and page configuration independently of the chat
+  transcript. The page remains usable without an active model run.
+- [ ] Let direct UI actions and agent tools update the same records through
+  shared validation, authorization, and typed server operations. Define
+  revision/conflict handling so concurrent edits do not silently overwrite.
+- [ ] Start with a small supported set of text, list, table, chart, and form
+  components. Let users configure them directly or instruct the agent to do
+  so; persist configuration changes with provenance and undo.
+- [ ] Give the assistant current workspace records as relevant context and
+  update the page when records change. Keep cross-workspace sharing explicit.
+- [ ] Expose equivalent record inspection and mutations through CLI/TUI;
+  visual layout belongs to Flutter.
+- [ ] Test chat-to-page and page-to-chat updates, conflicts, undo, workspace
+  isolation, and restart persistence across the complete path.
 
-**Exit condition:** every consequential action is denied, pre-authorized by a
-specific inspectable and revocable capability, or paused for an explicit
-approval with a durable audit record. Remembered permissions survive restart
-and remain attributable to stable controller and project identities.
+**Exit condition:** ask Dextero to move a planned workout and see the page
+update; edit it directly and have the next chat turn use that change. Records
+and layout survive restart, and changes can be inspected and undone.
 
-## Milestone 4 — durable memory and sessions
+## Next — permissions, approvals, and audit
 
-- [ ] Persist tasks, task events, and checkpoints with SQLite/Drift.
-- [ ] Persist conversations, messages, artifacts, and their provenance as a
-  durable source record.
-- [ ] Add full-text search and semantic/vector search over messages and
-  artifacts.
-- [ ] Extract structured preferences, facts, relationships, and outcomes with
-  correction and provenance support.
-- [ ] Build retrieval and context-compaction policies that use relevant memory
-  without treating the entire archive as a prompt.
-- [ ] Resume or fail tasks predictably after a process restart.
-- [ ] Add context-window accounting, token budgets, and compaction.
-- [ ] Support queued steering messages and reconnecting event subscribers.
-- [ ] Add in-product memory browsing, search, correction, export, retention,
-  and deletion controls.
-- [ ] Add schema migrations and recovery tests.
+Extend controls around exercised workflows. Existing one-shot approvals and
+local access restrictions remain in force while the product slices above are
+built; remote access and broader tool authority depend on stronger controls.
 
-**Exit condition:** a host restart or controller disconnect does not erase task
-history, conversation continuity, or the ability to find and understand what
-happened later.
+- [ ] Establish stable controller/device identities before remembered grants.
+- [ ] Define grants scoped by principal, task, product workspace or execution
+  project, resource, operation, constraints, and duration.
+- [ ] Offer explicit approve-once, task, project/workspace, and global choices,
+  with one-shot approval as the default. Evaluate grants locally with
+  deterministic precedence, default-deny behaviour, and an explanation.
+- [ ] Classify actions by risk and extend approval policy to consequential
+  process, network, and integration actions.
+- [ ] Persist grants, decisions, revocations, and structured security audit
+  events through the chosen host store, with migrations and recovery tests.
+- [ ] Expose grant inspection and immediate revocation in the typed API,
+  Flutter, and CLI/TUI. Cover expiry, denial, cancellation, reconnect, restart,
+  and revocation; remote controllers must not bypass local policy.
+- [ ] Separate the user task timeline from ordered operator diagnostics.
+- [ ] Introduce network egress policy and platform sandbox adapters as their
+  corresponding capabilities are added.
 
-## Milestone 5 — specialist delegation
+**Exit condition:** every consequential action is denied, allowed by an
+inspectable and revocable grant, or paused for approval with a durable audit
+record. Remembered permissions remain attributable after restart.
 
-Use coding as the first complete delegation domain.
+## Next — richer memory and task continuity
 
-- [ ] Define a common specialist contract: scoped task, context, capabilities,
-  progress events, steering, cancellation, artifacts, and structured result.
-- [ ] Harden the Codex app-server adapter behind that contract.
-- [ ] Add a second coding-agent adapter to prove portability.
-- [ ] Enforce separate workspaces and capability grants for delegated work.
-- [ ] Support foreground and bounded background specialists.
-- [ ] Incorporate specialist results and artifacts into the parent task.
+Build on durable conversations and workspace records once real usage shows
+what people need to find and carry forward.
 
-**Exit condition:** Dextero can delegate a repository task, show live progress,
-constrain and cancel the specialist, and return a structured result without
-pretending to be the coding agent itself.
+- [ ] Add full-text search, then evaluate semantic/vector retrieval over
+  messages and artifacts against concrete retrieval cases.
+- [ ] Extract preferences, facts, relationships, and outcomes with provenance,
+  correction, and explicit workspace/private-data boundaries.
+- [ ] Add context-window accounting, token budgets, compaction, and retrieval
+  policies that select relevant context without loading the full archive.
+- [ ] Add memory browsing, search, correction, retention, export, and deletion
+  controls, including removal from derived indexes and summaries.
+- [ ] Add queued steering, durable checkpoints, and safe task resumption with
+  explicit idempotency and recovery rules for side effects.
 
-## Milestone 6 — core local capabilities
+**Exit condition:** users can find, correct, and reuse relevant prior work
+without unrelated workspace context leaking into a task, and supported tasks
+resume without silently repeating consequential actions.
 
-Add the highest-value typed tools behind the permission model.
+## Future directions — ordered by demonstrated need
 
-- [ ] `SearchFilesTool`: literal/regex search, include/exclude globs, stable
-  locations, workspace confinement, and result caps.
-- [ ] `ApplyPatchTool`: atomic multi-file changes, complete preflight,
-  preconditions, path validation, and byte/file limits.
-- [ ] `GitInspectTool`: read-only status, diff, log, and show with hooks, pagers,
-  and external diff disabled.
-- [ ] `HttpFetchTool`: GET/HEAD with SSRF, redirect, content-type, size, and
-  timeout policy; no ambient cookies or credentials.
-- [ ] Central JSON Schema argument validation for every tool.
-- [ ] PTY support for explicitly approved interactive processes.
+These are not prerequisites for the workspace milestones or a fixed delivery
+sequence. Each selected capability needs a bounded end-to-end exit condition.
 
-Git mutation, deletion, and general shell authority remain separately gated.
-
-## Milestone 7 — AI gateway and runtime ecosystem
-
-- [x] Add a Gemini function-calling adapter through the provider-neutral agent
-  loop with environment-controlled credentials and model selection.
-- [ ] Add an MCP client and dynamic tool registry.
-- [ ] Define manifests, trust levels, lifecycle, health, and version negotiation
-  for runtime adapters.
-- [ ] Add direct streaming model adapters while retaining provider-neutral
-  kernel contracts.
-- [ ] Route tasks across local models, cloud providers, and specialists using
-  explicit capability, privacy, latency, availability, and cost policy.
-- [ ] Show which provider handled a task, why it was selected, what context was
-  shared, and its measured or estimated cost.
-- [ ] Keep provider credentials, consent, and routing preferences under the
-  user's control without copying the full memory store to every provider.
-- [ ] Support project instructions, skills, and configuration profiles.
-- [ ] Define separate household identities, memories, permissions, budgets,
-  age-appropriate controls, and transparent family usage summaries.
-- [ ] Add hooks and artifact storage without allowing extensions to bypass
+- **Specialist delegation:** scoped tasks, context, capabilities, progress,
+  steering, cancellation, artifacts, and structured results. Harden Codex,
+  prove a second adapter when needed, and isolate delegated execution roots
+  and grants. Support bounded foreground/background work and return results
+  to the originating workspace.
+- **Local tools:** confined, capped file search; atomic, preflighted patching;
+  read-only Git inspection with hooks, pagers, and external diff disabled;
+  policy-bound HTTP fetching with SSRF and redirect controls; central argument
+  validation; and explicitly approved PTYs. Git mutation, deletion, and shell
+  authority need their own policy coverage.
+- **Runtime ecosystem and routing:** MCP and a dynamic tool registry;
+  versioned adapter manifests, trust, lifecycle, and health; direct streaming
+  providers; project instructions, skills, and profiles. Route among permitted
+  models using explicit privacy, capability, latency, availability, and cost
+  policy. Show provider, selection rationale, shared context, and cost without
+  copying the full memory store to providers or letting extensions bypass
   policy.
-
-**Exit condition:** Dextero can choose among permitted local and cloud models
-for a task without fragmenting the user's context, while useful capabilities
-can be installed or connected without recompiling Dextero or granting them
-ambient authority.
-
-## Milestone 8 — browser and computer use
-
-- [ ] Add an isolated browser profile and Chrome DevTools Protocol adapter.
-- [ ] Prefer DOM/semantic actions and gate consequential submissions.
-- [ ] Add screenshots and artifacts to the typed event stream.
-- [ ] Define stable native adapter interfaces for macOS accessibility, Windows
-  UI Automation, and Linux accessibility APIs.
-- [ ] Add display, window, coordinate, and accessibility-node models.
-- [ ] Treat vision/pixel input as a fallback with explicit confidence and
-  recovery paths.
-- [ ] Prove an end-to-end workflow that combines multiple ordinary desktop
-  applications rather than only developer tools.
-
-**Exit condition:** Dextero can complete a browser workflow safely and can
-exercise one native desktop workflow through a replaceable platform adapter.
-
-## Milestone 9 — secure remote control
-
-- [ ] Add cryptographic device pairing and per-device authorization.
-- [ ] Add controller presence, session discovery, revocation, and key rotation.
-- [ ] Use Serverpod for commands, task streams, approvals, and WebRTC
-  signalling.
-- [ ] Use WebRTC for low-latency screen, audio, pointer, and keyboard traffic.
-- [ ] Support LAN and private-overlay operation first.
-- [ ] Evaluate an optional rendezvous/notification/relay service without making
-  cloud authority mandatory.
-- [ ] Expand the Flutter controller across mobile, desktop, and web as platform
-  security constraints allow.
-
-**Exit condition:** a paired controller can securely monitor, steer, approve,
-and take over a task without opening an unrestricted remote shell.
-
-## Milestone 10 — channels and personal-system sync
-
-Make Dextero one continuous product that can be reached from the places people
-already use.
-
-- [ ] Define a channel-neutral conversation and identity model shared by the
-  app and messaging adapters.
-- [ ] Add one trusted text-messaging adapter with pairing, sender verification,
-  approvals, and delivery-state handling.
-- [ ] Route channel messages into the same conversations, tasks, memory, and
-  policy engine as the app.
-- [ ] Build a first-class calendar view inside Dextero.
-- [ ] Add two-way sync with at least one widely used calendar provider so
-  Dextero-created events appear on the user's phone and external changes flow
-  back.
-- [ ] Define conflict resolution, idempotency, provenance, offline replay, and
-  deletion semantics for synchronized records.
-- [ ] Generalize the sync adapter contract for tasks, contacts, files, and
-  other personal systems without hiding third-party failures.
-
-**Exit condition:** a user can ask Dextero by text to create or change an
-event, see the same conversation and result in the Dextero app, and find the
-event in the calendar already used on their phone.
+- **Browser and computer use:** semantic browser actions through an isolated
+  profile and CDP, gated submissions, screenshots/artifacts, and replaceable
+  native accessibility adapters. Use pixels as a fallback with confidence
+  and recovery handling; prove a workflow across ordinary desktop apps.
+- **Secure remote control:** cryptographic pairing, per-device authorization,
+  presence, discovery, revocation, and key rotation. Start with LAN/private
+  overlays; evaluate WebRTC for screen/audio/input and optional relay services
+  without transferring local authority to the cloud.
+- **Channels and personal-system sync:** trusted messaging into the same
+  identity, conversations, approvals, and delivery state; calendar and other
+  workspace views synchronized with existing services. Define sender
+  verification, conflicts, idempotency, provenance, offline replay, and
+  deletion semantics. Prove that a change requested by message appears both
+  in Dextero and in the calendar already used on the user's phone.
+- **Household profiles:** separate identities, memories, permissions, and
+  budgets, with age-appropriate controls and explicit, transparent monitoring.
+- **Arbitrary interactive pages:** evaluate generated executable pages only
+  when supported components limit useful workflows; define isolation,
+  authority, versioning, and recovery before enabling them.
+- **Client offline support:** local caches and synchronization where needed,
+  with explicit conflict and deletion handling and clear host authority.
 
 ## Release engineering
 
-These concerns cut across all milestones:
+These concerns cut across milestones:
 
 - [ ] CI on macOS, Windows, and Linux with platform-native builds.
 - [ ] Signed and notarized release artifacts where required.
@@ -250,23 +236,20 @@ These concerns cut across all milestones:
   delegated specialists.
 - [ ] Stable migration and compatibility policy before a `1.0` release.
 
-## Review follow-ups
+## Deliberate non-goals for the next product slices
 
-## Deliberate non-goals for the MVP
-
-- Bundling or requiring Postgres on each controlled computer
-- A central cloud account as a prerequisite for local use
-- Separate agent identities and fragmented histories for each messaging
-  channel
-- Treating Dextero's built-in calendar or task views as isolated replacements
-  for the user's existing services
-- Video or high-frequency input over Serverpod WebSockets
-- Unrestricted desktop control before permissions and auditability
-- Bespoke integrations for every service before MCP support
-- Destructive Git operations as ordinary agent tools
-- Dynamically loading arbitrary Dart packages into an AOT process
-- Replacing mature coding agents with a weaker in-house imitation
-- Claiming one executable or one automation implementation works everywhere
+- Requiring a cloud account or service for local ownership and execution.
+- Requiring users to operate Postgres merely to save conversations.
+- Full semantic memory, automatic task resumption, or arbitrary generated
+  applications before durable conversations and a useful workspace page.
+- Treating built-in views as isolated replacements for existing services.
+- Fragmenting identity and history across messaging channels.
+- Unrestricted desktop control before permissions and auditability.
+- Video or high-frequency input over Serverpod WebSockets.
+- Bespoke integrations for every service before evaluating MCP.
+- Replacing mature coding agents or dynamically loading arbitrary Dart
+  packages into an AOT process.
+- Claiming one executable or automation implementation works everywhere.
 
 ## Parking lot — revisit only if it proves useful
 
