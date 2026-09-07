@@ -13,12 +13,23 @@ void main() {
   late Directory temporary;
   late String database;
 
-  Future<Process> start(String command) =>
-      Process.start(executable ?? Platform.resolvedExecutable, [
+  Future<Process> start(String command) async {
+    final process = await Process.start(
+      executable ?? Platform.resolvedExecutable,
+      [
         if (executable == null) ...['run', 'bin/probe.dart'],
         command,
         database,
-      ], workingDirectory: workingDirectory);
+      ],
+      workingDirectory: workingDirectory,
+    );
+    // Test timeouts must not leave a host using a directory teardown removes.
+    addTearDown(() async {
+      process.kill(ProcessSignal.sigkill);
+      await process.exitCode;
+    });
+    return process;
+  }
 
   Future<({Map<String, dynamic> data, String output})> run(
     String command,
@@ -76,6 +87,8 @@ void main() {
       final restarted = await run('inspect');
       expect(restarted.data, appended.data);
     },
+    // Three separate JIT launches can exceed the test runner's 30s default.
+    timeout: const Timeout(Duration(minutes: 3)),
   );
 
   test(
