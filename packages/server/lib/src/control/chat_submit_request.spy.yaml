@@ -4,3 +4,4 @@ fields:
   message: String
   modelName: String
   correlationId: String?
+  modelProvider: String

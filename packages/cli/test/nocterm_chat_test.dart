@@ -6,6 +6,44 @@ import 'package:nocterm/nocterm.dart' as nocterm;
 import 'package:test/test.dart';
 
 void main() {
+  test('lists combinations then switches provider before submitting', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(120, 30),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient();
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+    await tester.enterText('/models');
+    await tester.sendEnter();
+    await tester.pump();
+    expect(
+      tester.terminalState.containsText('codex:gpt-5.3-codex-spark'),
+      isTrue,
+    );
+    expect(tester.terminalState.containsText('Dextero harness tools'), isTrue);
+    await tester.enterText('/model codex:gpt-5.3-codex-spark');
+    await tester.sendEnter();
+    await tester.pump();
+    await tester.pump();
+    expect(client.modelSelections, ['codex:gpt-5.3-codex-spark']);
+    await tester.enterText('Start');
+    await tester.sendEnter();
+    await tester.pump();
+    await tester.pump();
+    expect(client.requests.single.modelProvider, 'codex');
+    expect(client.requests.single.modelName, 'gpt-5.3-codex-spark');
+    await tester.enterText('/model gemini:gemini-2.5-flash');
+    await tester.sendEnter();
+    await tester.pump();
+    expect(
+      tester.terminalState.containsText('locked after the first message'),
+      isTrue,
+    );
+    expect(client.modelSelections, hasLength(1));
+  });
+
   test(
     'renders history and submits a message through the Nocterm TUI',
     () async {
@@ -162,9 +200,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(client.modelSelections, ['gemini-pro']);
+    expect(client.modelSelections, ['gemini:gemini-pro']);
     expect(tester.terminalState.containsText('gemini · gemini-pro'), isTrue);
-    expect(tester.terminalState.containsText('Using gemini-pro'), isTrue);
+    expect(tester.terminalState.containsText('Using gemini'), isTrue);
   });
 
   test('keeps Ctrl+C active while a response stream is pending', () async {
@@ -231,7 +269,7 @@ final class _FakeClient implements TerminalChatClient {
   @override
   Future<HostStatus> selectModel(String modelName) async {
     modelSelections.add(modelName);
-    return _status(modelName: modelName);
+    return _status(modelName: modelName.split(':').last);
   }
 
   @override
@@ -283,9 +321,29 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
-  modelProvider: 'gemini',
+  modelProvider: modelName == 'gpt-5.3-codex-spark' || modelName == 'default'
+      ? 'codex'
+      : 'gemini',
   modelName: modelName,
   availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
+  modelOptions: [
+    for (final model in const ['gpt-5.3-codex-spark', 'default'])
+      ModelOption(
+        id: 'codex:$model',
+        provider: 'codex',
+        modelName: model,
+        label: 'Codex · $model',
+        toolDescription: 'Codex tools + Dextero harness tools',
+      ),
+    for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
+      ModelOption(
+        id: 'gemini:$model',
+        provider: 'gemini',
+        modelName: model,
+        label: 'Gemini · $model',
+        toolDescription: 'Dextero harness tools',
+      ),
+  ],
 );
 
 ChatEntry _entry({

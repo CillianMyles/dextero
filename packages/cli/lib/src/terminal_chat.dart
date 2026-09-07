@@ -45,7 +45,7 @@ final class TerminalChat {
     var failed = false;
     try {
       _status = await _client.status();
-      if (modelName != null && modelName != _status.modelName) {
+      if (modelName != null && modelName != _status.selectedModelId) {
         _status = await _client.selectModel(modelName);
       }
       if (cancelRunId != null) {
@@ -122,6 +122,7 @@ final class TerminalChat {
         conversationId: _status.conversationId,
         message: normalized,
         modelName: _status.modelName,
+        modelProvider: _status.modelProvider,
         correlationId: _correlationIdFactory(),
       ),
     );

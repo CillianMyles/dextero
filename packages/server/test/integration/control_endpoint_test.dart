@@ -24,6 +24,20 @@ void main() {
       chatService: service,
       defaultConversationId: conversationId,
       availableModels: const ['default', core.codexSparkModel],
+      modelOptions: const [
+        core.AgentModelOption(
+          provider: core.AgentProvider.gemini,
+          modelName: 'default',
+        ),
+        core.AgentModelOption(
+          provider: core.AgentProvider.codex,
+          modelName: core.codexSparkModel,
+        ),
+        core.AgentModelOption(
+          provider: core.AgentProvider.codex,
+          modelName: 'default',
+        ),
+      ],
       modelSelector: (modelName) async {
         await service.selectAgent(
           conversationId: conversationId,
@@ -85,8 +99,145 @@ void main() {
       );
 
       expect(status.modelName, core.codexSparkModel);
-      expect(selectedModel, core.codexSparkModel);
+      expect(selectedModel, 'codex:${core.codexSparkModel}');
     });
+
+    test(
+      'switches providers and rejects a stale same-name submission',
+      () async {
+        final status = await endpoints.control.selectModel(
+          authenticatedSession,
+          'gemini:default',
+        );
+        expect(status.modelProvider, 'gemini');
+        expect(status.modelName, 'default');
+        expect(status.modelOptions.map((option) => option.id), [
+          'gemini:default',
+          'codex:gpt-5.3-codex-spark',
+          'codex:default',
+        ]);
+        expect(selectedModel, 'gemini:default');
+        await expectLater(
+          endpoints.control.submitMessage(
+            authenticatedSession,
+            ChatSubmitRequest(
+              conversationId: conversationId,
+              message: 'Stale provider',
+              modelName: 'default',
+              modelProvider: 'codex',
+            ),
+          ),
+          throwsStateError,
+        );
+        expect(await store.history(conversationId), isEmpty);
+        await endpoints.control.selectModel(
+          authenticatedSession,
+          'codex:default',
+        );
+        expect(ChatRuntime.modelProvider, 'codex');
+      },
+    );
+
+    test(
+      'rejects ambiguous and unadvertised combinations without mutation',
+      () async {
+        for (final choice in [
+          'default',
+          'gemini:gpt-5.3-codex-spark',
+          'missing:model',
+        ]) {
+          await expectLater(
+            endpoints.control.selectModel(authenticatedSession, choice),
+            throwsArgumentError,
+          );
+        }
+        expect(ChatRuntime.modelProvider, 'codex');
+        expect(ChatRuntime.modelName, 'default');
+      },
+    );
+
+    test('rejects unauthenticated selection', () async {
+      await expectLater(
+        endpoints.control.selectModel(sessionBuilder, 'gemini:default'),
+        throwsA(isA<ServerpodUnauthenticatedException>()),
+      );
+    });
+
+    test('serializes provider changes with concurrent submissions', () async {
+      final selecting = Completer<void>();
+      final release = Completer<void>();
+      ChatRuntime.configure(
+        chatService: service,
+        defaultConversationId: conversationId,
+        modelOptions: const [
+          core.AgentModelOption(
+            provider: core.AgentProvider.codex,
+            modelName: 'default',
+          ),
+          core.AgentModelOption(
+            provider: core.AgentProvider.gemini,
+            modelName: 'default',
+          ),
+        ],
+        modelSelector: (id) async {
+          selecting.complete();
+          await release.future;
+          await service.selectAgent(
+            conversationId: conversationId,
+            agent: _FakeConversationAgent(modelName: id),
+          );
+        },
+      );
+      final selection = endpoints.control.selectModel(
+        authenticatedSession,
+        'gemini:default',
+      );
+      await selecting.future;
+      final submission = endpoints.control.submitMessage(
+        authenticatedSession,
+        ChatSubmitRequest(
+          conversationId: conversationId,
+          message: 'Racing request',
+          modelName: 'default',
+          modelProvider: 'codex',
+        ),
+      );
+      final rejected = expectLater(submission, throwsStateError);
+      release.complete();
+      await selection;
+      await rejected;
+      expect(await store.history(conversationId), isEmpty);
+      expect(ChatRuntime.modelProvider, 'gemini');
+    });
+
+    test(
+      'failed provider changes leave the original selection intact',
+      () async {
+        ChatRuntime.configure(
+          chatService: service,
+          defaultConversationId: conversationId,
+          modelOptions: const [
+            core.AgentModelOption(
+              provider: core.AgentProvider.codex,
+              modelName: 'default',
+            ),
+            core.AgentModelOption(
+              provider: core.AgentProvider.gemini,
+              modelName: 'default',
+            ),
+          ],
+          modelSelector: (_) async =>
+              throw StateError('Agent initialization failed'),
+        );
+        await expectLater(
+          endpoints.control.selectModel(authenticatedSession, 'gemini:default'),
+          throwsStateError,
+        );
+        expect(ChatRuntime.modelProvider, 'codex');
+        expect(ChatRuntime.modelName, 'default');
+        expect(await store.history(conversationId), isEmpty);
+      },
+    );
 
     test('rejects a stale client model before accepting its message', () async {
       await endpoints.control.selectModel(
@@ -101,6 +252,7 @@ void main() {
             conversationId: conversationId,
             message: 'Use the stale choice',
             modelName: 'default',
+            modelProvider: 'codex',
           ),
         ),
         throwsA(
@@ -121,6 +273,7 @@ void main() {
           conversationId: conversationId,
           message: 'Start',
           modelName: 'default',
+          modelProvider: 'codex',
         ),
       );
       await store
@@ -150,6 +303,7 @@ void main() {
             conversationId: conversationId,
             message: 'Inspect the workspace',
             modelName: 'default',
+            modelProvider: 'codex',
             correlationId: 'client-1',
           ),
         );
@@ -225,6 +379,7 @@ void main() {
             conversationId: conversationId,
             message: '   ',
             modelName: 'default',
+            modelProvider: 'codex',
           ),
         ),
         throwsArgumentError,
@@ -263,6 +418,7 @@ void main() {
           conversationId: conversationId,
           message: 'Long task',
           modelName: 'default',
+          modelProvider: 'codex',
         ),
       );
       await transport.started.future;
@@ -300,6 +456,7 @@ void main() {
           conversationId: conversationId,
           message: 'Edit README.md',
           modelName: 'default',
+          modelProvider: 'codex',
         ),
       );
       final pending = await store

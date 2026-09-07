@@ -12,7 +12,8 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
 import 'package:serverpod_client/serverpod_client.dart' as _i1;
-import 'package:dextero_server/src/protocol/protocol.dart' as _i2;
+import '../control/model_option.dart' as _i2;
+import 'package:dextero_server/src/protocol/protocol.dart' as _i3;
 
 abstract class HostStatus implements _i1.SerializableModel {
   HostStatus._({
@@ -27,6 +28,7 @@ abstract class HostStatus implements _i1.SerializableModel {
     required this.modelProvider,
     required this.modelName,
     required this.availableModels,
+    required this.modelOptions,
   });
 
   factory HostStatus({
@@ -41,6 +43,7 @@ abstract class HostStatus implements _i1.SerializableModel {
     required String modelProvider,
     required String modelName,
     required List<String> availableModels,
+    required List<_i2.ModelOption> modelOptions,
   }) = _HostStatusImpl;
 
   factory HostStatus.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -61,8 +64,11 @@ abstract class HostStatus implements _i1.SerializableModel {
       ),
       modelProvider: jsonSerialization['modelProvider'] as String,
       modelName: jsonSerialization['modelName'] as String,
-      availableModels: _i2.Protocol().deserialize<List<String>>(
+      availableModels: _i3.Protocol().deserialize<List<String>>(
         jsonSerialization['availableModels'],
+      ),
+      modelOptions: _i3.Protocol().deserialize<List<_i2.ModelOption>>(
+        jsonSerialization['modelOptions'],
       ),
     );
   }
@@ -89,6 +95,8 @@ abstract class HostStatus implements _i1.SerializableModel {
 
   List<String> availableModels;
 
+  List<_i2.ModelOption> modelOptions;
+
   /// Returns a shallow copy of this [HostStatus]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -104,6 +112,7 @@ abstract class HostStatus implements _i1.SerializableModel {
     String? modelProvider,
     String? modelName,
     List<String>? availableModels,
+    List<_i2.ModelOption>? modelOptions,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -120,6 +129,7 @@ abstract class HostStatus implements _i1.SerializableModel {
       'modelProvider': modelProvider,
       'modelName': modelName,
       'availableModels': availableModels.toJson(),
+      'modelOptions': modelOptions.toJson(valueToJson: (v) => v.toJson()),
     };
   }
 
@@ -142,6 +152,7 @@ class _HostStatusImpl extends HostStatus {
     required String modelProvider,
     required String modelName,
     required List<String> availableModels,
+    required List<_i2.ModelOption> modelOptions,
   }) : super._(
          name: name,
          version: version,
@@ -154,6 +165,7 @@ class _HostStatusImpl extends HostStatus {
          modelProvider: modelProvider,
          modelName: modelName,
          availableModels: availableModels,
+         modelOptions: modelOptions,
        );
 
   /// Returns a shallow copy of this [HostStatus]
@@ -172,6 +184,7 @@ class _HostStatusImpl extends HostStatus {
     String? modelProvider,
     String? modelName,
     List<String>? availableModels,
+    List<_i2.ModelOption>? modelOptions,
   }) {
     return HostStatus(
       name: name ?? this.name,
@@ -186,6 +199,8 @@ class _HostStatusImpl extends HostStatus {
       modelName: modelName ?? this.modelName,
       availableModels:
           availableModels ?? this.availableModels.map((e0) => e0).toList(),
+      modelOptions:
+          modelOptions ?? this.modelOptions.map((e0) => e0.copyWith()).toList(),
     );
   }
 }

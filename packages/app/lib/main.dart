@@ -227,7 +227,7 @@ class _ModelSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = controller.hostStatus!;
-    if (status.availableModels.length < 2) {
+    if (status.modelOptions.length < 2) {
       return _StatusBadge(
         key: const Key('model-provider'),
         icon: LucideIcons.bot,
@@ -236,13 +236,26 @@ class _ModelSelector extends StatelessWidget {
     }
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 210, maxWidth: 290),
+      key: const Key('model-selector'),
       child: ShadSelect<String>(
-        key: const Key('model-selector'),
-        initialValue: status.modelName,
+        key: ValueKey('${status.selectedModelId}:${controller.canSelectModel}'),
+        initialValue: status.selectedModelId,
         enabled: controller.canSelectModel,
         options: [
-          for (final model in status.availableModels)
-            ShadOption(value: model, child: Text(model)),
+          for (final option in status.modelOptions)
+            ShadOption(
+              value: option.id,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(option.label),
+                  Text(
+                    option.toolDescription,
+                    style: ShadTheme.of(context).textTheme.small,
+                  ),
+                ],
+              ),
+            ),
         ],
         selectedOptionBuilder: (context, model) => Row(
           mainAxisSize: MainAxisSize.min,
@@ -251,7 +264,7 @@ class _ModelSelector extends StatelessWidget {
             const SizedBox(width: 7),
             Flexible(
               child: Text(
-                '${_displayName(status.modelProvider)} · $model',
+                status.resolveModel(model)?.label ?? model,
                 overflow: TextOverflow.ellipsis,
               ),
             ),

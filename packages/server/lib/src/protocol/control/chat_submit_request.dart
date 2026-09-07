@@ -19,6 +19,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
     required this.message,
     required this.modelName,
     this.correlationId,
+    required this.modelProvider,
   });
 
   factory ChatSubmitRequest({
@@ -26,6 +27,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
     required String message,
     required String modelName,
     String? correlationId,
+    required String modelProvider,
   }) = _ChatSubmitRequestImpl;
 
   factory ChatSubmitRequest.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -34,6 +36,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
       message: jsonSerialization['message'] as String,
       modelName: jsonSerialization['modelName'] as String,
       correlationId: jsonSerialization['correlationId'] as String?,
+      modelProvider: jsonSerialization['modelProvider'] as String,
     );
   }
 
@@ -45,6 +48,8 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
 
   String? correlationId;
 
+  String modelProvider;
+
   /// Returns a shallow copy of this [ChatSubmitRequest]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -53,6 +58,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
     String? message,
     String? modelName,
     String? correlationId,
+    String? modelProvider,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -62,6 +68,7 @@ abstract class ChatSubmitRequest implements _i1.SerializableModel {
       'message': message,
       'modelName': modelName,
       if (correlationId != null) 'correlationId': correlationId,
+      'modelProvider': modelProvider,
     };
   }
 
@@ -79,11 +86,13 @@ class _ChatSubmitRequestImpl extends ChatSubmitRequest {
     required String message,
     required String modelName,
     String? correlationId,
+    required String modelProvider,
   }) : super._(
          conversationId: conversationId,
          message: message,
          modelName: modelName,
          correlationId: correlationId,
+         modelProvider: modelProvider,
        );
 
   /// Returns a shallow copy of this [ChatSubmitRequest]
@@ -95,6 +104,7 @@ class _ChatSubmitRequestImpl extends ChatSubmitRequest {
     String? message,
     String? modelName,
     Object? correlationId = _Undefined,
+    String? modelProvider,
   }) {
     return ChatSubmitRequest(
       conversationId: conversationId ?? this.conversationId,
@@ -103,6 +113,7 @@ class _ChatSubmitRequestImpl extends ChatSubmitRequest {
       correlationId: correlationId is String?
           ? correlationId
           : this.correlationId,
+      modelProvider: modelProvider ?? this.modelProvider,
     );
   }
 }

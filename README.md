@@ -54,20 +54,33 @@ make dev
 
 Make loads local provider settings and credentials from the ignored `.env`
 file. Keep values unquoted because the file uses Make assignment syntax. To use
-Gemini instead of Codex, set `DEXTERO_MODEL_PROVIDER=gemini` and add the key:
+Gemini as the initial provider, add the key:
 
 ```sh
 GEMINI_API_KEY=your-key
 ```
 
-`DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the automatic provider choice;
-without an explicit provider, a non-empty Gemini key selects Gemini. The
-initial models come from `DEXTERO_CODEX_MODEL` and `DEXTERO_GEMINI_MODEL`.
-Comma-separated `DEXTERO_CODEX_MODELS` and `DEXTERO_GEMINI_MODELS` values
-control the choices clients may select before the first message. The defaults
-offer Codex's configured default and `gpt-5.3-codex-spark`; Gemini defaults to
-`gemini-2.5-flash`. Spark requires a ChatGPT Pro-authenticated Codex CLI and is
-not an API-key model.
+Before the first message, the app and TUI offer provider/model combinations in
+this order:
+
+1. Gemini · `gemini-2.5-flash` (initial choice when a key is configured)
+2. Codex · `gpt-5.3-codex-spark` (initial choice without a Gemini key)
+3. Codex · `default` (uses the authenticated Codex CLI's configured model)
+
+Gemini is omitted when `GEMINI_API_KEY` is empty. Codex choices require an
+installed, authenticated Codex CLI; model access is checked when a run starts.
+If Spark is unavailable to your account, choose `codex:default` before sending.
+There is no automatic retry with another provider or model after a run fails.
+
+Gemini uses Dextero's harness tools. Codex also has its configured Codex tools;
+its existing read-only sandbox and instructions to use the harness for file
+and command operations still apply.
+
+`DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the initial provider without
+hiding the other provider. `DEXTERO_CODEX_MODEL` and `DEXTERO_GEMINI_MODEL`
+override initial models. Comma-separated `DEXTERO_CODEX_MODELS` and
+`DEXTERO_GEMINI_MODELS` override each provider's advertised models; the initial
+model is always included. Credentials stay on the host.
 
 Use the native client for the current desktop platform:
 
@@ -123,12 +136,18 @@ used safely from scripts.
 Select an advertised model when starting the CLI conversation:
 
 ```sh
-make cli MODEL=gpt-5.3-codex-spark PROMPT="Run the focused tests"
+make cli MODEL=codex:gpt-5.3-codex-spark PROMPT="Run the focused tests"
 ```
 
-The Flutter header provides the same model chooser. In the interactive TUI,
-use `/model <name>` before the first message. Model selection is locked after
-the first message so one in-memory conversation uses one model.
+The Flutter header provides the same provider/model chooser with tool descriptions.
+In the interactive TUI, use `/models` to list choices and
+`/model codex:default` or `/model gemini:gemini-2.5-flash` to select one.
+`--model <provider>:<model>` accepts the same choices for one-shot CLI runs;
+a bare model name also works when it identifies exactly one advertised choice.
+Selection is locked after the first message so one in-memory conversation uses
+one provider/model combination. Restart the server to start a fresh conversation.
+Clients submit both provider and model, and stale selections are rejected before
+any message is stored.
 
 Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
 
@@ -181,6 +200,8 @@ history, or tool subprocess environments.
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
 typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
 and `cancelRun` operations.
+The status contract includes typed `modelOptions`; submissions require `modelProvider`
+as well as `modelName`. Update server and clients together for this contract change.
 Generated server, client, and test code is committed. After changing an
 endpoint or `.spy.yaml` model, run:
 

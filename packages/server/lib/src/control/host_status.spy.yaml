@@ -11,3 +11,4 @@ fields:
   modelProvider: String
   modelName: String
   availableModels: List<String>
+  modelOptions: List<ModelOption>

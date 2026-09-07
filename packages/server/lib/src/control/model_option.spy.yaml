@@ -1,0 +1,7 @@
+class: ModelOption
+fields:
+  id: String
+  provider: String
+  modelName: String
+  label: String
+  toolDescription: String

@@ -14,12 +14,30 @@ enum AgentProvider { codex, gemini }
 const defaultCodexModel = 'default';
 const codexSparkModel = 'gpt-5.3-codex-spark';
 
+/// A provider-qualified choice; model names alone are not globally unique.
+final class AgentModelOption {
+  const AgentModelOption({required this.provider, required this.modelName});
+
+  final AgentProvider provider;
+  final String modelName;
+
+  String get id => '${provider.name}:$modelName';
+  String get label => switch (provider) {
+    AgentProvider.gemini => 'Gemini · $modelName',
+    AgentProvider.codex => 'Codex · $modelName',
+  };
+  String get toolDescription => provider == AgentProvider.gemini
+      ? 'Dextero harness tools'
+      : 'Codex tools + Dextero harness tools';
+}
+
 /// Resolves the production conversation agent from explicit environment data.
 final class AgentRuntimeConfiguration {
   AgentRuntimeConfiguration._({
     required this.provider,
     required this.modelName,
     required this.availableModels,
+    required this.availableOptions,
     required String? apiKey,
   }) : _apiKey = apiKey;
 
@@ -50,20 +68,31 @@ final class AgentRuntimeConfiguration {
         _nonEmpty(environment['DEXTERO_GEMINI_MODEL']) ?? defaultGeminiModel;
     final modelName = provider == AgentProvider.gemini
         ? geminiModel
-        : codexModel ?? defaultCodexModel;
-    final availableModels = _availableModels(
-      environment[provider == AgentProvider.codex
-          ? 'DEXTERO_CODEX_MODELS'
-          : 'DEXTERO_GEMINI_MODELS'],
-      fallback: provider == AgentProvider.codex
-          ? const [defaultCodexModel, codexSparkModel]
-          : [defaultGeminiModel],
-      selected: modelName,
+        : codexModel ?? codexSparkModel;
+    final codexModels = _availableModels(
+      environment['DEXTERO_CODEX_MODELS'],
+      fallback: const [codexSparkModel, defaultCodexModel],
+      selected: codexModel ?? codexSparkModel,
     );
+    final geminiModels = _availableModels(
+      environment['DEXTERO_GEMINI_MODELS'],
+      fallback: const [defaultGeminiModel],
+      selected: geminiModel,
+    );
+    final availableOptions = <AgentModelOption>[
+      if (apiKey != null)
+        for (final model in geminiModels)
+          AgentModelOption(provider: AgentProvider.gemini, modelName: model),
+      for (final model in codexModels)
+        AgentModelOption(provider: AgentProvider.codex, modelName: model),
+    ];
     return AgentRuntimeConfiguration._(
       provider: provider,
       modelName: modelName,
-      availableModels: availableModels,
+      availableModels: provider == AgentProvider.gemini
+          ? geminiModels
+          : codexModels,
+      availableOptions: List.unmodifiable(availableOptions),
       apiKey: apiKey,
     );
   }
@@ -71,6 +100,9 @@ final class AgentRuntimeConfiguration {
   final AgentProvider provider;
   final String modelName;
   final List<String> availableModels;
+  final List<AgentModelOption> availableOptions;
+
+  String get selectedModelId => '${provider.name}:$modelName';
   final String? _apiKey;
 
   String get providerName => provider.name;
@@ -78,14 +110,21 @@ final class AgentRuntimeConfiguration {
   ConversationAgent createAgent({
     required String workspace,
     String? modelName,
+    AgentProvider? provider,
     GeminiTransport? geminiTransport,
+    CodexTransportFactory? codexTransportFactory,
   }) {
+    final selectedProvider = provider ?? this.provider;
     final selectedModel = modelName ?? this.modelName;
-    if (!availableModels.contains(selectedModel)) {
+    if (!availableOptions.any(
+      (option) =>
+          option.provider == selectedProvider &&
+          option.modelName == selectedModel,
+    )) {
       throw ArgumentError.value(
         selectedModel,
         'modelName',
-        'must be one of ${availableModels.join(', ')}',
+        'must be an advertised provider/model combination',
       );
     }
     final tools = <Tool>[
@@ -95,11 +134,12 @@ final class AgentRuntimeConfiguration {
       RunCommandTool(workingDirectory: workspace),
       RunShellTool(workingDirectory: workspace),
     ];
-    return switch (provider) {
+    return switch (selectedProvider) {
       AgentProvider.codex => CodexConversationAgent(
         agent: CodexAppServerAgent(
           model: selectedModel == defaultCodexModel ? null : selectedModel,
           workingDirectory: workspace,
+          transportFactory: codexTransportFactory,
         ),
         tools: tools,
         approvalRequiredTools: const {'edit_file'},
