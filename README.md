@@ -199,6 +199,11 @@ history, or tool subprocess environments.
 
 ## Serverpod changes
 
+The isolated host SQLite experiment and storage recommendation are in
+[spikes/host_storage/README.md](spikes/host_storage/README.md).
+Run `make check-storage-spike` to validate its migrations, process recovery,
+and native bundle. It has a separate lockfile and does not upgrade the app.
+
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
 typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
 and `cancelRun` operations.

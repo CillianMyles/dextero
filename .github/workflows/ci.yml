@@ -14,6 +14,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  storage-spike:
+    name: Storage spike (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.13.2
+      - name: Validate SQLite migrations, recovery, and native packaging
+        run: make check-storage-spike
+
   test:
     name: Code checks
     runs-on: ubuntu-latest
