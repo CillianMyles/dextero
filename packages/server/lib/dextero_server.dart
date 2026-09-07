@@ -50,13 +50,20 @@ Future<void> run(List<String> arguments) async {
     modelName: agentConfiguration.modelName,
     bindAddress: bindAddress,
     availableModels: agentConfiguration.availableModels,
-    modelSelector: (modelName) => service.selectAgent(
-      conversationId: conversation.id,
-      agent: agentConfiguration.createAgent(
-        workspace: workspace,
-        modelName: modelName,
-      ),
-    ),
+    modelOptions: agentConfiguration.availableOptions,
+    modelSelector: (modelId) {
+      final option = agentConfiguration.availableOptions.singleWhere(
+        (option) => option.id == modelId,
+      );
+      return service.selectAgent(
+        conversationId: conversation.id,
+        agent: agentConfiguration.createAgent(
+          workspace: workspace,
+          modelName: option.modelName,
+          provider: option.provider,
+        ),
+      );
+    },
   );
 }
 
@@ -76,6 +83,7 @@ Future<Serverpod> startControlServer({
   InternetAddress? bindAddress,
   List<String>? availableModels,
   ModelSelector? modelSelector,
+  List<AgentModelOption>? modelOptions,
 }) async {
   if (token.length < 32) {
     throw ArgumentError.value(
@@ -91,6 +99,7 @@ Future<Serverpod> startControlServer({
     modelName: modelName,
     availableModels: availableModels,
     modelSelector: modelSelector,
+    modelOptions: modelOptions,
   );
   final config = apiPort == null
       ? null

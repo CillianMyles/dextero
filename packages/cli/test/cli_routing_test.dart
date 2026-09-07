@@ -154,6 +154,16 @@ final class _FakeClient implements TerminalChatClient {
     modelProvider: 'gemini',
     modelName: 'gemini-2.5-flash',
     availableModels: const ['gemini-2.5-flash'],
+    modelOptions: [
+      for (final model in const ['gemini-2.5-flash'])
+        ModelOption(
+          id: 'gemini:$model',
+          provider: 'gemini',
+          modelName: model,
+          label: 'Gemini · $model',
+          toolDescription: 'Dextero harness tools',
+        ),
+    ],
   );
 
   @override

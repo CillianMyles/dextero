@@ -20,7 +20,8 @@ import 'control/chat_event_family.dart' as _i6;
 import 'control/chat_submission.dart' as _i7;
 import 'control/chat_submit_request.dart' as _i8;
 import 'control/host_status.dart' as _i9;
-import 'package:dextero_server/src/protocol/control/chat_entry.dart' as _i10;
+import 'control/model_option.dart' as _i10;
+import 'package:dextero_server/src/protocol/control/chat_entry.dart' as _i11;
 export 'control/chat_entry.dart';
 export 'control/chat_entry_kind.dart';
 export 'control/chat_entry_source.dart';
@@ -29,6 +30,7 @@ export 'control/chat_event_family.dart';
 export 'control/chat_submission.dart';
 export 'control/chat_submit_request.dart';
 export 'control/host_status.dart';
+export 'control/model_option.dart';
 export 'client.dart';
 
 class Protocol extends _i1.SerializationManager {
@@ -86,6 +88,9 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i9.HostStatus) {
       return _i9.HostStatus.fromJson(data) as T;
     }
+    if (t == _i10.ModelOption) {
+      return _i10.ModelOption.fromJson(data) as T;
+    }
     if (t == _i1.getType<_i2.ChatEntry?>()) {
       return (data != null ? _i2.ChatEntry.fromJson(data) : null) as T;
     }
@@ -110,11 +115,20 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i1.getType<_i9.HostStatus?>()) {
       return (data != null ? _i9.HostStatus.fromJson(data) : null) as T;
     }
+    if (t == _i1.getType<_i10.ModelOption?>()) {
+      return (data != null ? _i10.ModelOption.fromJson(data) : null) as T;
+    }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i10.ChatEntry>) {
-      return (data as List).map((e) => deserialize<_i10.ChatEntry>(e)).toList()
+    if (t == List<_i10.ModelOption>) {
+      return (data as List)
+              .map((e) => deserialize<_i10.ModelOption>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i11.ChatEntry>) {
+      return (data as List).map((e) => deserialize<_i11.ChatEntry>(e)).toList()
           as T;
     }
     return super.deserialize<T>(data, t);
@@ -130,6 +144,7 @@ class Protocol extends _i1.SerializationManager {
       _i7.ChatSubmission => 'ChatSubmission',
       _i8.ChatSubmitRequest => 'ChatSubmitRequest',
       _i9.HostStatus => 'HostStatus',
+      _i10.ModelOption => 'ModelOption',
       _ => null,
     };
   }
@@ -160,6 +175,8 @@ class Protocol extends _i1.SerializationManager {
         return 'ChatSubmitRequest';
       case _i9.HostStatus():
         return 'HostStatus';
+      case _i10.ModelOption():
+        return 'ModelOption';
     }
     return null;
   }
@@ -193,6 +210,9 @@ class Protocol extends _i1.SerializationManager {
     }
     if (dataClassName == 'HostStatus') {
       return deserialize<_i9.HostStatus>(data['data']);
+    }
+    if (dataClassName == 'ModelOption') {
+      return deserialize<_i10.ModelOption>(data['data']);
     }
     return super.deserializeByClassName(data);
   }

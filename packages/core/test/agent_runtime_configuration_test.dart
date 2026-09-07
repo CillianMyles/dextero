@@ -2,13 +2,74 @@ import 'package:dextero_core/dextero_core.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test(
+    'advertises both providers in priority order and creates either agent',
+    () {
+      final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+        'GEMINI_API_KEY': 'test-key',
+      });
+      expect(configuration.selectedModelId, 'gemini:gemini-2.5-flash');
+      expect(configuration.availableOptions.map((option) => option.id), [
+        'gemini:gemini-2.5-flash',
+        'codex:gpt-5.3-codex-spark',
+        'codex:default',
+      ]);
+      for (final option in configuration.availableOptions) {
+        final agent = configuration.createAgent(
+          workspace: '.',
+          provider: option.provider,
+          modelName: option.modelName,
+        );
+        expect(
+          agent,
+          option.provider == AgentProvider.gemini
+              ? isA<ModelConversationAgent>()
+              : isA<CodexConversationAgent>(),
+        );
+      }
+      expect(
+        () => configuration.createAgent(
+          workspace: '.',
+          provider: AgentProvider.gemini,
+          modelName: codexSparkModel,
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test('an initial provider override keeps the other provider selectable', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'DEXTERO_MODEL_PROVIDER': 'codex',
+      'GEMINI_API_KEY': 'test-key',
+    });
+    expect(configuration.provider, AgentProvider.codex);
+    expect(configuration.availableOptions.first.provider, AgentProvider.gemini);
+  });
+
+  test('does not advertise or instantiate Gemini without credentials', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {});
+    expect(configuration.availableOptions.map((option) => option.id), [
+      'codex:gpt-5.3-codex-spark',
+      'codex:default',
+    ]);
+    expect(
+      () => configuration.createAgent(
+        workspace: '.',
+        provider: AgentProvider.gemini,
+        modelName: defaultGeminiModel,
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test('uses Codex when no provider credentials are configured', () {
     final configuration = AgentRuntimeConfiguration.fromEnvironment(const {});
 
     expect(configuration.provider, AgentProvider.codex);
     expect(configuration.providerName, 'codex');
-    expect(configuration.modelName, defaultCodexModel);
-    expect(configuration.availableModels, [defaultCodexModel, codexSparkModel]);
+    expect(configuration.modelName, codexSparkModel);
+    expect(configuration.availableModels, [codexSparkModel, defaultCodexModel]);
   });
 
   test('uses default model choices when Make exports an empty list', () {
@@ -16,7 +77,7 @@ void main() {
       'DEXTERO_CODEX_MODELS': '',
     });
 
-    expect(configuration.availableModels, [defaultCodexModel, codexSparkModel]);
+    expect(configuration.availableModels, [codexSparkModel, defaultCodexModel]);
   });
 
   test('selects Gemini when an API key is plugged in', () {

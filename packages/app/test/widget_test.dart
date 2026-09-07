@@ -41,12 +41,37 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('model-selector')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('gemini-pro').last);
+    await tester.tap(find.text('Gemini · gemini-pro').last);
     await tester.pumpAndSettle();
 
-    expect(api.modelSelections, ['gemini-pro']);
+    expect(api.modelSelections, ['gemini:gemini-pro']);
     expect(controller.hostStatus!.modelName, 'gemini-pro');
     expect(find.text('Gemini · gemini-pro'), findsOneWidget);
+  });
+
+  testWidgets('switches provider and submits the selected combination', (
+    tester,
+  ) async {
+    final api = _FakeChatApi(status: Future.value(_status()));
+    final controller = DexteroController(api: api);
+    await tester.pumpWidget(DexteroApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('model-selector')));
+    await tester.pumpAndSettle();
+    expect(find.text('Dextero harness tools'), findsWidgets);
+    expect(find.text('Codex tools + Dextero harness tools'), findsWidgets);
+    await tester.tap(find.text('Codex · gpt-5.3-codex-spark').last);
+    await tester.pumpAndSettle();
+    expect(controller.hostStatus!.modelProvider, 'codex');
+    expect(api.modelSelections, ['codex:gpt-5.3-codex-spark']);
+    await tester.enterText(find.byKey(const Key('chat-message')), 'Start');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('send-message')));
+    await tester.pumpAndSettle();
+    expect(api.submissions.single.modelProvider, 'codex');
+    expect(api.submissions.single.modelName, 'gpt-5.3-codex-spark');
+    expect(controller.canSelectModel, isFalse);
+    expect(await controller.selectModel('gemini:gemini-2.5-flash'), isFalse);
   });
 
   testWidgets('keeps the connected chat controls usable at phone width', (
@@ -753,7 +778,7 @@ final class _FakeChatApi implements ChatApi {
   @override
   Future<HostStatus> selectModel(String modelName) async {
     modelSelections.add(modelName);
-    return _status(modelName: modelName);
+    return _status(modelName: modelName.split(':').last);
   }
 
   @override
@@ -777,9 +802,29 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
-  modelProvider: 'gemini',
+  modelProvider: modelName == 'gpt-5.3-codex-spark' || modelName == 'default'
+      ? 'codex'
+      : 'gemini',
   modelName: modelName,
   availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
+  modelOptions: [
+    for (final model in const ['gpt-5.3-codex-spark', 'default'])
+      ModelOption(
+        id: 'codex:$model',
+        provider: 'codex',
+        modelName: model,
+        label: 'Codex · $model',
+        toolDescription: 'Codex tools + Dextero harness tools',
+      ),
+    for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
+      ModelOption(
+        id: 'gemini:$model',
+        provider: 'gemini',
+        modelName: model,
+        label: 'Gemini · $model',
+        toolDescription: 'Dextero harness tools',
+      ),
+  ],
 );
 
 ChatSubmission _submission(String message) => ChatSubmission(

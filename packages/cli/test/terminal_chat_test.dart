@@ -6,6 +6,20 @@ import 'dart:convert';
 
 void main() {
   test(
+    'one-shot selection submits the Codex provider as well as model',
+    () async {
+      final client = _FakeClient();
+      final result = await TerminalChat(
+        client: client,
+        io: _FakeIo(lines: const []),
+      ).run(initialMessage: 'Start', modelName: 'codex:default');
+      expect(result, 0);
+      expect(client.requests.single.modelProvider, 'codex');
+      expect(client.requests.single.modelName, 'default');
+    },
+  );
+
+  test(
     'runs a repeatable interactive conversation through injected seams',
     () async {
       final client = _FakeClient();
@@ -213,7 +227,7 @@ final class _FakeClient implements TerminalChatClient {
   @override
   Future<HostStatus> selectModel(String modelName) async {
     modelSelections.add(modelName);
-    return _status(modelName: modelName);
+    return _status(modelName: modelName.split(':').last);
   }
 
   @override
@@ -334,9 +348,29 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
-  modelProvider: 'gemini',
+  modelProvider: modelName == 'gpt-5.3-codex-spark' || modelName == 'default'
+      ? 'codex'
+      : 'gemini',
   modelName: modelName,
   availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
+  modelOptions: [
+    for (final model in const ['gpt-5.3-codex-spark', 'default'])
+      ModelOption(
+        id: 'codex:$model',
+        provider: 'codex',
+        modelName: model,
+        label: 'Codex · $model',
+        toolDescription: 'Codex tools + Dextero harness tools',
+      ),
+    for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
+      ModelOption(
+        id: 'gemini:$model',
+        provider: 'gemini',
+        modelName: model,
+        label: 'Gemini · $model',
+        toolDescription: 'Dextero harness tools',
+      ),
+  ],
 );
 
 ChatEntry _entry({

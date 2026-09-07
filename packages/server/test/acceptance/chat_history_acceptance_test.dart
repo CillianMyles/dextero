@@ -43,6 +43,7 @@ void main() {
             conversationId: status.conversationId,
             message: 'Hello Dextero',
             modelName: status.modelName,
+            modelProvider: status.modelProvider,
             correlationId: 'acceptance-1',
           ),
         );

@@ -34,6 +34,16 @@ final class ControlEndpoint extends Endpoint {
     modelProvider: ChatRuntime.modelProvider,
     modelName: ChatRuntime.modelName,
     availableModels: ChatRuntime.availableModels,
+    modelOptions: [
+      for (final option in ChatRuntime.modelOptions)
+        ModelOption(
+          id: option.id,
+          provider: option.provider.name,
+          modelName: option.modelName,
+          label: option.label,
+          toolDescription: option.toolDescription,
+        ),
+    ],
   );
 
   /// Canonically accepts a user message before starting assistant work.
@@ -45,6 +55,7 @@ final class ControlEndpoint extends Endpoint {
       conversationId: request.conversationId,
       message: request.message,
       modelName: request.modelName,
+      modelProvider: request.modelProvider,
       correlationId: request.correlationId,
     );
     return ChatSubmission(

@@ -255,7 +255,7 @@ final class DexteroController extends ChangeNotifier {
     final normalized = modelName.trim();
     if (status == null ||
         normalized.isEmpty ||
-        normalized == status.modelName ||
+        normalized == status.selectedModelId ||
         !canSelectModel) {
       return false;
     }
@@ -289,6 +289,7 @@ final class DexteroController extends ChangeNotifier {
           conversationId: status.conversationId,
           message: normalized,
           modelName: status.modelName,
+          modelProvider: status.modelProvider,
           correlationId: _correlationIdFactory(),
         ),
       );

@@ -87,7 +87,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
     try {
       var status = await component.client.status();
       final requestedModel = component.modelName;
-      if (requestedModel != null && requestedModel != status.modelName) {
+      if (requestedModel != null && requestedModel != status.selectedModelId) {
         status = await component.client.selectModel(requestedModel);
       }
       final history = await component.client.history(status.conversationId);
@@ -134,6 +134,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
           conversationId: status.conversationId,
           message: message,
           modelName: status.modelName,
+          modelProvider: status.modelProvider,
           correlationId: component.correlationIdFactory(),
         ),
       );
@@ -189,17 +190,18 @@ final class _DexteroTuiState extends State<DexteroTui> {
     }
     final parts = command.split(RegExp(r'\s+'));
     if (parts.length != 2 || command == '/models') {
-      _showNotice('Models: ${status.availableModels.join(', ')}');
+      _showNotice('Choose a combination above with /model <provider>:<model>.');
       return;
     }
-    final modelName = parts[1];
-    if (!status.availableModels.contains(modelName)) {
+    final option = status.resolveModel(parts[1]);
+    if (option == null) {
       _showNotice(
-        'Unknown model. Choose: ${status.availableModels.join(', ')}',
+        'Unknown model. Choose: ${status.modelOptions.map((option) => option.id).join(', ')}',
       );
       return;
     }
-    if (modelName == status.modelName) {
+    final modelName = option.id;
+    if (modelName == status.selectedModelId) {
       _showNotice('Already using $modelName');
       return;
     }
@@ -213,7 +215,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
       setState(() {
         _status = selected;
         _sending = false;
-        _notice = 'Using ${selected.modelName}';
+        _notice = 'Using ${selected.modelProvider} · ${selected.modelName}';
       });
     } on Object catch (error) {
       _showError('Model selection failed: $error');
@@ -304,13 +306,25 @@ final class _DexteroTuiState extends State<DexteroTui> {
             ),
             Expanded(
               child: _entries.isEmpty
-                  ? Center(
-                      child: Text(
-                        status == null
-                            ? 'Connecting…'
-                            : 'No messages yet. Use /model <name> or type a message.',
-                        style: TextStyle(color: _muted),
-                      ),
+                  ? ListView(
+                      padding: EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                      children: [
+                        Text(
+                          status == null
+                              ? 'Connecting…'
+                              : 'No messages yet. Choose with /model <provider>:<model> or type a message.',
+                          style: TextStyle(color: _muted),
+                        ),
+                        if (status != null)
+                          for (final option in status.modelOptions)
+                            Padding(
+                              padding: EdgeInsets.only(top: 1),
+                              child: Text(
+                                '${option.id == status.selectedModelId ? '> ' : '  '}${_renderer.safeText(option.id)}\n  ${_renderer.safeText(option.toolDescription)}',
+                                style: TextStyle(color: _muted),
+                              ),
+                            ),
+                      ],
                     )
                   : Scrollbar(
                       controller: _scrollController,

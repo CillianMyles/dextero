@@ -12,6 +12,10 @@ abstract final class ChatRuntime {
   static String? _modelName;
   static List<String>? _availableModels;
   static ModelSelector? _modelSelector;
+  static List<AgentModelOption> _modelOptions = [];
+  static bool _qualifiedSelection = false;
+
+  static List<AgentModelOption> get modelOptions => _modelOptions;
   static Future<void> _operationLock = Future.value();
 
   static ChatService get service =>
@@ -39,6 +43,7 @@ abstract final class ChatRuntime {
     String modelName = 'default',
     List<String>? availableModels,
     ModelSelector? modelSelector,
+    List<AgentModelOption>? modelOptions,
   }) {
     if (defaultConversationId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -67,6 +72,29 @@ abstract final class ChatRuntime {
         'must contain the selected non-empty model',
       );
     }
+    final options = List<AgentModelOption>.unmodifiable(
+      modelOptions ??
+          [
+            for (final model in models)
+              AgentModelOption(
+                provider: AgentProvider.values.byName(modelProvider),
+                modelName: model,
+              ),
+          ],
+    );
+    if (!options.any(
+          (option) =>
+              option.provider.name == modelProvider &&
+              option.modelName == modelName,
+        ) ||
+        options.map((option) => option.id).toSet().length != options.length ||
+        options.any((option) => option.modelName.trim().isEmpty)) {
+      throw ArgumentError(
+        'Model options must be unique and contain the selected combination.',
+      );
+    }
+    _modelOptions = options;
+    _qualifiedSelection = modelOptions != null;
     _service = chatService;
     _conversationId = defaultConversationId;
     _modelProvider = modelProvider;
@@ -76,34 +104,52 @@ abstract final class ChatRuntime {
     _operationLock = Future.value();
   }
 
-  static Future<void> selectModel(String modelName) =>
-      _withOperationLock(() async {
-        final normalized = modelName.trim();
-        if (!availableModels.contains(normalized)) {
-          throw ArgumentError.value(
-            modelName,
-            'modelName',
-            'must be one of ${availableModels.join(', ')}',
-          );
-        }
-        if (normalized == ChatRuntime.modelName) return;
-        final selector = _modelSelector;
-        if (selector == null) {
-          throw StateError('Model selection is not available on this host.');
-        }
-        await selector(normalized);
-        _modelName = normalized;
-      });
+  static Future<void> selectModel(
+    String modelName,
+  ) => _withOperationLock(() async {
+    final normalized = modelName.trim();
+    final matches = modelOptions
+        .where(
+          (option) => option.id == normalized || option.modelName == normalized,
+        )
+        .toList();
+    if (matches.length != 1) {
+      throw ArgumentError.value(
+        modelName,
+        'modelName',
+        'must identify one of ${modelOptions.map((option) => option.id).join(', ')}',
+      );
+    }
+    final selected = matches.single;
+    if (selected.modelName == ChatRuntime.modelName &&
+        selected.provider.name == ChatRuntime.modelProvider) {
+      return;
+    }
+    final selector = _modelSelector;
+    if (selector == null) {
+      throw StateError('Model selection is not available on this host.');
+    }
+    await selector(_qualifiedSelection ? selected.id : selected.modelName);
+    _modelName = selected.modelName;
+    _modelProvider = selected.provider.name;
+    _availableModels = List.unmodifiable(
+      modelOptions
+          .where((option) => option.provider == selected.provider)
+          .map((option) => option.modelName),
+    );
+  });
 
   static Future<ChatSubmission> submit({
     required String conversationId,
     required String message,
     required String modelName,
+    required String modelProvider,
     String? correlationId,
   }) => _withOperationLock(() async {
-    if (modelName != ChatRuntime.modelName) {
+    if (modelName != ChatRuntime.modelName ||
+        modelProvider != ChatRuntime.modelProvider) {
       throw StateError(
-        'The selected model changed to ${ChatRuntime.modelName}. '
+        'The selected model changed to ${ChatRuntime.modelProvider}:${ChatRuntime.modelName}. '
         'Refresh the conversation before submitting.',
       );
     }
