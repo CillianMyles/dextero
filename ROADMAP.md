@@ -5,6 +5,11 @@ durable conversations, multiple workspaces, and a useful persistent workspace
 page. Broader permissions and memory follow the needs of those workflows;
 additional authority still requires the corresponding controls.
 
+This is a working plan, reviewed with the user after each useful slice or
+spike. Milestones describe intended outcomes, not batches to implement without
+feedback. Reorder, narrow, replace, or remove work as usage and new evidence
+change what is worth doing next; follow the cadence in [AGENTS.md](AGENTS.md).
+
 ## Foundation — completed
 
 - [x] Provider-neutral model interface and bounded model → tool → model loop.
