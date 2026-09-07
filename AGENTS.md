@@ -1,21 +1,5 @@
 # Repository instructions
 
-## Working cadence
-
-- Work in small, runnable slices with a clear outcome or question to resolve.
-  Detail the next slice; keep later work provisional.
-- Check in with the user after each useful slice or spike, before starting
-  another substantial slice. Show what works, what was learned, and the
-  recommended next step; do not wait for a whole milestone to finish.
-- During longer work, share meaningful progress and surface findings that
-  change scope or priorities as they arise.
-- Reassess the roadmap against the current code and product experience at
-  each checkpoint. Update it when feedback or evidence changes the plan;
-  reorder, narrow, replace, or remove work that no longer makes sense.
-- Treat roadmap checklists as revisable plans, not authorization to implement
-  every item in sequence. Complete the agreed slice and its delivery loop,
-  then choose the next slice with the user.
-
 ## Delivery loop
 
 For every change:

@@ -1,91 +1,69 @@
 # Roadmap
 
-Milestones are directional, not release-date promises. The next priorities are
-durable conversations, multiple workspaces, and a useful persistent workspace
-page. Broader permissions and memory follow the needs of those workflows;
-additional authority still requires the corresponding controls.
+The immediate plan is a storage decision followed by one durable conversation
+with working follow-ups. Workspace navigation and a persistent page come next,
+subject to what those slices teach us. The later sections describe candidate
+outcomes, not a commitment to implement every checklist in sequence.
 
-This is a working plan, reviewed with the user after each useful slice or
-spike. Milestones describe intended outcomes, not batches to implement without
-feedback. Reorder, narrow, replace, or remove work as usage and new evidence
-change what is worth doing next; follow the cadence in [AGENTS.md](AGENTS.md).
+## Now — choose the host storage path
 
-## Foundation — completed
+The code review found an existing core persistence interface, but startup
+creates a new in-memory conversation. Serverpod already supplies shared typed
+client/server contracts; using core for orchestration does not require placing
+the database implementation there.
 
-- [x] Provider-neutral model interface and bounded model → tool → model loop.
-- [x] Workspace-confined file reading, deterministic listing, and exact
-  single-match editing.
-- [x] Direct argv-based commands and explicit shell execution with timeouts,
-  environment filtering, output caps, and bounded background execution.
-- [x] Codex app-server specialist adapter and Gemini function-calling adapter.
-- [x] Deterministic demos, focused tool/protocol tests, and an AOT spike.
-- [x] Flutter controller and terminal clients, including a Nocterm TUI spike.
+The repo pins Serverpod 3.4.13. Its documented ORM uses Postgres, while
+[Serverpod Next documents host-side SQLite](https://docs.serverpod.dev/next/concepts/server-fundamentals/configuration).
+That newer backend does not support persistent session logs, so SQLite plus
+Insights is not yet a verified answer to both storage and observability.
 
-## Milestones 1–2 — chat and typed control backbone, completed
+- [ ] Spike a conversation and message table using Serverpod's newer SQLite
+  backend in isolation. Establish the required release and upgrade cost; prove
+  a transactional append, a schema migration, and recovery after restart.
+- [ ] Verify host packaging and what diagnostics are available with SQLite.
+  Compare the result with SQLite/Drift behind the existing core interface;
+  retain Drift as the fallback if the Serverpod path is unsuitable.
+- [ ] Recommend one approach, with evidence for ORM/model sharing, migration
+  support, runtime dependencies, and observability. Keep authoritative storage
+  on the host; do not add client synchronization or require a local Postgres
+  service as an incidental part of this slice.
 
-- [x] Append-only user, assistant, tool, lifecycle, and error history with
-  stable conversation, entry, run, tool-call, and correlation IDs.
-- [x] Versioned event families, readable tool summaries, streaming model
-  output, incremental tool activity, and a stable JSONL interface.
-- [x] Cancellation propagation and child-process-tree cleanup.
-- [x] Database-free Serverpod host with generated submit, history,
-  cursor-stream, approval, and cancellation contracts.
-- [x] Explicit one-shot file-edit approvals in Flutter and terminal clients.
-- [x] Bootstrap authentication, local development defaults, and explicit
-  network binding.
-- [x] Provider-qualified Gemini/Codex model selection before the first
-  message through Flutter and terminal clients.
-- [x] Layered tests and network acceptance coverage.
+**Checkpoint:** review the spike and choose the storage approach with the user
+before a production integration or framework upgrade. Update this plan and
+reconcile the SQLite/Drift deployment assumption in VISION.md with that choice.
 
-**Established outcome:** Flutter and terminal clients can observe the same
-ordered activity, approve a gated edit, cancel work, and receive its result.
-Durable history and model context across submissions are the next milestone.
-See [README.md](README.md) for current behaviour and security limitations.
+## Next — one conversation that survives restart and remembers earlier turns
 
-## Milestone 3 — durable conversations and context
+The current activity timeline is not model context: Gemini starts each run
+with the new prompt, and the Codex adapter starts a new thread. Persisting only
+the visible transcript would leave follow-up questions without earlier context.
 
-Return to a conversation after restarting Dextero and continue it meaningfully.
+- [ ] Implement the selected durable store in server behind core's storage
+  interface. Restore the existing conversation on startup, including source
+  messages, ordered activity, run state, and provider/model selection.
+- [ ] Supply bounded earlier context to both providers. Preserve the source
+  needed for continuity separately from display summaries and any provider
+  session reference; report context limits until compaction is implemented.
+- [ ] Persist accepted messages before starting work and publish events after
+  durable append. Reconnect Flutter and CLI/TUI to the restored conversation
+  without losing cursor order or mixing provider/model selections.
+- [ ] Mark unfinished runs interrupted after restart and invalidate pending
+  approvals. A retry needs a fresh approval; uncertain side effects must not
+  be replayed automatically.
+- [ ] Cover the changed path with core, server, Flutter, and CLI/TUI tests,
+  including a network acceptance test that restarts the host between turns.
 
-- [ ] Run a bounded storage spike comparing Serverpod's newer SQLite support
-  with SQLite/Drift behind the existing persistence interface. Verify the
-  required Serverpod version, host-side ORM support, migrations, transactions,
-  packaging, restart recovery, and diagnostic limitations before choosing.
-  This reopens the SQLite/Drift choice recorded in VISION.md; reconcile that
-  deployment guidance when the spike concludes.
-- [ ] Keep authoritative data on the computer running Dextero. Client caches
-  and offline synchronization are separate, later work. Require an explicit
-  deployment decision before adding a local Postgres service.
-- [ ] Keep conversation rules, context assembly, and storage interfaces in
-  core; implement durable stores, migrations, and host lifecycle in server,
-  with generated contracts shared by Flutter and CLI/TUI.
-- [ ] Persist conversations, messages, run state, activity events, provider
-  and model selection, and provenance. Preserve source messages and structured
-  context needed by the model separately from bounded display summaries.
-- [ ] Supply earlier conversation context on follow-up submissions for both
-  Gemini and Codex. Define bounded context assembly and persist any provider
-  session references needed for continuity without making them the only copy
-  of user history. Report context limits explicitly until compaction exists.
-- [ ] Restore conversations on startup and expose creation, listing,
-  reopening, and paginated history through the typed API, Flutter, and CLI/TUI.
-- [ ] Commit accepted messages before starting work and publish history
-  events only after durable append. Preserve cursor order across reconnects.
-- [ ] Mark unfinished runs interrupted after restart; invalidate pending
-  approvals and require a fresh decision before retrying an action. Do not
-  automatically replay side effects whose outcome is uncertain.
-- [ ] Add migrations, backup/restore, export, and explicit deletion paths.
-- [ ] Correlate host diagnostics with conversation and run IDs. Evaluate
-  Serverpod Insights as an operator view; keep durable task history independent
-  of diagnostic log retention and database-backend limitations.
-- [ ] Test context continuity, durable appends, cursor recovery, migrations,
-  and interrupted work through core, server, Flutter, CLI/TUI, and a host
-  restart acceptance test.
+**Checkpoint:** tell Dextero your preferred training days, restart the host,
+and ask a follow-up that uses those days without repeating them. Demonstrate
+it through both clients, including recovery from interrupted work. Review that
+experience before expanding storage or beginning workspace navigation.
 
-**Exit condition:** restart the host, reopen the same conversation from either
-client, and ask a follow-up that correctly uses earlier messages. History and
-model selection survive; interrupted work and expired approvals are explicit.
-Semantic search and automatic task resumption are not required for this exit.
+**Outside this first slice:** a session browser, workspace sidebar, general
+backup/export UI, semantic search, fact extraction, automatic task resumption,
+and remembered grants. Add these when the next exercised workflow needs them;
+keep migrations and a documented way to back up and remove local data in scope.
 
-## Milestone 4 — multiple workspaces
+## Then — explore multiple workspaces
 
 A workspace is a persistent place for an ongoing activity, such as Fitness.
 It contains conversations and shared records; it is not one endless chat or a
@@ -111,7 +89,7 @@ the model supports multiple conversations per workspace.
 switch between them, and restart. Each retains its own conversations and
 configuration, with no context or approval leakage between them.
 
-## Milestone 5 — first persistent workspace page
+## Then — first persistent workspace page
 
 Prove one useful workspace before building a general page-building platform.
 Use Fitness as the first example: a weekly plan, workout log, and progress view.
@@ -138,7 +116,7 @@ Use Fitness as the first example: a weekly plan, workout log, and progress view.
 update; edit it directly and have the next chat turn use that change. Records
 and layout survive restart, and changes can be inspected and undone.
 
-## Next — permissions, approvals, and audit
+## Later — permissions, approvals, and audit
 
 Extend controls around exercised workflows. Existing one-shot approvals and
 local access restrictions remain in force while the product slices above are
@@ -165,7 +143,7 @@ built; remote access and broader tool authority depend on stronger controls.
 inspectable and revocable grant, or paused for approval with a durable audit
 record. Remembered permissions remain attributable after restart.
 
-## Next — richer memory and task continuity
+## Later — richer memory and task continuity
 
 Build on durable conversations and workspace records once real usage shows
 what people need to find and carry forward.
@@ -187,7 +165,7 @@ resume without silently repeating consequential actions.
 
 ## Future directions — ordered by demonstrated need
 
-These are not prerequisites for the workspace milestones or a fixed delivery
+These are not prerequisites for the workspace experiments or a fixed delivery
 sequence. Each selected capability needs a bounded end-to-end exit condition.
 
 - **Specialist delegation:** scoped tasks, context, capabilities, progress,
@@ -228,6 +206,38 @@ sequence. Each selected capability needs a bounded end-to-end exit condition.
   authority, versioning, and recovery before enabling them.
 - **Client offline support:** local caches and synchronization where needed,
   with explicit conflict and deletion handling and clear host authority.
+
+## Foundation — completed
+
+- [x] Provider-neutral model interface and bounded model → tool → model loop.
+- [x] Workspace-confined file reading, deterministic listing, and exact
+  single-match editing.
+- [x] Direct argv-based commands and explicit shell execution with timeouts,
+  environment filtering, output caps, and bounded background execution.
+- [x] Codex app-server specialist adapter and Gemini function-calling adapter.
+- [x] Deterministic demos, focused tool/protocol tests, and an AOT spike.
+- [x] Flutter controller and terminal clients, including a Nocterm TUI spike.
+
+## Milestones 1–2 — chat and typed control backbone, completed
+
+- [x] Append-only user, assistant, tool, lifecycle, and error history with
+  stable conversation, entry, run, tool-call, and correlation IDs.
+- [x] Versioned event families, readable tool summaries, streaming model
+  output, incremental tool activity, and a stable JSONL interface.
+- [x] Cancellation propagation and child-process-tree cleanup.
+- [x] Database-free Serverpod host with generated submit, history,
+  cursor-stream, approval, and cancellation contracts.
+- [x] Explicit one-shot file-edit approvals in Flutter and terminal clients.
+- [x] Bootstrap authentication, local development defaults, and explicit
+  network binding.
+- [x] Provider-qualified Gemini/Codex model selection before the first
+  message through Flutter and terminal clients.
+- [x] Layered tests and network acceptance coverage.
+
+**Established outcome:** Flutter and terminal clients can observe the same
+ordered activity, approve a gated edit, cancel work, and receive its result.
+Durable history and model context across submissions remain to be implemented.
+See [README.md](README.md) for current behaviour and security limitations.
 
 ## Release engineering
 

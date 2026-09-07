@@ -169,7 +169,7 @@ The MVP uses a bootstrap bearer token; it does not yet provide device pairing
 or OS-level sandboxing. Core can edit files and run processes inside
 `DEXTERO_WORKSPACE`. File edits pause for explicit approval, but process tools
 do not yet have the policy coverage planned in the
-[permissions roadmap](ROADMAP.md#next--permissions-approvals-and-audit).
+[permissions roadmap](ROADMAP.md#later--permissions-approvals-and-audit).
 Every `edit_file` invocation requests a fresh approval; decisions are not
 currently remembered.
 
