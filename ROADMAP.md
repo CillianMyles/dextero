@@ -239,6 +239,32 @@ ordered activity, approve a gated edit, cancel work, and receive its result.
 Durable history and model context across submissions remain to be implemented.
 See [README.md](README.md) for current behaviour and security limitations.
 
+## Milestone 11 — voice and visual surfaces
+
+Give the continuous Dextero identity an embodied mobile interface before
+considering dedicated hardware.
+
+- [ ] Extend conversation entries and streams for audio input, partial and
+  final transcripts, streamed speech output, interruption, and modality
+  provenance.
+- [ ] Add a push-to-talk Flutter mobile interaction with clear listening,
+  thinking, tool-use, approval, speaking, and failure states.
+- [ ] Keep the spoken interaction in the same conversation, memory, task,
+  approval, and audit model as text rather than creating a voice-only session.
+- [ ] Add explicitly initiated image/camera context with visible capture state,
+  scoped authority, retention controls, and inspectable provenance.
+- [ ] Evaluate on-device and host-side speech recognition and synthesis against
+  privacy, latency, quality, battery, and offline-operation requirements.
+- [ ] Define a small paired-surface protocol for microphone, speaker, display,
+  buttons, LEDs, and presence so a later room endpoint or wearable can reuse
+  the mobile interaction model.
+- [ ] Prototype specialized hardware only after repeated phone use demonstrates
+  what the dedicated device must improve.
+
+**Exit condition:** a paired phone can speak into an existing conversation,
+see and hear a streamed response, interrupt it, approve a gated action, and
+inspect the resulting transcript and task state from another Dextero surface.
+
 ## Release engineering
 
 These concerns cut across milestones:

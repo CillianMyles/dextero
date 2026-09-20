@@ -55,6 +55,30 @@ Dextero should synchronize with personal systems already in use. For example,
 an event created in Dextero should appear in the calendar on the user's phone,
 and external changes should flow back.
 
+### Voice and visual presence
+
+Voice and visual interaction are modalities of the same Dextero identity, not
+separate assistants. The first embodied surface should be the phone already in
+the user's pocket:
+
+- the microphone captures speech and optional explicitly initiated visual
+  context;
+- the display shows listening, thinking, tool-use, approval, interruption, and
+  response state without exposing agent internals by default;
+- the speaker delivers streamed responses while the transcript and task remain
+  available in the ordinary conversation;
+- voice, text, images, approvals, artifacts, memory, and task state stay in one
+  continuous record across phone, desktop, terminal, and trusted channels.
+
+Start with push-to-talk and obvious microphone/camera indicators. Ambient
+listening, background capture, and camera access require separate, revocable
+authority and must never be implied by pairing a device.
+
+A specialized speaker, display, wearable, or room endpoint may later package
+the same paired-controller protocol. It should be a replaceable peripheral of
+the user's Dextero host, not a new cloud-dependent identity. Prove the
+interaction model on commodity phones before designing dedicated hardware.
+
 ## Memory
 
 “Never forget” means continuity by default, with user-controlled correction,
