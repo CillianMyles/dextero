@@ -107,6 +107,10 @@ test: ## Run every package test suite, including the Flutter web tests.
 
 check: format-check analyze test ## Run the same quality gate expected before review.
 
+.PHONY: check-storage-spike
+check-storage-spike: ## Validate the isolated SQLite spike and its native host bundle.
+	@bash spikes/host_storage/serverpod/check.sh
+
 server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and Codex-backed core.
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
 	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \

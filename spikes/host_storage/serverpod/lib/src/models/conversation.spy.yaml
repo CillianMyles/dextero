@@ -1,0 +1,9 @@
+class: Conversation
+table: spike_conversation
+fields:
+  publicId: String
+  nextSequence: int
+indexes:
+  spike_conversation_public_id:
+    fields: publicId
+    unique: true

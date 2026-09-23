@@ -12,18 +12,19 @@ creates a new in-memory conversation. Serverpod already supplies shared typed
 client/server contracts; using core for orchestration does not require placing
 the database implementation there.
 
-The repo pins Serverpod 3.4.13. Its documented ORM uses Postgres, while
-[Serverpod Next documents host-side SQLite](https://docs.serverpod.dev/next/concepts/server-fundamentals/configuration).
-That newer backend does not support persistent session logs, so SQLite plus
-Insights is not yet a verified answer to both storage and observability.
+The application still pins Serverpod 3.4.13. The
+[isolated storage spike](spikes/host_storage/README.md) tests Serverpod
+4.0.0-rc.2 host-side SQLite and recommends it for the next slice, subject to
+reviewing the prerelease dependency and separate host diagnostics. Drift remains
+the fallback. SQLite does not support persistent Serverpod session logs.
 
-- [ ] Spike a conversation and message table using Serverpod's newer SQLite
+- [x] Spike a conversation and message table using Serverpod's newer SQLite
   backend in isolation. Establish the required release and upgrade cost; prove
   a transactional append, a schema migration, and recovery after restart.
-- [ ] Verify host packaging and what diagnostics are available with SQLite.
+- [x] Verify host packaging and what diagnostics are available with SQLite.
   Compare the result with SQLite/Drift behind the existing core interface;
   retain Drift as the fallback if the Serverpod path is unsuitable.
-- [ ] Recommend one approach, with evidence for ORM/model sharing, migration
+- [x] Recommend one approach, with evidence for ORM/model sharing, migration
   support, runtime dependencies, and observability. Keep authoritative storage
   on the host; do not add client synchronization or require a local Postgres
   service as an incidental part of this slice.
@@ -31,6 +32,7 @@ Insights is not yet a verified answer to both storage and observability.
 **Checkpoint:** review the spike and choose the storage approach with the user
 before a production integration or framework upgrade. Update this plan and
 reconcile the SQLite/Drift deployment assumption in VISION.md with that choice.
+This decision is still pending; the spike does not integrate durable storage.
 
 ## Next — one conversation that survives restart and remembers earlier turns
 

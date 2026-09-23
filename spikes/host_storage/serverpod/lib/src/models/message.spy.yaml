@@ -1,0 +1,11 @@
+class: Message
+table: spike_message
+fields:
+  conversationId: int, relation(parent=spike_conversation)
+  sequence: int
+  content: String
+  source: String, default='user'
+indexes:
+  spike_message_sequence:
+    fields: conversationId, sequence
+    unique: true

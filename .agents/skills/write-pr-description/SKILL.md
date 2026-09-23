@@ -1,84 +1,65 @@
 ---
 name: write-pr-description
-description: "Draft or rewrite a pull request description that explains the problem, rationale, implementation, tradeoffs, and validation with concise bullets and useful diagrams. Use when creating or improving a PR body; do not use for reviewing whether someone else's PR is correct."
+description: "Draft or rewrite compact pull request descriptions using diagrams, pseudocode, or tables to explain nontrivial changes. Use when creating or improving a PR body; do not use for reviewing implementation correctness."
 ---
 
 # Write PR Description
 
-Write a PR body that lets a reviewer quickly answer:
-
-- What problem does this solve, and why does it matter?
-- What approach did the change take, and why?
-- How does the new behavior work?
-- What tradeoffs, risks, and non-goals should I know?
-- What evidence says it works?
+Make the problem, approach, and evidence understandable in one quick scan.
+Default to **250 words or fewer**, including bullets and table cells but excluding
+diagram/code syntax. Simple changes should be much shorter. Exceed this only
+when the user requests detail or essential compatibility, rollout, or correctness
+information cannot fit; link supporting reports instead of reproducing them.
 
 ## Establish the facts
 
-Inspect the change before writing:
+- Inspect the exact base/head, complete diff, relevant runtime path, and tests.
+- Read the existing PR body, required template, and linked context. Preserve
+  issue-closing keywords and required sections.
+- Separate verified results from recommendations and untested assumptions.
+  Never invent validation or claim that a diagram proves behavior.
 
-- Identify the exact base and head. Read the diff, changed-file summary, and commits; do not describe only the latest commit.
-- Read the existing PR body, repository PR template, linked issue or ticket, relevant discussion, and nearby documentation when available.
-- Trace the important runtime path through the surrounding code. Read tests as evidence of intended behavior, not merely as files that changed.
-- Separate verified facts from inference. Do not invent motivation, user impact, alternatives, test results, compatibility, or rollout details. If important context is unavailable, say what is unknown.
+## Explain through a compact visual
 
-When rewriting an existing body, preserve required template sections, issue-closing keywords, task lists, and accurate context that the diff does not contain.
+For a nontrivial change, include at least one representation that carries the
+explanation. Choose what helps the reviewer; do not add every visual type:
 
-## Build the explanation
+| What needs explaining | Preferred representation |
+| --- | --- |
+| Boundaries, ownership, dependencies | Small architecture or component diagram |
+| Calls between participants, async ordering, recovery | Mermaid sequence diagram |
+| Transactions, branching, retries, state transitions | Short pseudocode or flowchart |
+| Alternatives, exact before/after behavior, spike findings | Small comparison table |
 
-Lead with the outcome, then cover only the sections the change needs:
+Use real names and show only the consequential steps. A trivial change that is
+clear in one or two sentences does not need a visual. Multiple layers or recovery
+steps are reasons to use a visual, not to replace it with longer bullets.
 
-1. **Summary** — one to three bullets describing the observable result.
-2. **Why** — the old behavior or constraint, who or what it affected, and the desired behavior.
-3. **How it works** — the important control flow, data flow, state transition, or responsibility change.
-4. **Tradeoffs** — the chosen approach's cost, credible alternatives considered, and why the choice is reasonable here.
-5. **Risks and rollout** — compatibility, migration, operational, security, performance, or reversibility concerns when relevant.
-6. **Validation** — exact automated and manual checks and their results. Clearly mark checks that were not run.
+**The visual replaces prose.** Do not narrate its steps again above or below it.
+If the flow needs more than roughly eight steps to explain, show the main path
+and link the detailed design. Check that Mermaid syntax renders on GitHub.
 
-Call out non-goals when a reviewer could reasonably mistake adjacent work for part of the PR. Explain generated files or broad mechanical changes once instead of itemizing them.
+## Assemble the body
 
-## Prefer visual compression
+Use this order, without turning each item into a mandatory heading:
 
-Use concise bullets and the smallest visual that makes the change easier to understand:
+1. One or two sentences: the concrete problem and resulting behavior or decision.
+2. The diagram, pseudocode, or table explaining the approach.
+3. Only material tradeoffs or scope limits not already shown. Link deeper detail.
+4. Two or three short validation bullets with commands and observed results.
 
-- Pseudocode for branching logic, ordering, retries, fallbacks, or state transitions.
-- A Mermaid sequence or flow diagram when three or more participants or steps interact.
-- A shallow call tree, component tree, or file tree when ownership moved.
-- A small before/after table for exact behavioral or configuration mappings.
-- A focused `diff` sketch when the surrounding shape matters more than syntax.
+For spikes, put findings and alternatives in a table and link the full report.
+For implementation, prefer the runtime flow. Explain generated-file volume once
+if needed. Avoid separate Summary/Why/How/Findings sections repeating the same facts.
 
-Place each visual beside the text it supports. Use real names from the change and omit incidental calls, files, and branches. Do not add a diagram to a change that a few bullets explain more clearly.
+## Compression pass before publishing
 
-## Recommended shape
+- Remove prose that repeats the visual, a linked report, or another bullet.
+- Split or shorten bullets that contain several sentences; do not disguise
+  paragraphs as bullets.
+- Keep validation specific without listing every passing test.
+- Check the word budget, factual scope, and rendered visual. Essential risk and
+  untested limitations must remain visible; move supporting detail behind links.
 
-Adapt this outline rather than filling every heading mechanically:
-
-```markdown
-## Summary
-
-- <observable outcome>
-- <important scope boundary>
-
-## Why
-
-- **Before:** <current problem or constraint>
-- **Impact:** <why it matters>
-- **After:** <desired behavior>
-
-## How it works
-
-<small diagram, pseudocode, table, or bullets>
-
-## Tradeoffs
-
-- **Choice:** <decision and why>
-- **Cost:** <complexity, limitation, or operational consequence>
-- **Alternative:** <credible option and why it was not chosen>
-
-## Validation
-
-- `command` — passed; <what it proves>
-- Manual: <scenario and observed result>
-```
-
-Return a complete, paste-ready PR body without a prose preamble. Prefer links to source context over copying it. Avoid a commit log, a file-by-file inventory, long narrative paragraphs, repeated implementation detail, and claims that exceed the available evidence.
+Return the complete PR body without a preamble. Publishing or editing a PR still
+depends on the user's authorization; this skill does not grant it.
