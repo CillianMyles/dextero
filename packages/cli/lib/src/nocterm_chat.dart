@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dextero_server/dextero_client.dart';
 import 'package:nocterm/nocterm.dart';
 
 import 'chat_client.dart';
 import 'terminal_renderer.dart';
+import 'voice_file.dart';
 
 typedef TuiExit = void Function(int exitCode);
 
@@ -122,14 +124,31 @@ final class _DexteroTuiState extends State<DexteroTui> {
     }
 
     _inputController.clear();
-    setState(() {
-      _sending = true;
-      _notice = 'Dextero is working…';
-    });
-
-    try {
-      final status = _status!;
-      final submission = await component.client.submit(
+    final status = _status!;
+    if (message == '/voice' || message.startsWith('/voice ')) {
+      final path = message.substring('/voice'.length).trim();
+      if (path.isEmpty) {
+        _showNotice('Send a recording with /voice <file.wav|.mp3|.flac>.');
+        return;
+      }
+      await _follow('Transcribing $path…', () async {
+        final voice = await VoiceFile.read(path);
+        return component.client.submitVoice(
+          VoiceSubmitRequest(
+            conversationId: status.conversationId,
+            audio: ByteData.sublistView(voice.bytes),
+            mimeType: voice.mimeType,
+            modelName: status.modelName,
+            modelProvider: status.modelProvider,
+            correlationId: component.correlationIdFactory(),
+          ),
+        );
+      });
+      return;
+    }
+    await _follow(
+      'Dextero is working…',
+      () => component.client.submit(
         ChatSubmitRequest(
           conversationId: status.conversationId,
           message: message,
@@ -137,8 +156,25 @@ final class _DexteroTuiState extends State<DexteroTui> {
           modelProvider: status.modelProvider,
           correlationId: component.correlationIdFactory(),
         ),
-      );
+      ),
+    );
+  }
+
+  /// Submits one turn and streams its activity until the run finishes.
+  Future<void> _follow(
+    String pendingNotice,
+    Future<ChatSubmission> Function() submit,
+  ) async {
+    setState(() {
+      _sending = true;
+      _notice = pendingNotice;
+    });
+
+    try {
+      final status = _status!;
+      final submission = await submit();
       _add(submission.userEntry);
+      _showNotice(_renderer.activityNotice(agentActivityOf(_entries)));
 
       var terminalSeen = false;
       var succeeded = true;
@@ -148,6 +184,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
         afterSequence,
       )) {
         _add(entry);
+        _showNotice(_renderer.activityNotice(agentActivityOf(_entries)));
         if (entry.kind == ChatEntryKind.error &&
             entry.status == ChatEntryStatus.failed) {
           succeeded = false;
@@ -177,6 +214,8 @@ final class _DexteroTuiState extends State<DexteroTui> {
         _failed |= !succeeded;
         _notice = succeeded ? 'Ready' : 'The last run failed';
       });
+    } on VoiceTurnException catch (error) {
+      _showError('Voice request failed: ${error.message}');
     } on Object catch (error) {
       _showError('Request failed: $error');
     }
@@ -389,7 +428,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
                     ),
                   ),
                   Text(
-                    'Enter send  ·  /models list  ·  /exit or Ctrl+C quit',
+                    'Enter send  ·  /voice <file>  ·  /models  ·  /exit quit',
                     style: TextStyle(color: _muted),
                   ),
                 ],
@@ -439,7 +478,7 @@ final class _EntryView extends StatelessComponent {
     return switch (entry.kind) {
       ChatEntryKind.userMessage => (
         symbol: 'YOU',
-        label: 'you',
+        label: entry.modality == ChatModality.voice ? 'voice' : 'you',
         color: Colors.brightMagenta,
       ),
       ChatEntryKind.assistantMessage => (

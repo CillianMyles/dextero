@@ -4,3 +4,4 @@ export 'src/nocterm_chat.dart';
 export 'src/terminal_chat.dart';
 export 'src/terminal_io.dart';
 export 'src/terminal_renderer.dart';
+export 'src/voice_file.dart';

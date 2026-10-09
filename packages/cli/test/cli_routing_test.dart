@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_server/dextero_client.dart';
@@ -86,6 +88,59 @@ void main() {
     expect(result, 0);
     expect(selectedModel, 'gemini-pro');
   });
+
+  test('routes --voice turns past the TUI and writes the reply', () async {
+    final directory = Directory.systemTemp.createTempSync('dextero-cli-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final recording = File('${directory.path}/question.WAV')
+      ..writeAsBytesSync([82, 73, 70, 70]);
+    final reply = '${directory.path}/reply.wav';
+    final io = _FakeIo(
+      lines: const [],
+      hasInputTerminal: true,
+      hasOutputTerminal: true,
+    );
+    final client = _FakeClient();
+    var tuiRuns = 0;
+
+    final result = await cli.run(
+      ['--voice', recording.path, '--reply-audio', reply],
+      io: io,
+      environment: const {
+        'DEXTERO_CONTROL_TOKEN': 'test-token-0123456789-0123456789',
+      },
+      clientFactory: ({required serverUrl, required token}) => client,
+      tuiRunner: ({required client, modelName}) async {
+        tuiRuns++;
+        return 0;
+      },
+    );
+
+    expect(result, 0);
+    expect(tuiRuns, 0);
+    expect(client.voiceRequests.single.mimeType, 'audio/wav');
+    expect(client.voiceRequests.single.audio.lengthInBytes, 4);
+    expect(File(reply).readAsBytesSync(), [1, 2]);
+  });
+
+  test('rejects conflicting or unreadable voice arguments', () async {
+    Future<int> run(List<String> arguments) => cli.run(
+      arguments,
+      io: _FakeIo(lines: const []),
+      environment: const {
+        'DEXTERO_CONTROL_TOKEN': 'test-token-0123456789-0123456789',
+      },
+      clientFactory: ({required serverUrl, required token}) => _FakeClient(),
+    );
+
+    expect(await run(['--voice', 'question.wav', 'and text']), 64);
+    expect(await run(['--voice', 'question.wav', '--cancel', 'run-1']), 64);
+    expect(await run(['--reply-audio', 'reply.wav']), 64);
+    expect(await run(['--voice', 'question.ogg']), 66);
+    expect(await run(['--voice', '/missing/question.wav']), 66);
+    expect(voiceMimeTypeForPath('a.flac'), 'audio/flac');
+    expect(voiceMimeTypeForPath('a.mp3'), 'audio/mpeg');
+  });
 }
 
 final class _FakeIo implements TerminalIo {
@@ -119,6 +174,7 @@ final class _FakeIo implements TerminalIo {
 
 final class _FakeClient implements TerminalChatClient {
   final requests = <ChatSubmitRequest>[];
+  final voiceRequests = <VoiceSubmitRequest>[];
   final approvals = <(String, String, String)>[];
   bool closed = false;
 
@@ -204,6 +260,33 @@ final class _FakeClient implements TerminalChatClient {
       ),
     );
   }
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) async {
+    voiceRequests.add(request);
+    return ChatSubmission(
+      conversationId: request.conversationId,
+      runId: 'run-1',
+      correlationId: request.correlationId!,
+      userEntry: _entry(
+        sequence: 0,
+        id: 'user-1',
+        kind: ChatEntryKind.userMessage,
+        status: ChatEntryStatus.submitted,
+        content: 'Spoken request',
+      ),
+    );
+  }
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) async =>
+      SpokenReply(
+        entryId: entryId,
+        audio: ByteData.sublistView(Uint8List.fromList([1, 2])),
+        mimeType: 'audio/wav',
+        engine: 'macOS say on this host',
+        truncated: false,
+      );
 }
 
 ChatEntry _entry({

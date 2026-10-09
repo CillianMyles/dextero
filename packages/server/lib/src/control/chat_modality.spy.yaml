@@ -1,0 +1,5 @@
+enum: ChatModality
+serialized: byName
+values:
+  - text
+  - voice

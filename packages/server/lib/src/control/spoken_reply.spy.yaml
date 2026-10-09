@@ -1,0 +1,7 @@
+class: SpokenReply
+fields:
+  entryId: String
+  audio: ByteData
+  mimeType: String
+  engine: String
+  truncated: bool

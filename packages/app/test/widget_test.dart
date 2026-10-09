@@ -791,6 +791,14 @@ final class _FakeChatApi implements ChatApi {
     return submitter?.call(request) ??
         Future.value(_submission(request.message));
   }
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) =>
+      throw UnimplementedError('Voice is covered in voice_test.dart.');
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) =>
+      throw UnimplementedError('Voice is covered in voice_test.dart.');
 }
 
 HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dextero_core/dextero_core.dart' as core;
 import 'package:serverpod/serverpod.dart';
@@ -44,6 +45,9 @@ final class ControlEndpoint extends Endpoint {
           toolDescription: option.toolDescription,
         ),
     ],
+    voiceInputAvailable: ChatRuntime.voice.inputAvailable,
+    voiceOutputAvailable: ChatRuntime.voice.outputAvailable,
+    voiceNotice: ChatRuntime.voice.privacyNotice,
   );
 
   /// Canonically accepts a user message before starting assistant work.
@@ -63,6 +67,54 @@ final class ControlEndpoint extends Endpoint {
       runId: submission.runId,
       correlationId: submission.correlationId,
       userEntry: _toProtocolEntry(submission.userEntry),
+    );
+  }
+
+  /// Transcribes push-to-talk audio on the host and accepts the transcript
+  /// into the same conversation as typed messages. Audio is not retained.
+  Future<ChatSubmission> submitVoiceMessage(
+    Session session,
+    VoiceSubmitRequest request,
+  ) async {
+    final submission = await _voiceOperation(
+      () => ChatRuntime.submitVoice(
+        conversationId: request.conversationId,
+        audio: request.audio.buffer.asUint8List(
+          request.audio.offsetInBytes,
+          request.audio.lengthInBytes,
+        ),
+        mimeType: request.mimeType,
+        modelName: request.modelName,
+        modelProvider: request.modelProvider,
+        correlationId: request.correlationId,
+      ),
+    );
+    return ChatSubmission(
+      conversationId: submission.conversationId,
+      runId: submission.runId,
+      correlationId: submission.correlationId,
+      userEntry: _toProtocolEntry(submission.userEntry),
+    );
+  }
+
+  /// Synthesizes speech for one assistant reply; the audio is not stored.
+  Future<SpokenReply> speakReply(
+    Session session,
+    String conversationId,
+    String entryId,
+  ) async {
+    final speech = await _voiceOperation(
+      () => ChatRuntime.voice.speak(
+        conversationId: conversationId,
+        entryId: entryId,
+      ),
+    );
+    return SpokenReply(
+      entryId: entryId,
+      audio: ByteData.sublistView(speech.bytes),
+      mimeType: speech.mimeType,
+      engine: speech.engine,
+      truncated: speech.truncated,
     );
   }
 
@@ -119,5 +171,15 @@ final class ControlEndpoint extends Endpoint {
     toolCallId: entry.toolCallId,
     toolName: entry.toolName,
     approvalId: entry.approvalId,
+    modality: ChatModality.values.byName(entry.modality.name),
+    transcriptionEngine: entry.transcriptionEngine,
   );
+
+  Future<T> _voiceOperation<T>(Future<T> Function() operation) async {
+    try {
+      return await operation();
+    } on core.SpeechException catch (error) {
+      throw VoiceTurnException(message: error.message);
+    }
+  }
 }

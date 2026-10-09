@@ -12,3 +12,6 @@ fields:
   modelName: String
   availableModels: List<String>
   modelOptions: List<ModelOption>
+  voiceInputAvailable: bool, default=false
+  voiceOutputAvailable: bool, default=false
+  voiceNotice: String?

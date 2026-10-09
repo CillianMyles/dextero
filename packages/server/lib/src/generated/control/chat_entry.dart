@@ -13,9 +13,10 @@
 
 import 'package:serverpod/serverpod.dart' as _i1;
 import '../control/chat_event_family.dart' as _i2;
-import '../control/chat_entry_kind.dart' as _i3;
-import '../control/chat_entry_status.dart' as _i4;
-import '../control/chat_entry_source.dart' as _i5;
+import '../control/chat_modality.dart' as _i3;
+import '../control/chat_entry_kind.dart' as _i4;
+import '../control/chat_entry_status.dart' as _i5;
+import '../control/chat_entry_source.dart' as _i6;
 
 abstract class ChatEntry
     implements _i1.SerializableModel, _i1.ProtocolSerialization {
@@ -36,8 +37,11 @@ abstract class ChatEntry
     this.toolCallId,
     this.toolName,
     this.approvalId,
+    _i3.ChatModality? modality,
+    this.transcriptionEngine,
   }) : eventVersion = eventVersion ?? 1,
-       family = family ?? _i2.ChatEventFamily.task;
+       family = family ?? _i2.ChatEventFamily.task,
+       modality = modality ?? _i3.ChatModality.text;
 
   factory ChatEntry({
     int? eventVersion,
@@ -45,17 +49,19 @@ abstract class ChatEntry
     required String conversationId,
     required String entryId,
     required int sequence,
-    required _i3.ChatEntryKind kind,
-    required _i4.ChatEntryStatus status,
+    required _i4.ChatEntryKind kind,
+    required _i5.ChatEntryStatus status,
     required String content,
     required DateTime createdAt,
     required String correlationId,
-    required _i5.ChatEntrySource source,
+    required _i6.ChatEntrySource source,
     required bool truncated,
     String? runId,
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    _i3.ChatModality? modality,
+    String? transcriptionEngine,
   }) = _ChatEntryImpl;
 
   factory ChatEntry.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -69,8 +75,8 @@ abstract class ChatEntry
       conversationId: jsonSerialization['conversationId'] as String,
       entryId: jsonSerialization['entryId'] as String,
       sequence: jsonSerialization['sequence'] as int,
-      kind: _i3.ChatEntryKind.fromJson((jsonSerialization['kind'] as String)),
-      status: _i4.ChatEntryStatus.fromJson(
+      kind: _i4.ChatEntryKind.fromJson((jsonSerialization['kind'] as String)),
+      status: _i5.ChatEntryStatus.fromJson(
         (jsonSerialization['status'] as String),
       ),
       content: jsonSerialization['content'] as String,
@@ -78,7 +84,7 @@ abstract class ChatEntry
         jsonSerialization['createdAt'],
       ),
       correlationId: jsonSerialization['correlationId'] as String,
-      source: _i5.ChatEntrySource.fromJson(
+      source: _i6.ChatEntrySource.fromJson(
         (jsonSerialization['source'] as String),
       ),
       truncated: _i1.BoolJsonExtension.fromJson(jsonSerialization['truncated']),
@@ -86,6 +92,12 @@ abstract class ChatEntry
       toolCallId: jsonSerialization['toolCallId'] as String?,
       toolName: jsonSerialization['toolName'] as String?,
       approvalId: jsonSerialization['approvalId'] as String?,
+      modality: jsonSerialization['modality'] == null
+          ? null
+          : _i3.ChatModality.fromJson(
+              (jsonSerialization['modality'] as String),
+            ),
+      transcriptionEngine: jsonSerialization['transcriptionEngine'] as String?,
     );
   }
 
@@ -99,9 +111,9 @@ abstract class ChatEntry
 
   int sequence;
 
-  _i3.ChatEntryKind kind;
+  _i4.ChatEntryKind kind;
 
-  _i4.ChatEntryStatus status;
+  _i5.ChatEntryStatus status;
 
   String content;
 
@@ -109,7 +121,7 @@ abstract class ChatEntry
 
   String correlationId;
 
-  _i5.ChatEntrySource source;
+  _i6.ChatEntrySource source;
 
   bool truncated;
 
@@ -121,6 +133,10 @@ abstract class ChatEntry
 
   String? approvalId;
 
+  _i3.ChatModality modality;
+
+  String? transcriptionEngine;
+
   /// Returns a shallow copy of this [ChatEntry]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -130,17 +146,19 @@ abstract class ChatEntry
     String? conversationId,
     String? entryId,
     int? sequence,
-    _i3.ChatEntryKind? kind,
-    _i4.ChatEntryStatus? status,
+    _i4.ChatEntryKind? kind,
+    _i5.ChatEntryStatus? status,
     String? content,
     DateTime? createdAt,
     String? correlationId,
-    _i5.ChatEntrySource? source,
+    _i6.ChatEntrySource? source,
     bool? truncated,
     String? runId,
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    _i3.ChatModality? modality,
+    String? transcriptionEngine,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -162,6 +180,9 @@ abstract class ChatEntry
       if (toolCallId != null) 'toolCallId': toolCallId,
       if (toolName != null) 'toolName': toolName,
       if (approvalId != null) 'approvalId': approvalId,
+      'modality': modality.toJson(),
+      if (transcriptionEngine != null)
+        'transcriptionEngine': transcriptionEngine,
     };
   }
 
@@ -185,6 +206,9 @@ abstract class ChatEntry
       if (toolCallId != null) 'toolCallId': toolCallId,
       if (toolName != null) 'toolName': toolName,
       if (approvalId != null) 'approvalId': approvalId,
+      'modality': modality.toJson(),
+      if (transcriptionEngine != null)
+        'transcriptionEngine': transcriptionEngine,
     };
   }
 
@@ -203,17 +227,19 @@ class _ChatEntryImpl extends ChatEntry {
     required String conversationId,
     required String entryId,
     required int sequence,
-    required _i3.ChatEntryKind kind,
-    required _i4.ChatEntryStatus status,
+    required _i4.ChatEntryKind kind,
+    required _i5.ChatEntryStatus status,
     required String content,
     required DateTime createdAt,
     required String correlationId,
-    required _i5.ChatEntrySource source,
+    required _i6.ChatEntrySource source,
     required bool truncated,
     String? runId,
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    _i3.ChatModality? modality,
+    String? transcriptionEngine,
   }) : super._(
          eventVersion: eventVersion,
          family: family,
@@ -231,6 +257,8 @@ class _ChatEntryImpl extends ChatEntry {
          toolCallId: toolCallId,
          toolName: toolName,
          approvalId: approvalId,
+         modality: modality,
+         transcriptionEngine: transcriptionEngine,
        );
 
   /// Returns a shallow copy of this [ChatEntry]
@@ -243,17 +271,19 @@ class _ChatEntryImpl extends ChatEntry {
     String? conversationId,
     String? entryId,
     int? sequence,
-    _i3.ChatEntryKind? kind,
-    _i4.ChatEntryStatus? status,
+    _i4.ChatEntryKind? kind,
+    _i5.ChatEntryStatus? status,
     String? content,
     DateTime? createdAt,
     String? correlationId,
-    _i5.ChatEntrySource? source,
+    _i6.ChatEntrySource? source,
     bool? truncated,
     Object? runId = _Undefined,
     Object? toolCallId = _Undefined,
     Object? toolName = _Undefined,
     Object? approvalId = _Undefined,
+    _i3.ChatModality? modality,
+    Object? transcriptionEngine = _Undefined,
   }) {
     return ChatEntry(
       eventVersion: eventVersion ?? this.eventVersion,
@@ -272,6 +302,10 @@ class _ChatEntryImpl extends ChatEntry {
       toolCallId: toolCallId is String? ? toolCallId : this.toolCallId,
       toolName: toolName is String? ? toolName : this.toolName,
       approvalId: approvalId is String? ? approvalId : this.approvalId,
+      modality: modality ?? this.modality,
+      transcriptionEngine: transcriptionEngine is String?
+          ? transcriptionEngine
+          : this.transcriptionEngine,
     );
   }
 }

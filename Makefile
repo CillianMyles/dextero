@@ -8,6 +8,8 @@ ENV_FILE ?= .env
 -include $(ENV_FILE)
 export DEXTERO_MODEL_PROVIDER DEXTERO_CODEX_MODEL DEXTERO_CODEX_MODELS
 export GEMINI_API_KEY DEXTERO_GEMINI_MODEL DEXTERO_GEMINI_MODELS
+export DEXTERO_WHISPER_MODEL DEXTERO_WHISPER_CLI DEXTERO_WHISPER_LANGUAGE
+export DEXTERO_SPEECH_OUTPUT DEXTERO_SPEECH_VOICE
 
 .DEFAULT_GOAL := help
 
@@ -56,6 +58,14 @@ doctor: ## Check the local tools used by the workspace.
 	  codex login status >/dev/null || { echo "Codex is not authenticated; run 'codex login'"; exit 1; }; \
 	fi
 	@if command -v $(SERVERPOD) >/dev/null; then printf "Serverpod: "; $(SERVERPOD) version; else echo "Serverpod: not installed (make tools)"; fi
+	@if [ -z "$(DEXTERO_WHISPER_MODEL)" ]; then \
+	  echo "Voice:   off (set DEXTERO_WHISPER_MODEL to enable push-to-talk)"; \
+	elif [ ! -f "$(DEXTERO_WHISPER_MODEL)" ]; then \
+	  echo "DEXTERO_WHISPER_MODEL does not name an existing file"; exit 1; \
+	else \
+	  command -v "$(or $(DEXTERO_WHISPER_CLI),whisper-cli)" >/dev/null || { echo "Missing whisper-cli (brew install whisper-cpp)"; exit 1; }; \
+	  echo "Voice:   whisper.cpp with $(notdir $(DEXTERO_WHISPER_MODEL))"; \
+	fi
 
 bootstrap: doctor ## Resolve every Dart and Flutter workspace dependency.
 	@$(DART) pub get
@@ -164,7 +174,10 @@ cli: $(DEV_TOKEN_FILE) ## Run the terminal client (start the server separately).
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
 	 DEXTERO_CONTROL_URL="$(CONTROL_URL)" \
 	 $(DART) run packages/cli/bin/dextero.dart \
-	 $(if $(MODEL),--model "$(MODEL)",) $(if $(PROMPT),"$(PROMPT)",)
+	 $(if $(MODEL),--model "$(MODEL)",) \
+	 $(if $(VOICE),--voice "$(VOICE)",) \
+	 $(if $(REPLY_AUDIO),--reply-audio "$(REPLY_AUDIO)",) \
+	 $(if $(PROMPT),"$(PROMPT)",)
 
 cancel: $(DEV_TOKEN_FILE) ## Cancel a run (set RUN_ID).
 	@test -n "$(RUN_ID)" || { echo "Set RUN_ID to the run identifier."; exit 2; }

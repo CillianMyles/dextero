@@ -27,6 +27,25 @@ final class JsonlRenderer {
     if (entry.toolCallId != null) 'tool_call_id': entry.toolCallId,
     if (entry.toolName != null) 'tool_name': entry.toolName,
     if (entry.approvalId != null) 'approval_id': entry.approvalId,
+    'modality': entry.modality.name,
+    if (entry.transcriptionEngine != null)
+      'transcription_engine': entry.transcriptionEngine,
+  });
+
+  String spokenReply({
+    required String conversationId,
+    required SpokenReply reply,
+    required String path,
+  }) => jsonEncode({
+    'schema_version': schemaVersion,
+    'type': 'spoken_reply',
+    'conversation_id': conversationId,
+    'entry_id': reply.entryId,
+    'path': path,
+    'mime_type': reply.mimeType,
+    'bytes': reply.audio.lengthInBytes,
+    'engine': reply.engine,
+    'truncated': reply.truncated,
   });
 
   String error(Object error) => jsonEncode({

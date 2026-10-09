@@ -117,11 +117,27 @@ final class ChatService {
     _agents[conversationId] = agent;
   });
 
+  /// Whether a response is currently running for [conversationId].
+  bool hasActiveRun(String conversationId) =>
+      _activeRuns.containsKey(conversationId);
+
+  /// Accepts a message into history; voice turns pass their transcript here
+  /// with [modality] and [transcriptionEngine] provenance.
   Future<ChatSubmission> submit({
     required String conversationId,
     required String message,
     String? correlationId,
+    ChatModality modality = ChatModality.text,
+    String? transcriptionEngine,
   }) async {
+    if ((modality == ChatModality.voice) !=
+        (transcriptionEngine?.trim().isNotEmpty ?? false)) {
+      throw ArgumentError.value(
+        transcriptionEngine,
+        'transcriptionEngine',
+        'must be provided for voice messages only',
+      );
+    }
     final normalized = message.trim();
     if (normalized.isEmpty || normalized.length > 32000) {
       throw ArgumentError.value(
@@ -153,6 +169,10 @@ final class ChatService {
           correlationId: effectiveCorrelationId,
           source: ChatEntrySource.user,
           runId: runId,
+          modality: modality,
+          transcriptionEngine: transcriptionEngine == null
+              ? null
+              : SafeMetadata.text(transcriptionEngine).text,
         ),
       );
       final cancellation = CancellationController();

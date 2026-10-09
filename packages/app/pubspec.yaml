@@ -10,10 +10,12 @@ environment:
 resolution: workspace
 
 dependencies:
+  audioplayers: ^6.7.1
   dextero_server:
     path: ../server
   flutter:
     sdk: flutter
+  record: ^7.1.1
   shad: ^0.99.4
 
 dev_dependencies:

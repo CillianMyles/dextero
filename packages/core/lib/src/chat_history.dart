@@ -40,6 +40,9 @@ enum ChatEntryStatus {
 
 enum ChatEntrySource { user, dextero, model }
 
+/// How a user message was captured before it entered the conversation.
+enum ChatModality { text, voice }
+
 final class ChatConversation {
   const ChatConversation({required this.id, required this.createdAt});
 
@@ -66,6 +69,8 @@ final class ChatHistoryEntry {
     this.toolCallId,
     this.toolName,
     this.approvalId,
+    this.modality = ChatModality.text,
+    this.transcriptionEngine,
   }) : _family = family;
 
   final int eventVersion;
@@ -86,6 +91,10 @@ final class ChatHistoryEntry {
   final String? toolCallId;
   final String? toolName;
   final String? approvalId;
+  final ChatModality modality;
+
+  /// Display-safe description of the speech engine that produced a transcript.
+  final String? transcriptionEngine;
 }
 
 final class PendingChatEntry {
@@ -101,6 +110,8 @@ final class PendingChatEntry {
     this.toolName,
     this.approvalId,
     this.family,
+    this.modality = ChatModality.text,
+    this.transcriptionEngine,
   });
 
   final ChatEntryKind kind;
@@ -114,6 +125,8 @@ final class PendingChatEntry {
   final String? toolName;
   final String? approvalId;
   final ChatEventFamily? family;
+  final ChatModality modality;
+  final String? transcriptionEngine;
 }
 
 ChatEventFamily eventFamilyFor(ChatEntryKind kind, ChatEntryStatus status) {
@@ -226,6 +239,8 @@ final class InMemoryChatHistoryStore implements ChatHistoryStore {
       toolCallId: entry.toolCallId,
       toolName: entry.toolName,
       approvalId: entry.approvalId,
+      modality: entry.modality,
+      transcriptionEngine: entry.transcriptionEngine,
     );
     state.entries.add(canonical);
     state.changes.add(canonical);

@@ -3,6 +3,8 @@ import 'package:dextero_server/dextero_client.dart';
 import 'package:test/test.dart';
 
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 void main() {
   test(
@@ -173,6 +175,102 @@ void main() {
     expect(records.every((record) => record['type'] == 'chat_event'), isTrue);
     expect(io.output.join(), isNot(contains('Dextero is working')));
   });
+
+  test('sends a voice recording and saves the spoken reply', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+    final directory = Directory.systemTemp.createTempSync('dextero-cli-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final replyPath = '${directory.path}/reply.wav';
+
+    final result =
+        await TerminalChat(
+          client: client,
+          io: io,
+          correlationIdFactory: () => 'cli-voice-1',
+        ).run(
+          voice: VoiceFile(
+            bytes: Uint8List.fromList([1, 2, 3]),
+            mimeType: 'audio/wav',
+          ),
+          replyAudioPath: replyPath,
+        );
+
+    expect(result, 0);
+    final request = client.voiceRequests.single;
+    expect(request.mimeType, 'audio/wav');
+    expect(request.correlationId, 'cli-voice-1');
+    expect(request.audio.buffer.asUint8List(), [1, 2, 3]);
+    expect(io.output.join(), contains('[you · voice] What changed?'));
+    expect(
+      io.output.join(),
+      contains('(transcribed by whisper.cpp (ggml-base.bin) on this host)'),
+    );
+    expect(client.spokenEntryIds, ['entry-2']);
+    expect(File(replyPath).readAsBytesSync(), [5, 4, 3]);
+    expect(
+      io.output.join(),
+      contains(
+        'Spoken reply saved to $replyPath '
+        '(macOS say on this host; shortened for speech).',
+      ),
+    );
+  });
+
+  test('emits voice provenance and the spoken reply as JSONL', () async {
+    final client = _FakeClient();
+    final io = _FakeIo(lines: const []);
+    final directory = Directory.systemTemp.createTempSync('dextero-cli-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+
+    final result =
+        await TerminalChat(
+          client: client,
+          io: io,
+          outputMode: TerminalOutputMode.jsonl,
+        ).run(
+          voice: VoiceFile(bytes: Uint8List(4), mimeType: 'audio/wav'),
+          replyAudioPath: '${directory.path}/reply.wav',
+        );
+
+    expect(result, 0);
+    final records = io.output
+        .map((line) => jsonDecode(line) as Map<String, Object?>)
+        .toList();
+    expect(records.first['modality'], 'voice');
+    expect(
+      records.first['transcription_engine'],
+      'whisper.cpp (ggml-base.bin) on this host',
+    );
+    expect(records.last, {
+      'schema_version': 1,
+      'type': 'spoken_reply',
+      'conversation_id': 'conversation-1',
+      'entry_id': 'entry-2',
+      'path': '${directory.path}/reply.wav',
+      'mime_type': 'audio/wav',
+      'bytes': 3,
+      'engine': 'macOS say on this host',
+      'truncated': true,
+    });
+  });
+
+  test('reports rejected voice turns by their message', () async {
+    final client = _FakeClient()
+      ..voiceError = VoiceTurnException(
+        message: 'No speech was detected in the recording.',
+      );
+    final io = _FakeIo(lines: const []);
+
+    final result = await TerminalChat(client: client, io: io).run(
+      voice: VoiceFile(bytes: Uint8List(4), mimeType: 'audio/wav'),
+    );
+
+    expect(result, 1);
+    expect(io.errors, [
+      'Dextero voice request failed: No speech was detected in the recording.',
+    ]);
+  });
 }
 
 final class _FakeClient implements TerminalChatClient {
@@ -187,6 +285,9 @@ final class _FakeClient implements TerminalChatClient {
   final bool endBeforeTerminal;
   final Object? statusError;
   final bool approvalAccepted;
+  Object? voiceError;
+  final voiceRequests = <VoiceSubmitRequest>[];
+  final spokenEntryIds = <String>[];
   final requests = <ChatSubmitRequest>[];
   final cursors = <int>[];
   bool closed = false;
@@ -311,6 +412,38 @@ final class _FakeClient implements TerminalChatClient {
       ),
     );
   }
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) async {
+    if (voiceError case final error?) throw error;
+    voiceRequests.add(request);
+    return ChatSubmission(
+      conversationId: request.conversationId,
+      runId: 'run-1',
+      correlationId: request.correlationId!,
+      userEntry: _entry(
+        sequence: 0,
+        id: 'entry-0',
+        kind: ChatEntryKind.userMessage,
+        status: ChatEntryStatus.submitted,
+        content: 'What changed?',
+        modality: ChatModality.voice,
+        transcriptionEngine: 'whisper.cpp (ggml-base.bin) on this host',
+      ),
+    );
+  }
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) async {
+    spokenEntryIds.add(entryId);
+    return SpokenReply(
+      entryId: entryId,
+      audio: ByteData.sublistView(Uint8List.fromList([5, 4, 3])),
+      mimeType: 'audio/wav',
+      engine: 'macOS say on this host',
+      truncated: true,
+    );
+  }
 }
 
 final class _FakeIo implements TerminalIo {
@@ -379,6 +512,8 @@ ChatEntry _entry({
   required ChatEntryKind kind,
   required ChatEntryStatus status,
   required String content,
+  ChatModality modality = ChatModality.text,
+  String? transcriptionEngine,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: id,
@@ -393,4 +528,6 @@ ChatEntry _entry({
       : ChatEntrySource.model,
   truncated: false,
   runId: 'run-1',
+  modality: modality,
+  transcriptionEngine: transcriptionEngine,
 );

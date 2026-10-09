@@ -8,6 +8,9 @@ import 'package:shad/shad.dart';
 
 import 'src/dextero_controller.dart';
 import 'src/dextero_design.dart';
+import 'src/voice_controller.dart';
+import 'src/voice_plugins.dart';
+import 'src/voice_widgets.dart';
 
 const _controlToken = String.fromEnvironment('DEXTERO_CONTROL_TOKEN');
 const _controlUrl = String.fromEnvironment(
@@ -27,9 +30,12 @@ void main() {
 }
 
 class DexteroApp extends StatelessWidget {
-  const DexteroApp({required this.controller, super.key});
+  const DexteroApp({required this.controller, this.voice, super.key});
 
   final DexteroController controller;
+
+  /// Defaults to the platform microphone and speaker.
+  final VoiceController? voice;
 
   @override
   Widget build(BuildContext context) {
@@ -39,15 +45,16 @@ class DexteroApp extends StatelessWidget {
       theme: DexteroDesign.lightTheme,
       darkTheme: DexteroDesign.darkTheme,
       themeMode: ThemeMode.system,
-      home: DexteroHomePage(controller: controller),
+      home: DexteroHomePage(controller: controller, voice: voice),
     );
   }
 }
 
 class DexteroHomePage extends StatefulWidget {
-  const DexteroHomePage({required this.controller, super.key});
+  const DexteroHomePage({required this.controller, this.voice, super.key});
 
   final DexteroController controller;
+  final VoiceController? voice;
 
   @override
   State<DexteroHomePage> createState() => _DexteroHomePageState();
@@ -56,10 +63,19 @@ class DexteroHomePage extends StatefulWidget {
 class _DexteroHomePageState extends State<DexteroHomePage> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  late final VoiceController _voice;
 
   @override
   void initState() {
     super.initState();
+    _voice =
+        widget.voice ??
+        VoiceController(
+          chat: widget.controller,
+          recorder: PluginVoiceRecorder(),
+          player: PluginSpeechPlayer(),
+        );
+    _voice.addListener(_refreshVoice);
     widget.controller.addListener(_refresh);
     _messageController.addListener(_refresh);
     widget.controller.initialize();
@@ -67,6 +83,9 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
 
   @override
   void dispose() {
+    _voice
+      ..removeListener(_refreshVoice)
+      ..dispose();
     widget.controller.removeListener(_refresh);
     widget.controller.dispose();
     _messageController
@@ -87,6 +106,10 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  void _refreshVoice() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _send() async {
@@ -124,6 +147,9 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                     if (controller.error case final error?) ...[
                       _ErrorBanner(message: error),
                       const SizedBox(height: 12),
+                    ] else if (_voice.error case final error?) ...[
+                      _ErrorBanner(title: 'Voice problem', message: error),
+                      const SizedBox(height: 12),
                     ],
                     Expanded(
                       child: _ConversationPanel(
@@ -141,18 +167,30 @@ class _DexteroHomePageState extends State<DexteroHomePage> {
                         onApprove: _approve,
                       ),
                     ],
+                    if (controller.hostStatus != null) ...[
+                      const SizedBox(height: 12),
+                      AgentPresence(voice: _voice),
+                    ],
                     const SizedBox(height: 12),
-                    _Composer(
-                      messageController: _messageController,
-                      enabled: controller.canSubmit,
-                      canSend: canSend,
-                      submitting: controller.submitting,
-                      canCancel: controller.canCancel,
-                      cancelling: controller.cancelling,
-                      working: controller.busy && !controller.submitting,
-                      onSend: _send,
-                      onCancel: _cancel,
-                    ),
+                    if (_voice.phase == VoicePhase.listening ||
+                        _voice.phase == VoicePhase.transcribing)
+                      RecordingBar(voice: _voice)
+                    else
+                      _Composer(
+                        messageController: _messageController,
+                        enabled: controller.canSubmit,
+                        canSend: canSend,
+                        submitting: controller.submitting,
+                        canCancel: controller.canCancel,
+                        cancelling: controller.cancelling,
+                        working: controller.busy && !controller.submitting,
+                        onSend: _send,
+                        onCancel: _cancel,
+                        voiceAvailable: _voice.available,
+                        canTalk: _voice.canStartListening,
+                        voiceNotice: controller.hostStatus?.voiceNotice,
+                        onTalk: _voice.startListening,
+                      ),
                   ],
                 ),
               ),
@@ -460,14 +498,18 @@ class _ConversationView extends StatelessWidget {
       );
     }
     if (state == ChatLoadState.empty || entries.isEmpty) {
-      return const ShadEmpty(
-        icon: Icon(LucideIcons.messageSquare),
-        title: Text(
-          'Start a conversation with Dextero.',
-          key: Key('empty-history'),
-        ),
-        description: Text(
-          'Messages and safe activity summaries will appear here.',
+      return const Center(
+        child: SingleChildScrollView(
+          child: ShadEmpty(
+            icon: Icon(LucideIcons.messageSquare),
+            title: Text(
+              'Start a conversation with Dextero.',
+              key: Key('empty-history'),
+            ),
+            description: Text(
+              'Messages and safe activity summaries will appear here.',
+            ),
+          ),
         ),
       );
     }
@@ -511,6 +553,13 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final scheme = theme.colorScheme;
+    final voice = entry.modality == ChatModality.voice;
+    final label = theme.textTheme.small.copyWith(
+      color: user
+          ? scheme.primaryForeground.withValues(alpha: 0.76)
+          : scheme.mutedForeground,
+      fontWeight: FontWeight.w600,
+    );
     return Align(
       alignment: user ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -540,14 +589,22 @@ class _MessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  user ? 'You' : 'Dextero',
-                  style: theme.textTheme.small.copyWith(
-                    color: user
-                        ? scheme.primaryForeground.withValues(alpha: 0.76)
-                        : scheme.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (voice) ...[
+                      Icon(LucideIcons.mic, size: 12, color: label.color),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      user
+                          ? voice
+                                ? 'You · Voice'
+                                : 'You'
+                          : 'Dextero',
+                      style: label,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 SelectableText(
@@ -558,6 +615,19 @@ class _MessageBubble extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
+                if (entry.transcriptionEngine case final engine?
+                    when voice) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Transcribed by $engine',
+                    key: Key('voice-provenance-${entry.entryId}'),
+                    style: theme.textTheme.small.copyWith(
+                      color: user
+                          ? scheme.primaryForeground.withValues(alpha: 0.7)
+                          : scheme.mutedForeground,
+                    ),
+                  ),
+                ],
                 if (entry.truncated) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -978,6 +1048,10 @@ class _Composer extends StatelessWidget {
     required this.working,
     required this.onSend,
     required this.onCancel,
+    this.voiceAvailable = false,
+    this.canTalk = false,
+    this.voiceNotice,
+    this.onTalk,
   });
 
   final TextEditingController messageController;
@@ -989,6 +1063,10 @@ class _Composer extends StatelessWidget {
   final bool working;
   final Future<void> Function() onSend;
   final Future<void> Function() onCancel;
+  final bool voiceAvailable;
+  final bool canTalk;
+  final String? voiceNotice;
+  final Future<void> Function()? onTalk;
 
   @override
   Widget build(BuildContext context) {
@@ -1026,6 +1104,24 @@ class _Composer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+          if (voiceAvailable) ...[
+            ShadTooltip(
+              builder: (context) => ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Text(voiceNotice ?? 'Push to talk'),
+              ),
+              child: ShadGestureDetector(
+                child: ShadIconButton.outline(
+                  key: const Key('push-to-talk'),
+                  semanticLabel: 'Talk to Dextero',
+                  enabled: canTalk,
+                  onPressed: canTalk ? onTalk : null,
+                  icon: const Icon(LucideIcons.mic),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           if (working)
             ShadTooltip(
               builder: (context) => const Text('Cancel run'),
@@ -1063,15 +1159,19 @@ class _Composer extends StatelessWidget {
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+  const _ErrorBanner({
+    required this.message,
+    this.title = 'Connection problem',
+  });
 
+  final String title;
   final String message;
 
   @override
   Widget build(BuildContext context) => ShadAlert.destructive(
     key: const Key('error-banner'),
     icon: const Icon(LucideIcons.circleAlert),
-    title: const Text('Connection problem'),
+    title: Text(title),
     description: Text(message),
   );
 }

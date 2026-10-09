@@ -46,6 +46,8 @@ Future<int> run(
       effectiveEnvironment['DEXTERO_CONTROL_URL'] ?? 'http://localhost:8080/';
   var jsonl = false;
   String? modelName;
+  String? voicePath;
+  String? replyAudioPath;
   String? cancelRunId;
   String? approveRunId;
   String? approvalId;
@@ -61,6 +63,20 @@ Future<int> run(
           return 64;
         }
         modelName = arguments[++index];
+      case '--voice':
+        if (index + 1 >= arguments.length) {
+          io.error(
+            'Usage: dextero --voice <recording.wav> [--reply-audio <out.wav>]',
+          );
+          return 64;
+        }
+        voicePath = arguments[++index];
+      case '--reply-audio':
+        if (index + 1 >= arguments.length) {
+          io.error('Usage: dextero --reply-audio <out.wav> <message>');
+          return 64;
+        }
+        replyAudioPath = arguments[++index];
       case '--cancel':
         if (index + 1 >= arguments.length) {
           io.error('Usage: dextero --cancel <run-id>');
@@ -94,11 +110,29 @@ Future<int> run(
     io.error('A cancellation or approval request cannot select a model.');
     return 64;
   }
+  if (voicePath != null && (actionCount != 0 || message.isNotEmpty)) {
+    io.error('A voice turn cannot be combined with a message or request.');
+    return 64;
+  }
+  if (replyAudioPath != null && voicePath == null && message.isEmpty) {
+    io.error('--reply-audio needs a message or --voice recording.');
+    return 64;
+  }
+  VoiceFile? voice;
+  if (voicePath != null) {
+    try {
+      voice = await VoiceFile.read(voicePath);
+    } on Object catch (error) {
+      io.error('Cannot read the voice recording: $error');
+      return 66;
+    }
+  }
   final client = clientFactory(serverUrl: rawUrl, token: token);
   if (io.hasInputTerminal &&
       io.hasOutputTerminal &&
       !jsonl &&
       message.isEmpty &&
+      voice == null &&
       actionCount == 0) {
     return tuiRunner(client: client, modelName: modelName);
   }
@@ -109,6 +143,8 @@ Future<int> run(
   );
   return chat.run(
     initialMessage: message.isEmpty ? null : message.join(' '),
+    voice: voice,
+    replyAudioPath: replyAudioPath,
     cancelRunId: cancelRunId,
     approveRunId: approveRunId,
     approvalId: approvalId,
