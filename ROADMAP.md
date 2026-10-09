@@ -35,15 +35,18 @@ reconcile the SQLite/Drift deployment assumption in VISION.md with that choice.
 ## Next — one conversation that survives restart and remembers earlier turns
 
 The current activity timeline is not model context: Gemini starts each run
-with the new prompt, and the Codex adapter starts a new thread. Persisting only
-the visible transcript would leave follow-up questions without earlier context.
+with the new prompt, and the Codex adapter starts a new thread. Claude Code
+resumes its own session, but Dextero keeps that reference only in memory.
+Persisting only the visible transcript would leave follow-up questions without
+earlier context.
 
 - [ ] Implement the selected durable store in server behind core's storage
   interface. Restore the existing conversation on startup, including source
   messages, ordered activity, run state, and provider/model selection.
-- [ ] Supply bounded earlier context to both providers. Preserve the source
-  needed for continuity separately from display summaries and any provider
-  session reference; report context limits until compaction is implemented.
+- [ ] Supply bounded earlier context to Codex and Gemini, and persist the
+  Claude Code session reference. Preserve the source needed for continuity
+  separately from display summaries and any provider session reference;
+  report context limits until compaction is implemented.
 - [ ] Persist accepted messages before starting work and publish events after
   durable append. Reconnect Flutter and CLI/TUI to the restored conversation
   without losing cursor order or mixing provider/model selections.
@@ -173,6 +176,15 @@ sequence. Each selected capability needs a bounded end-to-end exit condition.
   prove a second adapter when needed, and isolate delegated execution roots
   and grants. Support bounded foreground/background work and return results
   to the originating workspace.
+- **Claude API-key path:** the Claude Agent SDK drives the same CLI
+  stream-json control protocol that the Claude Code adapter already speaks, so
+  it complements that adapter rather than replacing it. When a non-subscription
+  path is needed, add a separately labelled Anthropic API-key mode to the same
+  Dart adapter, with the key taken from the protected secret store and passed
+  only to the CLI subprocess, rather than a Node or Python SDK sidecar. Expose
+  per-run usage and cost from the CLI result. Exit when an API-key Claude run
+  completes with its billing source and cost visible and is never confused
+  with the subscription choice.
 - **Local tools:** confined, capped file search; atomic, preflighted patching;
   read-only Git inspection with hooks, pagers, and external diff disabled;
   policy-bound HTTP fetching with SSRF and redirect controls; central argument

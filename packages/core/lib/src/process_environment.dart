@@ -39,6 +39,22 @@ Map<String, String> codexProcessEnvironment([Map<String, String>? source]) {
   return environment;
 }
 
+/// Adds an explicit Claude Code config directory to the filtered environment.
+///
+/// API keys such as `ANTHROPIC_API_KEY` stay excluded so the CLI uses its own
+/// login rather than silently switching to API billing.
+Map<String, String> claudeCodeProcessEnvironment([
+  Map<String, String>? source,
+]) {
+  final input = source ?? Platform.environment;
+  final environment = filteredProcessEnvironment(input);
+  final configDirectory = input['CLAUDE_CONFIG_DIR'];
+  if (configDirectory != null && configDirectory.isNotEmpty) {
+    environment['CLAUDE_CONFIG_DIR'] = configDirectory;
+  }
+  return environment;
+}
+
 Future<void> terminateProcessTree(
   Process process, {
   Duration gracePeriod = const Duration(seconds: 2),

@@ -205,6 +205,39 @@ void main() {
     expect(tester.terminalState.containsText('Using gemini'), isTrue);
   });
 
+  test('shows the Claude auth source and submits Claude', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(120, 30),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient();
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+    expect(
+      tester.terminalState.containsText('local Claude Code subscription'),
+      isTrue,
+    );
+    await tester.enterText('/model claude:opus');
+    await tester.sendEnter();
+    await tester.pump();
+    await tester.pump();
+    expect(client.modelSelections, ['claude:opus']);
+    expect(
+      tester.terminalState.containsText(
+        'Using claude · opus · local Claude Code subscription',
+      ),
+      isTrue,
+    );
+    await tester.enterText('Start');
+    await tester.sendEnter();
+    await tester.pump();
+    await tester.pump();
+    expect(client.requests.single.modelProvider, 'claude');
+    expect(client.requests.single.modelName, 'opus');
+  });
+
   test('keeps Ctrl+C active while a response stream is pending', () async {
     final tester = await nocterm.NoctermTester.create();
     addTearDown(tester.dispose);
@@ -321,9 +354,11 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
-  modelProvider: modelName == 'gpt-5.3-codex-spark' || modelName == 'default'
-      ? 'codex'
-      : 'gemini',
+  modelProvider: switch (modelName) {
+    'gpt-5.3-codex-spark' || 'default' => 'codex',
+    'opus' => 'claude',
+    _ => 'gemini',
+  },
   modelName: modelName,
   availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
   modelOptions: [
@@ -334,6 +369,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Codex · $model',
         toolDescription: 'Codex tools + Dextero harness tools',
+        authSource: 'local Codex CLI login',
       ),
     for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
       ModelOption(
@@ -342,7 +378,16 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Gemini · $model',
         toolDescription: 'Dextero harness tools',
+        authSource: 'Gemini API key',
       ),
+    ModelOption(
+      id: 'claude:opus',
+      provider: 'claude',
+      modelName: 'opus',
+      label: 'Claude · opus',
+      toolDescription: 'Dextero harness tools via Claude Code',
+      authSource: 'local Claude Code subscription',
+    ),
   ],
 );
 
