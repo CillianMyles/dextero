@@ -148,4 +148,72 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('offers Claude after the other providers when Claude Code is ready', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'GEMINI_API_KEY': 'test-key',
+    }, claudeCode: const ClaudeCodeAvailability.available());
+    expect(configuration.selectedModelId, 'gemini:gemini-2.5-flash');
+    expect(configuration.availableOptions.map((option) => option.id), [
+      'gemini:gemini-2.5-flash',
+      'codex:gpt-5.3-codex-spark',
+      'codex:default',
+      'claude:opus',
+      'claude:sonnet',
+    ]);
+    final claude = configuration.availableOptions.last;
+    expect(claude.label, 'Claude · sonnet');
+    expect(claude.authSource, 'local Claude Code subscription');
+    expect(claude.toolDescription, 'Dextero harness tools via Claude Code');
+    expect(
+      configuration.createAgent(
+        workspace: '.',
+        provider: AgentProvider.claude,
+        modelName: claudeOpusModel,
+      ),
+      isA<ClaudeCodeConversationAgent>()
+          .having((agent) => agent.model, 'model', 'opus')
+          .having(
+            (agent) => agent.authSource,
+            'authSource',
+            'local Claude Code subscription',
+          ),
+    );
+  });
+
+  test('does not advertise Claude when Claude Code is unavailable', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {});
+    expect(
+      configuration.availableOptions.map((option) => option.provider),
+      isNot(contains(AgentProvider.claude)),
+    );
+  });
+
+  test('selects a configured Claude model as the initial choice', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'DEXTERO_MODEL_PROVIDER': 'claude',
+      'DEXTERO_CLAUDE_MODEL': 'claude-opus-5-5',
+      'DEXTERO_CLAUDE_MODELS': 'opus',
+    }, claudeCode: const ClaudeCodeAvailability.available());
+    expect(configuration.selectedModelId, 'claude:claude-opus-5-5');
+    expect(configuration.availableModels, ['claude-opus-5-5', 'opus']);
+  });
+
+  test('rejects explicit Claude selection when Claude Code is unavailable', () {
+    expect(
+      () => AgentRuntimeConfiguration.fromEnvironment(
+        const {'DEXTERO_MODEL_PROVIDER': 'claude'},
+        claudeCode: const ClaudeCodeAvailability.unavailable(
+          'Claude Code CLI is not installed.',
+        ),
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('not installed'),
+        ),
+      ),
+    );
+  });
 }

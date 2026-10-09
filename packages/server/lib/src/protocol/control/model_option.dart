@@ -20,6 +20,7 @@ abstract class ModelOption implements _i1.SerializableModel {
     required this.modelName,
     required this.label,
     required this.toolDescription,
+    required this.authSource,
   });
 
   factory ModelOption({
@@ -28,6 +29,7 @@ abstract class ModelOption implements _i1.SerializableModel {
     required String modelName,
     required String label,
     required String toolDescription,
+    required String authSource,
   }) = _ModelOptionImpl;
 
   factory ModelOption.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -37,6 +39,7 @@ abstract class ModelOption implements _i1.SerializableModel {
       modelName: jsonSerialization['modelName'] as String,
       label: jsonSerialization['label'] as String,
       toolDescription: jsonSerialization['toolDescription'] as String,
+      authSource: jsonSerialization['authSource'] as String,
     );
   }
 
@@ -50,6 +53,8 @@ abstract class ModelOption implements _i1.SerializableModel {
 
   String toolDescription;
 
+  String authSource;
+
   /// Returns a shallow copy of this [ModelOption]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -59,6 +64,7 @@ abstract class ModelOption implements _i1.SerializableModel {
     String? modelName,
     String? label,
     String? toolDescription,
+    String? authSource,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -69,6 +75,7 @@ abstract class ModelOption implements _i1.SerializableModel {
       'modelName': modelName,
       'label': label,
       'toolDescription': toolDescription,
+      'authSource': authSource,
     };
   }
 
@@ -85,12 +92,14 @@ class _ModelOptionImpl extends ModelOption {
     required String modelName,
     required String label,
     required String toolDescription,
+    required String authSource,
   }) : super._(
          id: id,
          provider: provider,
          modelName: modelName,
          label: label,
          toolDescription: toolDescription,
+         authSource: authSource,
        );
 
   /// Returns a shallow copy of this [ModelOption]
@@ -103,6 +112,7 @@ class _ModelOptionImpl extends ModelOption {
     String? modelName,
     String? label,
     String? toolDescription,
+    String? authSource,
   }) {
     return ModelOption(
       id: id ?? this.id,
@@ -110,6 +120,7 @@ class _ModelOptionImpl extends ModelOption {
       modelName: modelName ?? this.modelName,
       label: label ?? this.label,
       toolDescription: toolDescription ?? this.toolDescription,
+      authSource: authSource ?? this.authSource,
     );
   }
 }

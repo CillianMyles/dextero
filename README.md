@@ -1,9 +1,9 @@
 # Dextero
 
 Dextero is an experimental local computer agent built with Dart, Flutter, and
-Serverpod. The current MVP provides one chat conversation backed by Codex or
-Gemini and shows the same ordered history in the Flutter app and terminal
-client.
+Serverpod. The current MVP provides one chat conversation backed by Codex,
+Gemini, or Claude Code and shows the same ordered history in the Flutter app
+and terminal client.
 
 See [VISION.md](VISION.md) for product direction and [ROADMAP.md](ROADMAP.md)
 for planned work.
@@ -22,7 +22,7 @@ Dependency flow:
 
 ```text
 app ─┐
-     ├──> generated client ──> server ──> core ──> Codex or Gemini
+     ├──> generated client ──> server ──> core ──> Codex, Gemini, or Claude Code
 cli ─┘
 ```
 
@@ -42,6 +42,7 @@ Requirements:
 - GNU Make and Bash; on Windows, run the Make targets from MSYS2 or another
   Bash environment with `bash.exe` available on `PATH`
 - Codex CLI authenticated with `codex login`, or a Gemini API key
+- Optional: Claude Code CLI authenticated with `claude auth login`
 - OpenSSL and curl
 
 Start the server and web app:
@@ -66,8 +67,15 @@ this order:
 1. Gemini · `gemini-2.5-flash` (initial choice when a key is configured)
 2. Codex · `gpt-5.3-codex-spark` (initial choice without a Gemini key)
 3. Codex · `default` (uses the authenticated Codex CLI's configured model)
+4. Claude · `opus`
+5. Claude · `sonnet`
 
-Gemini is omitted when `GEMINI_API_KEY` is empty. Codex choices require an
+Each choice shows its auth source: `Gemini API key`, `local Codex CLI login`,
+or `local Claude Code subscription`.
+
+Gemini is omitted when `GEMINI_API_KEY` is empty. Claude is omitted unless
+`claude auth status` reports a login when the server starts; a stale login is
+reported when a run starts. Codex choices require an
 installed, authenticated Codex CLI; model access is checked when a run starts.
 If Spark is unavailable to your account, choose `codex:default` before sending.
 There is no automatic retry with another provider or model after a run fails.
@@ -76,11 +84,20 @@ Gemini uses Dextero's harness tools. Codex also has its configured Codex tools;
 its existing read-only sandbox and instructions to use the harness for file
 and command operations still apply.
 
-`DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the initial provider without
-hiding the other provider. `DEXTERO_CODEX_MODEL` and `DEXTERO_GEMINI_MODEL`
-override initial models. Comma-separated `DEXTERO_CODEX_MODELS` and
-`DEXTERO_GEMINI_MODELS` override each provider's advertised models; the initial
-model is always included. Credentials stay on the host.
+Claude runs the installed `claude` CLI in print mode with its built-in tools
+disabled and user settings, plugins, and MCP servers skipped. Dextero's harness
+tools are offered over the CLI's stream-json control protocol, and Dextero
+answers every permission prompt: tools outside the harness are denied, and
+`edit_file` still waits for Dextero approval. Later messages in the same
+conversation resume the Claude Code session, which Claude Code stores under
+`~/.claude/projects`; Codex and Gemini do not yet carry earlier turns.
+
+`DEXTERO_MODEL_PROVIDER=codex|gemini|claude` overrides the initial provider
+without hiding the others. `DEXTERO_CODEX_MODEL`, `DEXTERO_GEMINI_MODEL`, and
+`DEXTERO_CLAUDE_MODEL` override initial models. Comma-separated
+`DEXTERO_CODEX_MODELS`, `DEXTERO_GEMINI_MODELS`, and `DEXTERO_CLAUDE_MODELS`
+override each provider's advertised models; the initial model is always
+included. Credentials stay on the host.
 
 Use the native client for the current desktop platform:
 
@@ -192,6 +209,10 @@ stdout/stderr excerpts. Treat it as sensitive diagnostic data, not a security
 or retention boundary. The total activity-event count is not currently
 bounded. The current in-memory implementation loses its single conversation
 when the server restarts; no Postgres service is required.
+
+The Claude Code subprocess receives the same filtered environment as tools,
+plus `CLAUDE_CONFIG_DIR` when set. `ANTHROPIC_API_KEY` is not passed, so a
+Claude choice always uses the CLI's own login rather than API billing.
 
 Gemini credentials remain in the server process and are sent in the
 `x-goog-api-key` request header. They are not placed in request URLs, chat

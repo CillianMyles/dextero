@@ -13,6 +13,9 @@ export 'src/control/agent_runtime_configuration.dart'
     show
         AgentProvider,
         AgentRuntimeConfiguration,
+        ClaudeCodeAvailability,
+        claudeOpusModel,
+        claudeSonnetModel,
         codexSparkModel,
         defaultCodexModel;
 
@@ -34,6 +37,7 @@ Future<void> run(List<String> arguments) async {
   );
   final agentConfiguration = AgentRuntimeConfiguration.fromEnvironment(
     Platform.environment,
+    claudeCode: await ClaudeCodeAvailability.probe(),
   );
   final store = InMemoryChatHistoryStore();
   final service = ChatService(

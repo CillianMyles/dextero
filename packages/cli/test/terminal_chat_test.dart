@@ -348,9 +348,11 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
   retentionNotice: 'History is retained only until the server restarts.',
   databaseRequired: false,
   streamingAvailable: true,
-  modelProvider: modelName == 'gpt-5.3-codex-spark' || modelName == 'default'
-      ? 'codex'
-      : 'gemini',
+  modelProvider: switch (modelName) {
+    'gpt-5.3-codex-spark' || 'default' => 'codex',
+    'opus' => 'claude',
+    _ => 'gemini',
+  },
   modelName: modelName,
   availableModels: const ['gemini-2.5-flash', 'gemini-pro'],
   modelOptions: [
@@ -361,6 +363,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Codex · $model',
         toolDescription: 'Codex tools + Dextero harness tools',
+        authSource: 'local Codex CLI login',
       ),
     for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
       ModelOption(
@@ -369,7 +372,16 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Gemini · $model',
         toolDescription: 'Dextero harness tools',
+        authSource: 'Gemini API key',
       ),
+    ModelOption(
+      id: 'claude:opus',
+      provider: 'claude',
+      modelName: 'opus',
+      label: 'Claude · opus',
+      toolDescription: 'Dextero harness tools via Claude Code',
+      authSource: 'local Claude Code subscription',
+    ),
   ],
 );
 

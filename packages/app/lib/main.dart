@@ -228,11 +228,17 @@ class _ModelSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = controller.hostStatus!;
     if (status.modelOptions.length < 2) {
-      return _StatusBadge(
+      final authSource = status
+          .resolveModel(status.selectedModelId)
+          ?.authSource;
+      final badge = _StatusBadge(
         key: const Key('model-provider'),
         icon: LucideIcons.bot,
         label: '${_displayName(status.modelProvider)} · ${status.modelName}',
       );
+      return authSource == null
+          ? badge
+          : ShadTooltip(builder: (context) => Text(authSource), child: badge);
     }
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 210, maxWidth: 290),
@@ -252,6 +258,10 @@ class _ModelSelector extends StatelessWidget {
                   Text(
                     option.toolDescription,
                     style: ShadTheme.of(context).textTheme.small,
+                  ),
+                  Text(
+                    option.authSource,
+                    style: ShadTheme.of(context).textTheme.muted,
                   ),
                 ],
               ),

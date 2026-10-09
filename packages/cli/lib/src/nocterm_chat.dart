@@ -215,7 +215,12 @@ final class _DexteroTuiState extends State<DexteroTui> {
       setState(() {
         _status = selected;
         _sending = false;
-        _notice = 'Using ${selected.modelProvider} · ${selected.modelName}';
+        final authSource = selected
+            .resolveModel(selected.selectedModelId)
+            ?.authSource;
+        _notice =
+            'Using ${selected.modelProvider} · ${selected.modelName}'
+            '${authSource == null ? '' : ' · $authSource'}';
       });
     } on Object catch (error) {
       _showError('Model selection failed: $error');
@@ -320,7 +325,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
                             Padding(
                               padding: EdgeInsets.only(top: 1),
                               child: Text(
-                                '${option.id == status.selectedModelId ? '> ' : '  '}${_renderer.safeText(option.id)}\n  ${_renderer.safeText(option.toolDescription)}',
+                                '${option.id == status.selectedModelId ? '> ' : '  '}${_renderer.safeText(option.id)}\n  ${_renderer.safeText(option.toolDescription)} · ${_renderer.safeText(option.authSource)}',
                                 style: TextStyle(color: _muted),
                               ),
                             ),

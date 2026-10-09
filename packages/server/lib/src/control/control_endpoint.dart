@@ -42,6 +42,7 @@ final class ControlEndpoint extends Endpoint {
           modelName: option.modelName,
           label: option.label,
           toolDescription: option.toolDescription,
+          authSource: option.authSource,
         ),
     ],
   );

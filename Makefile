@@ -8,6 +8,7 @@ ENV_FILE ?= .env
 -include $(ENV_FILE)
 export DEXTERO_MODEL_PROVIDER DEXTERO_CODEX_MODEL DEXTERO_CODEX_MODELS
 export GEMINI_API_KEY DEXTERO_GEMINI_MODEL DEXTERO_GEMINI_MODELS
+export DEXTERO_CLAUDE_MODEL DEXTERO_CLAUDE_MODELS
 
 .DEFAULT_GOAL := help
 
@@ -55,6 +56,7 @@ doctor: ## Check the local tools used by the workspace.
 	  printf "Codex:   "; codex --version; \
 	  codex login status >/dev/null || { echo "Codex is not authenticated; run 'codex login'"; exit 1; }; \
 	fi
+	@if command -v claude >/dev/null; then printf "Claude:  "; claude --version; else echo "Claude:  not installed (optional)"; fi
 	@if command -v $(SERVERPOD) >/dev/null; then printf "Serverpod: "; $(SERVERPOD) version; else echo "Serverpod: not installed (make tools)"; fi
 
 bootstrap: doctor ## Resolve every Dart and Flutter workspace dependency.
@@ -107,7 +109,7 @@ test: ## Run every package test suite, including the Flutter web tests.
 
 check: format-check analyze test ## Run the same quality gate expected before review.
 
-server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and Codex-backed core.
+server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and agent core.
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
 	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \
 	 DEXTERO_WORKSPACE="$(WORKSPACE)" \

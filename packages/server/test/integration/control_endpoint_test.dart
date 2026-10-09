@@ -239,6 +239,39 @@ void main() {
       },
     );
 
+    test('advertises Claude with its auth source and selects it', () async {
+      ChatRuntime.configure(
+        chatService: service,
+        defaultConversationId: conversationId,
+        modelOptions: const [
+          core.AgentModelOption(
+            provider: core.AgentProvider.codex,
+            modelName: 'default',
+          ),
+          core.AgentModelOption(
+            provider: core.AgentProvider.claude,
+            modelName: core.claudeOpusModel,
+          ),
+        ],
+        modelSelector: (modelName) async => selectedModel = modelName,
+      );
+
+      final status = await endpoints.control.selectModel(
+        authenticatedSession,
+        'claude:opus',
+      );
+
+      expect(status.modelProvider, 'claude');
+      expect(status.modelName, 'opus');
+      expect(selectedModel, 'claude:opus');
+      final claude = status.modelOptions.singleWhere(
+        (option) => option.provider == 'claude',
+      );
+      expect(claude.label, 'Claude · opus');
+      expect(claude.authSource, 'local Claude Code subscription');
+      expect(status.modelOptions.first.authSource, 'local Codex CLI login');
+    });
+
     test('rejects a stale client model before accepting its message', () async {
       await endpoints.control.selectModel(
         authenticatedSession,
