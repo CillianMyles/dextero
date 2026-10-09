@@ -1,9 +1,9 @@
 # Dextero
 
 Dextero is an experimental local computer agent built with Dart, Flutter, and
-Serverpod. The current MVP provides one chat conversation backed by Codex or
-Gemini and shows the same ordered history in the Flutter app and terminal
-client.
+Serverpod. The current MVP provides one chat conversation backed by
+Anthropic, Codex, or Gemini and shows the same ordered history in the Flutter
+app and terminal client.
 
 See [VISION.md](VISION.md) for product direction and [ROADMAP.md](ROADMAP.md)
 for planned work.
@@ -22,7 +22,7 @@ Dependency flow:
 
 ```text
 app ─┐
-     ├──> generated client ──> server ──> core ──> Codex or Gemini
+     ├──> generated client ──> server ──> core ──> Anthropic, Codex, or Gemini
 cli ─┘
 ```
 
@@ -41,7 +41,8 @@ Requirements:
   Windows
 - GNU Make and Bash; on Windows, run the Make targets from MSYS2 or another
   Bash environment with `bash.exe` available on `PATH`
-- Codex CLI authenticated with `codex login`, or a Gemini API key
+- An Anthropic API key, a Gemini API key, or the Codex CLI authenticated with
+  `codex login`
 - OpenSSL and curl
 
 Start the server and web app:
@@ -53,34 +54,75 @@ make dev
 ```
 
 Make loads local provider settings and credentials from the ignored `.env`
-file. Keep values unquoted because the file uses Make assignment syntax. To use
-Gemini as the initial provider, add the key:
+file. Keep values unquoted because the file uses Make assignment syntax. Add
+the keys for the API providers you want to offer:
 
 ```sh
-GEMINI_API_KEY=your-key
+ANTHROPIC_API_KEY=your-anthropic-key
+GEMINI_API_KEY=your-gemini-key
 ```
 
 Before the first message, the app and TUI offer provider/model combinations in
 this order:
 
-1. Gemini · `gemini-2.5-flash` (initial choice when a key is configured)
-2. Codex · `gpt-5.3-codex-spark` (initial choice without a Gemini key)
-3. Codex · `default` (uses the authenticated Codex CLI's configured model)
+1. Anthropic · `claude-haiku-4-5` (initial choice when a key is configured)
+2. Anthropic · `claude-sonnet-5-5`
+3. Gemini · `gemini-2.5-flash` (initial choice without an Anthropic key)
+4. Codex · `gpt-5.3-codex-spark` (initial choice without either key)
+5. Codex · `default` (uses the authenticated Codex CLI's configured model)
 
-Gemini is omitted when `GEMINI_API_KEY` is empty. Codex choices require an
+Each choice shows its credential source: `Anthropic API key`, `Gemini API
+key`, or `Codex CLI login`. Anthropic and Gemini are omitted when their keys
+are empty. Codex choices require an
 installed, authenticated Codex CLI; model access is checked when a run starts.
 If Spark is unavailable to your account, choose `codex:default` before sending.
 There is no automatic retry with another provider or model after a run fails.
 
-Gemini uses Dextero's harness tools. Codex also has its configured Codex tools;
+Anthropic and Gemini use Dextero's harness tools. Codex also has its configured
+Codex tools;
 its existing read-only sandbox and instructions to use the harness for file
 and command operations still apply.
 
-`DEXTERO_MODEL_PROVIDER=codex|gemini` overrides the initial provider without
-hiding the other provider. `DEXTERO_CODEX_MODEL` and `DEXTERO_GEMINI_MODEL`
-override initial models. Comma-separated `DEXTERO_CODEX_MODELS` and
-`DEXTERO_GEMINI_MODELS` override each provider's advertised models; the initial
-model is always included. Credentials stay on the host.
+`DEXTERO_MODEL_PROVIDER=anthropic|codex|gemini` overrides the initial provider
+without hiding the others. `DEXTERO_ANTHROPIC_MODEL`, `DEXTERO_CODEX_MODEL`,
+and `DEXTERO_GEMINI_MODEL` override initial models. Comma-separated
+`DEXTERO_ANTHROPIC_MODELS`, `DEXTERO_CODEX_MODELS`, and `DEXTERO_GEMINI_MODELS`
+override each provider's advertised models; the initial model is always
+included. `ANTHROPIC_BASE_URL` points the Anthropic adapter at another
+Messages API endpoint. Credentials stay on the host.
+
+### Anthropic
+
+The Anthropic adapter calls the Messages API directly with streaming. Text
+streams into history in paragraph-sized `assistantDelta` entries. Tool calls
+use Dextero's tools and approval policy. A denied approval is returned to
+Claude as an error tool result. Thinking blocks are replayed unchanged within a
+run.
+
+- Each response is capped at 32,000 output tokens. Requests time out after 60
+  seconds without response headers, 90 seconds without stream data, or 10
+  minutes in total.
+- Rate limits (429), overload (529), other 5xx responses, timeouts, and
+  connection failures are retried up to three times. Retries honour
+  `retry-after` and otherwise back off from 1 second. A request is not retried
+  after its text has started streaming. Each retry appears as a warning.
+- Requests cache the tools and system prompt with an explicit breakpoint, and
+  the growing conversation with automatic caching. Prefixes below the model's
+  minimum cacheable size are not cached.
+- Each run ends with a `usage` history entry. It records provider, model,
+  credential source, input, cache-read, cache-write, and output tokens, request
+  count, and estimated cost from first-party list prices. Prices are known for
+  `claude-haiku-4-5`, `claude-sonnet-5-5`, and `claude-opus-5-5`; other models
+  show `cost unavailable`. Failed runs record usage for completed requests.
+  Cancelled runs record none.
+- Credit-balance, billing, and workspace usage-limit errors are shown as `Out of
+  credit`, rejected keys as `Key rejected`, and rate limits that persist after
+  retries as `Rate limited`. These entries carry a typed `errorCode`.
+- Batch processing and server-side refusal fallbacks are not used. A refusal or
+  output-limit stop fails the run with a specific message.
+
+Use a key from a dedicated Anthropic Console workspace with a workspace spend
+limit, so Dextero's spend is separately visible and bounded.
 
 Use the native client for the current desktop platform:
 
@@ -155,6 +197,9 @@ Pass `--jsonl` directly to the CLI for schema-v1 line-oriented event output:
 dart run packages/cli/bin/dextero.dart --jsonl "Inspect this workspace"
 ```
 
+Usage entries include a `usage` object, and categorized failures include an
+`error_code`.
+
 Run all checks:
 
 ```sh
@@ -193,17 +238,21 @@ or retention boundary. The total activity-event count is not currently
 bounded. The current in-memory implementation loses its single conversation
 when the server restarts; no Postgres service is required.
 
-Gemini credentials remain in the server process and are sent in the
-`x-goog-api-key` request header. They are not placed in request URLs, chat
-history, or tool subprocess environments.
+API keys remain in the server process. Gemini keys are sent in the
+`x-goog-api-key` header and Anthropic keys in the `x-api-key` header. Keys are
+not placed in request URLs, chat history, error messages, or tool subprocess
+environments. They are read from the environment, normally the ignored `.env`
+file; Dextero does not yet have an encrypted secret store.
 
 ## Serverpod changes
 
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
 typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
 and `cancelRun` operations.
-The status contract includes typed `modelOptions`; submissions require `modelProvider`
-as well as `modelName`. Update server and clients together for this contract change.
+The status contract includes typed `modelOptions`, each with an `authSource`;
+submissions require `modelProvider` as well as `modelName`. Chat entries may
+carry a typed `usage` receipt and `errorCode`. Update server and clients
+together for these contract changes.
 Generated server, client, and test code is committed. After changing an
 endpoint or `.spy.yaml` model, run:
 

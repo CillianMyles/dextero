@@ -354,5 +354,6 @@ final class _QueueModel implements AgentModel {
     required List<AgentMessage> messages,
     required List<ToolDefinition> tools,
     CancellationToken? cancellationToken,
+    ModelEventSink? onEvent,
   }) async => _turns[_index++];
 }

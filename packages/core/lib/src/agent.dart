@@ -26,17 +26,20 @@ final class AgentLoopActivity {
 
 typedef AgentLoopActivitySink =
     FutureOr<void> Function(AgentLoopActivity activity);
+typedef ModelUsageSink = FutureOr<void> Function(ModelUsage usage);
 
 final class AgentRun {
   const AgentRun({
     required this.output,
     required this.messages,
     required this.turns,
+    this.usage = ModelUsage.zero,
   });
 
   final String output;
   final List<AgentMessage> messages;
   final int turns;
+  final ModelUsage usage;
 }
 
 final class AgentLoop {
@@ -66,12 +69,15 @@ final class AgentLoop {
     CancellationToken? cancellationToken,
     AgentLoopActivitySink? onActivity,
     ToolApprovalRequester? onApprovalRequest,
+    ModelEventSink? onModelEvent,
+    ModelUsageSink? onUsage,
   }) async {
     if (prompt.trim().isEmpty) {
       throw ArgumentError.value(prompt, 'prompt', 'must not be empty');
     }
     final messages = <AgentMessage>[AgentMessage.user(prompt)];
     final definitions = _tools.values.map((tool) => tool.definition).toList();
+    var usage = ModelUsage.zero;
 
     for (var turn = 1; turn <= maxTurns; turn++) {
       cancellationToken?.throwIfCancellationRequested();
@@ -79,7 +85,12 @@ final class AgentLoop {
         messages: List.unmodifiable(messages),
         tools: List.unmodifiable(definitions),
         cancellationToken: cancellationToken,
+        onEvent: onModelEvent,
       );
+      if (response.usage case final turnUsage?) {
+        usage += turnUsage;
+        await onUsage?.call(turnUsage);
+      }
       cancellationToken?.throwIfCancellationRequested();
       final toolCalls = [
         for (final call in response.toolCalls)
@@ -91,7 +102,11 @@ final class AgentLoop {
           ),
       ];
       messages.add(
-        AgentMessage.assistant(content: response.content, toolCalls: toolCalls),
+        AgentMessage.assistant(
+          content: response.content,
+          toolCalls: toolCalls,
+          providerState: snapshotJsonMap(response.providerState),
+        ),
       );
 
       if (toolCalls.isEmpty) {
@@ -103,6 +118,7 @@ final class AgentLoop {
           output: output,
           messages: List.unmodifiable(messages),
           turns: turn,
+          usage: usage,
         );
       }
 

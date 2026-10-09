@@ -121,7 +121,10 @@ void main() {
       expect(exitCode, 0);
       expect(selectedModel, 'gemini-selected');
       expect(io.errors, isEmpty);
-      expect(io.output.join(), contains('gemini · gemini-selected'));
+      expect(
+        io.output.join(),
+        contains('Gemini · gemini-selected · Gemini API key'),
+      );
       expect(io.output.join(), contains('[you] Inspect the workspace'));
       expect(
         io.output.join(),

@@ -176,6 +176,7 @@ final class GeminiModel implements AgentModel {
     required List<AgentMessage> messages,
     required List<ToolDefinition> tools,
     CancellationToken? cancellationToken,
+    ModelEventSink? onEvent,
   }) async {
     if (messages.isEmpty) {
       throw ArgumentError.value(messages, 'messages', 'must not be empty');

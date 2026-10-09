@@ -1,3 +1,4 @@
+import 'anthropic_model.dart';
 import 'codex_app_server_agent.dart';
 import 'chat_service.dart';
 import 'gemini_model.dart';
@@ -9,7 +10,7 @@ import 'tools/read_file_tool.dart';
 import 'tools/run_command_tool.dart';
 import 'tools/run_shell_tool.dart';
 
-enum AgentProvider { codex, gemini }
+enum AgentProvider { codex, gemini, anthropic }
 
 const defaultCodexModel = 'default';
 const codexSparkModel = 'gpt-5.3-codex-spark';
@@ -22,13 +23,22 @@ final class AgentModelOption {
   final String modelName;
 
   String get id => '${provider.name}:$modelName';
-  String get label => switch (provider) {
-    AgentProvider.gemini => 'Gemini · $modelName',
-    AgentProvider.codex => 'Codex · $modelName',
+  String get providerLabel => switch (provider) {
+    AgentProvider.anthropic => 'Anthropic',
+    AgentProvider.gemini => 'Gemini',
+    AgentProvider.codex => 'Codex',
   };
-  String get toolDescription => provider == AgentProvider.gemini
-      ? 'Dextero harness tools'
-      : 'Codex tools + Dextero harness tools';
+  String get label => '$providerLabel · $modelName';
+  String get toolDescription => provider == AgentProvider.codex
+      ? 'Codex tools + Dextero harness tools'
+      : 'Dextero harness tools';
+
+  /// The credential the host uses for this choice; the value stays on the host.
+  String get authSource => switch (provider) {
+    AgentProvider.anthropic => anthropicAuthSource,
+    AgentProvider.gemini => 'Gemini API key',
+    AgentProvider.codex => 'Codex CLI login',
+  };
 }
 
 /// Resolves the production conversation agent from explicit environment data.
@@ -39,23 +49,44 @@ final class AgentRuntimeConfiguration {
     required this.availableModels,
     required this.availableOptions,
     required String? apiKey,
-  }) : _apiKey = apiKey;
+    required String? anthropicApiKey,
+    required Uri? anthropicBaseUrl,
+  }) : _apiKey = apiKey,
+       _anthropicApiKey = anthropicApiKey,
+       _anthropicBaseUrl = anthropicBaseUrl;
 
   factory AgentRuntimeConfiguration.fromEnvironment(
     Map<String, String> environment,
   ) {
     final apiKey = _nonEmpty(environment['GEMINI_API_KEY']);
+    final anthropicApiKey = _nonEmpty(environment['ANTHROPIC_API_KEY']);
+    final rawAnthropicBaseUrl = _nonEmpty(environment['ANTHROPIC_BASE_URL']);
+    final anthropicBaseUrl = rawAnthropicBaseUrl == null
+        ? null
+        : Uri.tryParse(rawAnthropicBaseUrl);
+    if (rawAnthropicBaseUrl != null &&
+        (anthropicBaseUrl == null ||
+            !{'http', 'https'}.contains(anthropicBaseUrl.scheme) ||
+            anthropicBaseUrl.host.isEmpty)) {
+      throw ArgumentError.value(
+        rawAnthropicBaseUrl,
+        'ANTHROPIC_BASE_URL',
+        'must be an absolute HTTP(S) URL',
+      );
+    }
     final requestedProvider = _nonEmpty(
       environment['DEXTERO_MODEL_PROVIDER'],
     )?.toLowerCase();
     final provider = switch (requestedProvider) {
+      null when anthropicApiKey != null => AgentProvider.anthropic,
       null => apiKey == null ? AgentProvider.codex : AgentProvider.gemini,
       'codex' => AgentProvider.codex,
       'gemini' => AgentProvider.gemini,
+      'anthropic' => AgentProvider.anthropic,
       _ => throw ArgumentError.value(
         requestedProvider,
         'DEXTERO_MODEL_PROVIDER',
-        'must be codex or gemini',
+        'must be anthropic, codex, or gemini',
       ),
     };
     if (provider == AgentProvider.gemini && apiKey == null) {
@@ -63,12 +94,27 @@ final class AgentRuntimeConfiguration {
         'GEMINI_API_KEY is required when DEXTERO_MODEL_PROVIDER=gemini.',
       );
     }
+    if (provider == AgentProvider.anthropic && anthropicApiKey == null) {
+      throw StateError(
+        'ANTHROPIC_API_KEY is required when DEXTERO_MODEL_PROVIDER=anthropic.',
+      );
+    }
     final codexModel = _nonEmpty(environment['DEXTERO_CODEX_MODEL']);
     final geminiModel =
         _nonEmpty(environment['DEXTERO_GEMINI_MODEL']) ?? defaultGeminiModel;
-    final modelName = provider == AgentProvider.gemini
-        ? geminiModel
-        : codexModel ?? codexSparkModel;
+    final anthropicModel =
+        _nonEmpty(environment['DEXTERO_ANTHROPIC_MODEL']) ??
+        defaultAnthropicModel;
+    final modelName = switch (provider) {
+      AgentProvider.anthropic => anthropicModel,
+      AgentProvider.gemini => geminiModel,
+      AgentProvider.codex => codexModel ?? codexSparkModel,
+    };
+    final anthropicModels = _availableModels(
+      environment['DEXTERO_ANTHROPIC_MODELS'],
+      fallback: const [defaultAnthropicModel, anthropicSonnetModel],
+      selected: anthropicModel,
+    );
     final codexModels = _availableModels(
       environment['DEXTERO_CODEX_MODELS'],
       fallback: const [codexSparkModel, defaultCodexModel],
@@ -80,6 +126,9 @@ final class AgentRuntimeConfiguration {
       selected: geminiModel,
     );
     final availableOptions = <AgentModelOption>[
+      if (anthropicApiKey != null)
+        for (final model in anthropicModels)
+          AgentModelOption(provider: AgentProvider.anthropic, modelName: model),
       if (apiKey != null)
         for (final model in geminiModels)
           AgentModelOption(provider: AgentProvider.gemini, modelName: model),
@@ -89,11 +138,15 @@ final class AgentRuntimeConfiguration {
     return AgentRuntimeConfiguration._(
       provider: provider,
       modelName: modelName,
-      availableModels: provider == AgentProvider.gemini
-          ? geminiModels
-          : codexModels,
+      availableModels: switch (provider) {
+        AgentProvider.anthropic => anthropicModels,
+        AgentProvider.gemini => geminiModels,
+        AgentProvider.codex => codexModels,
+      },
       availableOptions: List.unmodifiable(availableOptions),
       apiKey: apiKey,
+      anthropicApiKey: anthropicApiKey,
+      anthropicBaseUrl: anthropicBaseUrl,
     );
   }
 
@@ -104,6 +157,8 @@ final class AgentRuntimeConfiguration {
 
   String get selectedModelId => '${provider.name}:$modelName';
   final String? _apiKey;
+  final String? _anthropicApiKey;
+  final Uri? _anthropicBaseUrl;
 
   String get providerName => provider.name;
 
@@ -112,6 +167,7 @@ final class AgentRuntimeConfiguration {
     String? modelName,
     AgentProvider? provider,
     GeminiTransport? geminiTransport,
+    AnthropicTransport? anthropicTransport,
     CodexTransportFactory? codexTransportFactory,
   }) {
     final selectedProvider = provider ?? this.provider;
@@ -151,6 +207,26 @@ final class AgentRuntimeConfiguration {
         ),
         tools: tools,
         providerName: 'Gemini',
+        modelName: selectedModel,
+        authSource: 'Gemini API key',
+        approvalRequiredTools: const {'edit_file'},
+      ),
+      AgentProvider.anthropic => ModelConversationAgent(
+        model: AnthropicModel(
+          model: selectedModel,
+          transport:
+              anthropicTransport ??
+              AnthropicHttpTransport(
+                apiKey: _anthropicApiKey!,
+                apiEndpoint: _anthropicBaseUrl,
+              ),
+        ),
+        tools: tools,
+        providerName: 'Anthropic',
+        modelName: selectedModel,
+        authSource: anthropicAuthSource,
+        estimateCost: (usage) =>
+            estimateAnthropicCostMicrosUsd(selectedModel, usage),
         approvalRequiredTools: const {'edit_file'},
       ),
     };

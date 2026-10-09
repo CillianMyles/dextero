@@ -13,7 +13,8 @@ final class TerminalRenderer {
       ChatEntryKind.toolResult => entry.toolName ?? entry.kind.name,
       ChatEntryKind.approval => 'approval',
       ChatEntryKind.lifecycle => entry.status.name,
-      ChatEntryKind.error => 'error',
+      ChatEntryKind.error => entry.errorCodeLabel?.toLowerCase() ?? 'error',
+      ChatEntryKind.usage => 'usage',
     };
     return '[${safeText(label)}] ${entryContent(entry)}';
   }

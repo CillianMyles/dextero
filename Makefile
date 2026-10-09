@@ -8,6 +8,8 @@ ENV_FILE ?= .env
 -include $(ENV_FILE)
 export DEXTERO_MODEL_PROVIDER DEXTERO_CODEX_MODEL DEXTERO_CODEX_MODELS
 export GEMINI_API_KEY DEXTERO_GEMINI_MODEL DEXTERO_GEMINI_MODELS
+export ANTHROPIC_API_KEY ANTHROPIC_BASE_URL DEXTERO_ANTHROPIC_MODEL \
+	DEXTERO_ANTHROPIC_MODELS
 
 .DEFAULT_GOAL := help
 
@@ -46,7 +48,11 @@ doctor: ## Check the local tools used by the workspace.
 	@command -v curl >/dev/null || { echo "Missing curl (used by make dev readiness checks)"; exit 1; }
 	@printf "Dart:    "; $(DART) --version
 	@printf "Flutter: "; $(FLUTTER) --version | head -n 1
-	@if [ "$(DEXTERO_MODEL_PROVIDER)" = "gemini" ] && [ -z "$(GEMINI_API_KEY)" ]; then \
+	@if [ "$(DEXTERO_MODEL_PROVIDER)" = "anthropic" ] && [ -z "$(ANTHROPIC_API_KEY)" ]; then \
+	  echo "ANTHROPIC_API_KEY is required when DEXTERO_MODEL_PROVIDER=anthropic"; exit 1; \
+	elif [ -n "$(ANTHROPIC_API_KEY)" ] && [ "$(DEXTERO_MODEL_PROVIDER)" != "codex" ] && [ "$(DEXTERO_MODEL_PROVIDER)" != "gemini" ]; then \
+	  echo "Anthropic: API key configured"; \
+	elif [ "$(DEXTERO_MODEL_PROVIDER)" = "gemini" ] && [ -z "$(GEMINI_API_KEY)" ]; then \
 	  echo "GEMINI_API_KEY is required when DEXTERO_MODEL_PROVIDER=gemini"; exit 1; \
 	elif [ -n "$(GEMINI_API_KEY)" ] && [ "$(DEXTERO_MODEL_PROVIDER)" != "codex" ]; then \
 	  echo "Gemini:  API key configured"; \
@@ -107,7 +113,7 @@ test: ## Run every package test suite, including the Flutter web tests.
 
 check: format-check analyze test ## Run the same quality gate expected before review.
 
-server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and Codex-backed core.
+server: $(DEV_TOKEN_FILE) ## Run the local Serverpod host and model-backed core.
 	@DEXTERO_CONTROL_TOKEN="$$(cat $(DEV_TOKEN_FILE))" \
 	 DEXTERO_BIND_ADDRESS="$(BIND_ADDRESS)" \
 	 DEXTERO_WORKSPACE="$(WORKSPACE)" \

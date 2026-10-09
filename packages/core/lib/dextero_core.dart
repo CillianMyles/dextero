@@ -1,5 +1,7 @@
 export 'src/agent.dart';
+export 'src/agent_failure.dart';
 export 'src/agent_runtime_configuration.dart';
+export 'src/anthropic_model.dart';
 export 'src/approval.dart';
 export 'src/cancellation.dart';
 export 'src/chat_history.dart';

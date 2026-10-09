@@ -16,3 +16,5 @@ fields:
   toolCallId: String?
   toolName: String?
   approvalId: String?
+  usage: ChatRunUsage?
+  errorCode: ChatErrorCode?

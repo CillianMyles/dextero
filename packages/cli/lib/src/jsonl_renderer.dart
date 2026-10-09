@@ -27,6 +27,19 @@ final class JsonlRenderer {
     if (entry.toolCallId != null) 'tool_call_id': entry.toolCallId,
     if (entry.toolName != null) 'tool_name': entry.toolName,
     if (entry.approvalId != null) 'approval_id': entry.approvalId,
+    if (entry.errorCode case final code?) 'error_code': code.name,
+    if (entry.usage case final usage?)
+      'usage': {
+        'provider': usage.provider,
+        'model': usage.model,
+        'auth_source': usage.authSource,
+        'input_tokens': usage.inputTokens,
+        'output_tokens': usage.outputTokens,
+        'cache_creation_input_tokens': usage.cacheCreationInputTokens,
+        'cache_read_input_tokens': usage.cacheReadInputTokens,
+        'model_requests': usage.modelRequests,
+        'cost_micros_usd': usage.costMicrosUsd,
+      },
   });
 
   String error(Object error) => jsonEncode({

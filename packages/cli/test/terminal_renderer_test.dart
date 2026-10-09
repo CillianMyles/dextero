@@ -55,6 +55,32 @@ void main() {
     );
   });
 
+  test('labels usage receipts and categorized failures', () {
+    const renderer = TerminalRenderer();
+    expect(
+      renderer.plainEntryLine(
+        _entry(
+          sequence: 5,
+          kind: ChatEntryKind.usage,
+          status: ChatEntryStatus.completed,
+          content: 'Anthropic · claude-haiku-4-5 · Anthropic API key',
+        ),
+      ),
+      '[usage] Anthropic · claude-haiku-4-5 · Anthropic API key',
+    );
+    expect(
+      renderer.plainEntryLine(
+        _entry(
+          sequence: 6,
+          kind: ChatEntryKind.error,
+          status: ChatEntryStatus.failed,
+          content: 'Out of Anthropic API credit.',
+        ).copyWith(errorCode: ChatErrorCode.creditExhausted),
+      ),
+      '[out of credit] Out of Anthropic API credit.',
+    );
+  });
+
   test('removes terminal control sequences from history content', () {
     final entry = _entry(
       sequence: 0,

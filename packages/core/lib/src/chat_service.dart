@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'agent_failure.dart';
 import 'approval.dart';
 import 'cancellation.dart';
 import 'chat_history.dart';
@@ -13,6 +14,7 @@ enum ConversationAgentEventKind {
   toolOutput,
   toolCallCompleted,
   error,
+  usage,
 }
 
 final class ConversationAgentEvent {
@@ -23,6 +25,7 @@ final class ConversationAgentEvent {
     this.toolName,
     this.success,
     this.retrying = false,
+    this.usage,
   });
 
   final ConversationAgentEventKind kind;
@@ -31,6 +34,7 @@ final class ConversationAgentEvent {
   final String? toolName;
   final bool? success;
   final bool retrying;
+  final ChatRunUsage? usage;
 }
 
 final class ConversationAgentResult {
@@ -313,7 +317,8 @@ final class ChatService {
       );
     } on Object catch (error) {
       if (!terminalAgentErrorRecorded) {
-        final summary = SafeMetadata.text(error);
+        final categorized = error is CategorizedAgentFailure ? error : null;
+        final summary = SafeMetadata.text(categorized?.userMessage ?? error);
         await _append(
           conversationId,
           runId,
@@ -323,6 +328,7 @@ final class ChatService {
           content: summary.text,
           source: ChatEntrySource.dextero,
           truncated: summary.truncated,
+          errorCode: categorized?.errorCode,
         );
       }
       await _append(
@@ -446,6 +452,10 @@ final class ChatService {
         ChatEntryKind.error,
         event.retrying ? ChatEntryStatus.warning : ChatEntryStatus.failed,
       ),
+      ConversationAgentEventKind.usage => (
+        ChatEntryKind.usage,
+        ChatEntryStatus.completed,
+      ),
     };
     await _append(
       conversationId,
@@ -454,7 +464,9 @@ final class ChatService {
       kind: kind,
       status: status,
       content: event.summary.text,
-      source: ChatEntrySource.model,
+      source: event.kind == ConversationAgentEventKind.usage
+          ? ChatEntrySource.dextero
+          : ChatEntrySource.model,
       truncated: event.summary.truncated,
       toolCallId: event.toolCallId == null
           ? null
@@ -462,6 +474,7 @@ final class ChatService {
       toolName: event.toolName == null
           ? null
           : SafeMetadata.toolName(event.toolName!),
+      usage: event.usage,
     );
   }
 
@@ -477,6 +490,8 @@ final class ChatService {
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    ChatRunUsage? usage,
+    ChatErrorCode? errorCode,
   }) => _store.append(
     conversationId,
     PendingChatEntry(
@@ -490,6 +505,8 @@ final class ChatService {
       toolCallId: toolCallId,
       toolName: toolName,
       approvalId: approvalId,
+      usage: usage,
+      errorCode: errorCode,
     ),
   );
 

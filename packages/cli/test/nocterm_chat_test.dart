@@ -187,6 +187,68 @@ void main() {
     expect(tester.terminalState.containsText('× cancelled'), isTrue);
   });
 
+  test('labels usage receipts and out-of-credit failures', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(120, 24),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient(
+      historyEntries: [
+        _entry(
+          sequence: 0,
+          id: 'usage-1',
+          kind: ChatEntryKind.usage,
+          status: ChatEntryStatus.completed,
+          content:
+              'Anthropic · claude-haiku-4-5 · Anthropic API key · \$0.0069',
+        ),
+        _entry(
+          sequence: 1,
+          id: 'credit-1',
+          kind: ChatEntryKind.error,
+          status: ChatEntryStatus.failed,
+          content:
+              'Out of Anthropic API credit: Your credit balance is too low.',
+          errorCode: ChatErrorCode.creditExhausted,
+        ),
+      ],
+    );
+
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.terminalState.containsText('\$ usage'), isTrue);
+    expect(tester.terminalState.containsText('Anthropic API key'), isTrue);
+    expect(tester.terminalState.containsText('× out of credit'), isTrue);
+  });
+
+  test('shows the selected credential source and per-option sources', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(120, 30),
+    );
+    addTearDown(tester.dispose);
+
+    await tester.pumpComponent(
+      DexteroTui(client: _FakeClient(), onExit: (_) {}),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      tester.terminalState.containsText(
+        'Gemini · gemini-2.5-flash · Gemini API key',
+      ),
+      isTrue,
+    );
+    expect(
+      tester.terminalState.containsText(
+        'Codex tools + Dextero harness tools · Codex CLI login',
+      ),
+      isTrue,
+    );
+  });
+
   test('selects a model before the first message', () async {
     final tester = await nocterm.NoctermTester.create();
     addTearDown(tester.dispose);
@@ -201,8 +263,11 @@ void main() {
     await tester.pump();
 
     expect(client.modelSelections, ['gemini:gemini-pro']);
-    expect(tester.terminalState.containsText('gemini · gemini-pro'), isTrue);
-    expect(tester.terminalState.containsText('Using gemini'), isTrue);
+    expect(
+      tester.terminalState.containsText('Gemini · gemini-pro · Gemini API key'),
+      isTrue,
+    );
+    expect(tester.terminalState.containsText('Using Gemini'), isTrue);
   });
 
   test('keeps Ctrl+C active while a response stream is pending', () async {
@@ -334,6 +399,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Codex · $model',
         toolDescription: 'Codex tools + Dextero harness tools',
+        authSource: 'Codex CLI login',
       ),
     for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
       ModelOption(
@@ -342,6 +408,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Gemini · $model',
         toolDescription: 'Dextero harness tools',
+        authSource: 'Gemini API key',
       ),
   ],
 );
@@ -354,9 +421,11 @@ ChatEntry _entry({
   required String content,
   String? approvalId,
   bool truncated = false,
+  ChatErrorCode? errorCode,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: id,
+  errorCode: errorCode,
   sequence: sequence,
   kind: kind,
   status: status,

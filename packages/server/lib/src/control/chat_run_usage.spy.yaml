@@ -1,0 +1,11 @@
+class: ChatRunUsage
+fields:
+  provider: String
+  model: String
+  authSource: String
+  inputTokens: int
+  outputTokens: int
+  cacheCreationInputTokens: int
+  cacheReadInputTokens: int
+  modelRequests: int
+  costMicrosUsd: int?
