@@ -9,6 +9,8 @@ void main() {
       'PATH': '/bin',
       'HOME': '/home/person',
       'OPENAI_API_KEY': 'secret',
+      'ANTHROPIC_API_KEY': 'secret',
+      'GEMINI_API_KEY': 'secret',
       'DEXTERO_CONTROL_TOKEN': 'secret',
     });
 

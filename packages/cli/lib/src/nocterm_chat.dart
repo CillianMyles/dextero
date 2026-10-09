@@ -215,7 +215,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
       setState(() {
         _status = selected;
         _sending = false;
-        _notice = 'Using ${selected.modelProvider} · ${selected.modelName}';
+        _notice = 'Using ${selected.selectedModelSummary}';
       });
     } on Object catch (error) {
       _showError('Model selection failed: $error');
@@ -291,7 +291,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
                       ),
                       if (status != null)
                         Text(
-                          '${_renderer.safeText(status.modelProvider)} · ${_renderer.safeText(status.modelName)}',
+                          _renderer.safeText(status.selectedModelSummary),
                           style: TextStyle(color: _muted),
                         ),
                     ],
@@ -320,7 +320,7 @@ final class _DexteroTuiState extends State<DexteroTui> {
                             Padding(
                               padding: EdgeInsets.only(top: 1),
                               child: Text(
-                                '${option.id == status.selectedModelId ? '> ' : '  '}${_renderer.safeText(option.id)}\n  ${_renderer.safeText(option.toolDescription)}',
+                                '${option.id == status.selectedModelId ? '> ' : '  '}${_renderer.safeText(option.id)}\n  ${_renderer.safeText('${option.toolDescription} · ${option.authSource}')}',
                                 style: TextStyle(color: _muted),
                               ),
                             ),
@@ -494,8 +494,13 @@ final class _EntryView extends StatelessComponent {
       ),
       ChatEntryKind.error => (
         symbol: '×',
-        label: 'error',
+        label: entry.errorCodeLabel?.toLowerCase() ?? 'error',
         color: Colors.brightRed,
+      ),
+      ChatEntryKind.usage => (
+        symbol: '\$',
+        label: 'usage',
+        color: Colors.brightBlack,
       ),
     };
   }

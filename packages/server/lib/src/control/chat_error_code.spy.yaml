@@ -1,0 +1,6 @@
+enum: ChatErrorCode
+serialized: byName
+values:
+  - creditExhausted
+  - authenticationFailed
+  - rateLimited

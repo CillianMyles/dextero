@@ -12,6 +12,7 @@ enum ChatEntryKind {
   approval,
   lifecycle,
   error,
+  usage,
 }
 
 enum ChatEventFamily {
@@ -40,6 +41,36 @@ enum ChatEntryStatus {
 
 enum ChatEntrySource { user, dextero, model }
 
+/// Failure categories that clients present differently from generic errors.
+enum ChatErrorCode { creditExhausted, authenticationFailed, rateLimited }
+
+/// Provider, model, credential source, token usage, and cost for one run.
+final class ChatRunUsage {
+  const ChatRunUsage({
+    required this.provider,
+    required this.model,
+    required this.authSource,
+    required this.inputTokens,
+    required this.outputTokens,
+    required this.cacheCreationInputTokens,
+    required this.cacheReadInputTokens,
+    required this.modelRequests,
+    this.costMicrosUsd,
+  });
+
+  final String provider;
+  final String model;
+  final String authSource;
+  final int inputTokens;
+  final int outputTokens;
+  final int cacheCreationInputTokens;
+  final int cacheReadInputTokens;
+  final int modelRequests;
+
+  /// Estimated cost in millionths of a US dollar, or null when unpriced.
+  final int? costMicrosUsd;
+}
+
 final class ChatConversation {
   const ChatConversation({required this.id, required this.createdAt});
 
@@ -66,6 +97,8 @@ final class ChatHistoryEntry {
     this.toolCallId,
     this.toolName,
     this.approvalId,
+    this.usage,
+    this.errorCode,
   }) : _family = family;
 
   final int eventVersion;
@@ -86,6 +119,8 @@ final class ChatHistoryEntry {
   final String? toolCallId;
   final String? toolName;
   final String? approvalId;
+  final ChatRunUsage? usage;
+  final ChatErrorCode? errorCode;
 }
 
 final class PendingChatEntry {
@@ -101,6 +136,8 @@ final class PendingChatEntry {
     this.toolName,
     this.approvalId,
     this.family,
+    this.usage,
+    this.errorCode,
   });
 
   final ChatEntryKind kind;
@@ -114,6 +151,8 @@ final class PendingChatEntry {
   final String? toolName;
   final String? approvalId;
   final ChatEventFamily? family;
+  final ChatRunUsage? usage;
+  final ChatErrorCode? errorCode;
 }
 
 ChatEventFamily eventFamilyFor(ChatEntryKind kind, ChatEntryStatus status) {
@@ -129,6 +168,7 @@ ChatEventFamily eventFamilyFor(ChatEntryKind kind, ChatEntryStatus status) {
     ChatEntryKind.approval => ChatEventFamily.approval,
     ChatEntryKind.lifecycle => ChatEventFamily.task,
     ChatEntryKind.error => ChatEventFamily.error,
+    ChatEntryKind.usage => ChatEventFamily.usage,
   };
 }
 
@@ -226,6 +266,8 @@ final class InMemoryChatHistoryStore implements ChatHistoryStore {
       toolCallId: entry.toolCallId,
       toolName: entry.toolName,
       approvalId: entry.approvalId,
+      usage: entry.usage,
+      errorCode: entry.errorCode,
     );
     state.entries.add(canonical);
     state.changes.add(canonical);

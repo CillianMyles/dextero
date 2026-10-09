@@ -162,6 +162,7 @@ final class _FakeClient implements TerminalChatClient {
           modelName: model,
           label: 'Gemini · $model',
           toolDescription: 'Dextero harness tools',
+          authSource: 'Gemini API key',
         ),
     ],
   );

@@ -5,3 +5,4 @@ fields:
   modelName: String
   label: String
   toolDescription: String
+  authSource: String

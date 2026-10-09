@@ -42,6 +42,7 @@ final class ControlEndpoint extends Endpoint {
           modelName: option.modelName,
           label: option.label,
           toolDescription: option.toolDescription,
+          authSource: option.authSource,
         ),
     ],
   );
@@ -119,5 +120,23 @@ final class ControlEndpoint extends Endpoint {
     toolCallId: entry.toolCallId,
     toolName: entry.toolName,
     approvalId: entry.approvalId,
+    usage: switch (entry.usage) {
+      null => null,
+      final usage => ChatRunUsage(
+        provider: usage.provider,
+        model: usage.model,
+        authSource: usage.authSource,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        cacheCreationInputTokens: usage.cacheCreationInputTokens,
+        cacheReadInputTokens: usage.cacheReadInputTokens,
+        modelRequests: usage.modelRequests,
+        costMicrosUsd: usage.costMicrosUsd,
+      ),
+    },
+    errorCode: switch (entry.errorCode) {
+      null => null,
+      final code => ChatErrorCode.values.byName(code.name),
+    },
   );
 }

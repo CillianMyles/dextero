@@ -10,4 +10,23 @@ extension HostModelSelection on HostStatus {
         .toList();
     return matches.length == 1 ? matches.single : null;
   }
+
+  ModelOption? get selectedModelOption => resolveModel(selectedModelId);
+
+  /// Provider, model, and credential source for the current selection.
+  String get selectedModelSummary => switch (selectedModelOption) {
+    final option? => '${option.label} · ${option.authSource}',
+    null => '$modelProvider · $modelName',
+  };
+}
+
+/// Client-side presentation shared by the Flutter app and terminal clients.
+extension ChatEntryPresentation on ChatEntry {
+  /// A short label for categorized failures, or null for generic errors.
+  String? get errorCodeLabel => switch (errorCode) {
+    ChatErrorCode.creditExhausted => 'Out of credit',
+    ChatErrorCode.authenticationFailed => 'Key rejected',
+    ChatErrorCode.rateLimited => 'Rate limited',
+    null => null,
+  };
 }

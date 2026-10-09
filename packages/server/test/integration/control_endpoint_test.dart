@@ -442,6 +442,142 @@ void main() {
       expect(terminal.content, 'Response cancelled');
     });
 
+    test('advertises the credential source for each model option', () async {
+      final status = await endpoints.control.status(authenticatedSession);
+
+      expect(status.modelOptions.map((option) => option.authSource), [
+        'Gemini API key',
+        'Codex CLI login',
+        'Codex CLI login',
+      ]);
+    });
+
+    test(
+      'streams Anthropic usage receipts and out-of-credit failures',
+      () async {
+        final transport = _AnthropicScript([
+          [
+            {
+              'type': 'message_start',
+              'message': {
+                'usage': {
+                  'input_tokens': 900,
+                  'cache_creation_input_tokens': 0,
+                  'cache_read_input_tokens': 4000,
+                  'output_tokens': 1,
+                },
+              },
+            },
+            {
+              'type': 'content_block_start',
+              'index': 0,
+              'content_block': {'type': 'text', 'text': ''},
+            },
+            {
+              'type': 'content_block_delta',
+              'index': 0,
+              'delta': {'type': 'text_delta', 'text': 'Hello from Claude.'},
+            },
+            {'type': 'content_block_stop', 'index': 0},
+            {
+              'type': 'message_delta',
+              'delta': {'stop_reason': 'end_turn'},
+              'usage': {'output_tokens': 20},
+            },
+            {'type': 'message_stop'},
+          ],
+          core.AnthropicApiException.classify(
+            statusCode: 400,
+            errorType: 'invalid_request_error',
+            message: 'Your credit balance is too low to access the API.',
+          ),
+        ]);
+        final configuration = core.AgentRuntimeConfiguration.fromEnvironment(
+          const {'ANTHROPIC_API_KEY': 'sk-ant-integration'},
+        );
+        service = core.ChatService(
+          store: store,
+          agent: configuration.createAgent(
+            workspace: '.',
+            anthropicTransport: transport,
+          ),
+        );
+        conversationId = (await service.createConversation()).id;
+        ChatRuntime.configure(
+          chatService: service,
+          defaultConversationId: conversationId,
+          modelProvider: configuration.providerName,
+          modelName: configuration.modelName,
+          availableModels: configuration.availableModels,
+          modelOptions: configuration.availableOptions,
+        );
+        final status = await endpoints.control.status(authenticatedSession);
+        expect(status.modelOptions.first.authSource, 'Anthropic API key');
+
+        Future<List<ChatEntry>> runToEnd(String message) async {
+          final submission = await endpoints.control.submitMessage(
+            authenticatedSession,
+            ChatSubmitRequest(
+              conversationId: conversationId,
+              message: message,
+              modelName: status.modelName,
+              modelProvider: status.modelProvider,
+            ),
+          );
+          await store
+              .watch(conversationId)
+              .firstWhere(
+                (entry) =>
+                    entry.runId == submission.runId &&
+                    entry.kind == core.ChatEntryKind.lifecycle &&
+                    {
+                      core.ChatEntryStatus.completed,
+                      core.ChatEntryStatus.failed,
+                    }.contains(entry.status),
+              );
+          return (await endpoints.control.history(
+            authenticatedSession,
+            conversationId,
+          )).where((entry) => entry.runId == submission.runId).toList();
+        }
+
+        final completed = await runToEnd('Hello');
+        final receipt = completed.singleWhere(
+          (entry) => entry.kind == ChatEntryKind.usage,
+        );
+        expect(receipt.family, ChatEventFamily.usage);
+        expect(receipt.source, ChatEntrySource.dextero);
+        expect(receipt.usage!.provider, 'Anthropic');
+        expect(receipt.usage!.model, 'claude-haiku-4-5');
+        expect(receipt.usage!.authSource, 'Anthropic API key');
+        expect(receipt.usage!.inputTokens, 900);
+        expect(receipt.usage!.cacheReadInputTokens, 4000);
+        expect(receipt.usage!.outputTokens, 20);
+        expect(receipt.usage!.modelRequests, 1);
+        expect(receipt.usage!.costMicrosUsd, 900 + 400 + 100);
+        expect(
+          completed.map((entry) => entry.kind),
+          containsAllInOrder([
+            ChatEntryKind.assistantDelta,
+            ChatEntryKind.usage,
+            ChatEntryKind.assistantMessage,
+          ]),
+        );
+
+        final failed = await runToEnd('Again');
+        final error = failed.singleWhere(
+          (entry) => entry.kind == ChatEntryKind.error,
+        );
+        expect(error.errorCode, ChatErrorCode.creditExhausted);
+        expect(error.content, startsWith('Out of Anthropic API credit:'));
+        expect(
+          failed.where((entry) => entry.kind == ChatEntryKind.usage),
+          isEmpty,
+        );
+        expect(failed.last.status, ChatEntryStatus.failed);
+      },
+    );
+
     test('approves a pending action through the typed endpoint', () async {
       final agent = _ApprovalConversationAgent();
       service = core.ChatService(store: store, agent: agent);
@@ -545,6 +681,23 @@ final class _ApprovalConversationAgent
     );
     return const core.ConversationAgentResult(output: 'Edited README.md');
   }
+}
+
+final class _AnthropicScript implements core.AnthropicTransport {
+  _AnthropicScript(this._responses);
+
+  /// Each response is a list of SSE events or an error to throw.
+  final List<Object> _responses;
+  var _index = 0;
+
+  @override
+  Stream<core.JsonMap> streamMessage({
+    required core.JsonMap request,
+    core.CancellationToken? cancellationToken,
+  }) => switch (_responses[_index++]) {
+    final List<Object?> events => Stream.fromIterable(events.cast()),
+    final Object error => Stream.error(error),
+  };
 }
 
 final class _CancellableGeminiTransport implements core.GeminiTransport {

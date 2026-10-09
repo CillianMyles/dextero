@@ -22,7 +22,8 @@ enum ChatEntryKind implements _i1.SerializableModel {
   toolResult,
   approval,
   lifecycle,
-  error;
+  error,
+  usage;
 
   static ChatEntryKind fromJson(String name) {
     switch (name) {
@@ -44,6 +45,8 @@ enum ChatEntryKind implements _i1.SerializableModel {
         return ChatEntryKind.lifecycle;
       case 'error':
         return ChatEntryKind.error;
+      case 'usage':
+        return ChatEntryKind.usage;
       default:
         throw ArgumentError(
           'Value "$name" cannot be converted to "ChatEntryKind"',

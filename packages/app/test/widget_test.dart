@@ -29,7 +29,8 @@ void main() {
     expect(find.text('Dextero 0.0.1'), findsOneWidget);
     expect(find.text('Gemini · gemini-2.5-flash'), findsOneWidget);
     expect(find.byType(ShadEmpty), findsOneWidget);
-    expect(find.byType(ShadBadge), findsNWidgets(2));
+    expect(find.text('Gemini API key'), findsOneWidget);
+    expect(find.byType(ShadBadge), findsNWidgets(3));
     expect(find.byType(ShadInput), findsOneWidget);
   });
 
@@ -58,11 +59,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('model-selector')));
     await tester.pumpAndSettle();
-    expect(find.text('Dextero harness tools'), findsWidgets);
-    expect(find.text('Codex tools + Dextero harness tools'), findsWidgets);
+    expect(find.text('Dextero harness tools · Gemini API key'), findsWidgets);
+    expect(
+      find.text('Codex tools + Dextero harness tools · Codex CLI login'),
+      findsWidgets,
+    );
     await tester.tap(find.text('Codex · gpt-5.3-codex-spark').last);
     await tester.pumpAndSettle();
     expect(controller.hostStatus!.modelProvider, 'codex');
+    expect(find.text('Codex CLI login'), findsOneWidget);
     expect(api.modelSelections, ['codex:gpt-5.3-codex-spark']);
     await tester.enterText(find.byKey(const Key('chat-message')), 'Start');
     await tester.pump();
@@ -283,6 +288,76 @@ void main() {
     expect(
       find.text('read_file failed: File not found: missing.txt'),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('renders run usage receipts and the out-of-credit state', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _FakeChatApi(
+      status: Future.value(_status()),
+      initialHistory: [
+        _entry(
+          sequence: 1,
+          entryId: 'entry-usage',
+          kind: ChatEntryKind.usage,
+          status: ChatEntryStatus.completed,
+          content:
+              'Anthropic · claude-haiku-4-5 · Anthropic API key · '
+              '10,230 input · 50 output · \$0.0069',
+          family: ChatEventFamily.usage,
+          usage: ChatRunUsage(
+            provider: 'Anthropic',
+            model: 'claude-haiku-4-5',
+            authSource: 'Anthropic API key',
+            inputTokens: 930,
+            outputTokens: 50,
+            cacheCreationInputTokens: 4200,
+            cacheReadInputTokens: 5100,
+            modelRequests: 2,
+            costMicrosUsd: 6940,
+          ),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      DexteroApp(controller: DexteroController(api: api)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Run usage'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('activity-details-entry-usage')));
+    await tester.pumpAndSettle();
+    expect(find.text('claude-haiku-4-5'), findsOneWidget);
+    expect(find.text('Anthropic API key'), findsOneWidget);
+    expect(
+      find.text('930 input · 5100 cache read · 4200 cache write · 50 output'),
+      findsOneWidget,
+    );
+    expect(find.text('0.006940'), findsOneWidget);
+
+    api.emit(
+      _entry(
+        sequence: 2,
+        entryId: 'entry-credit',
+        kind: ChatEntryKind.error,
+        status: ChatEntryStatus.failed,
+        content:
+            'Out of Anthropic API credit: Your credit balance is too low. '
+            'Add credit or raise the workspace spend limit in the Anthropic '
+            'Console, or choose another model.',
+        errorCode: ChatErrorCode.creditExhausted,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Out of credit'), findsOneWidget);
+    expect(find.text('Agent error'), findsNothing);
+    expect(
+      find.textContaining('Out of Anthropic API credit'),
+      findsAtLeastNWidgets(1),
     );
   });
 
@@ -815,6 +890,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Codex · $model',
         toolDescription: 'Codex tools + Dextero harness tools',
+        authSource: 'Codex CLI login',
       ),
     for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
       ModelOption(
@@ -823,6 +899,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Gemini · $model',
         toolDescription: 'Dextero harness tools',
+        authSource: 'Gemini API key',
       ),
   ],
 );
@@ -866,8 +943,12 @@ ChatEntry _entry({
   bool truncated = false,
   DateTime? createdAt,
   ChatEventFamily family = ChatEventFamily.task,
+  ChatRunUsage? usage,
+  ChatErrorCode? errorCode,
 }) => ChatEntry(
   family: family,
+  usage: usage,
+  errorCode: errorCode,
   conversationId: 'conversation-1',
   entryId: entryId,
   sequence: sequence,

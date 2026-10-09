@@ -70,7 +70,7 @@ void main() {
 
     expect(result, 0);
     expect(client.modelSelections, ['gemini-pro']);
-    expect(io.output.join(), contains('gemini · gemini-pro'));
+    expect(io.output.join(), contains('Gemini · gemini-pro · Gemini API key'));
   });
 
   test(
@@ -361,6 +361,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Codex · $model',
         toolDescription: 'Codex tools + Dextero harness tools',
+        authSource: 'Codex CLI login',
       ),
     for (final model in const ['gemini-2.5-flash', 'gemini-pro'])
       ModelOption(
@@ -369,6 +370,7 @@ HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
         modelName: model,
         label: 'Gemini · $model',
         toolDescription: 'Dextero harness tools',
+        authSource: 'Gemini API key',
       ),
   ],
 );

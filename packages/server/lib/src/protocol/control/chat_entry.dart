@@ -16,6 +16,9 @@ import '../control/chat_event_family.dart' as _i2;
 import '../control/chat_entry_kind.dart' as _i3;
 import '../control/chat_entry_status.dart' as _i4;
 import '../control/chat_entry_source.dart' as _i5;
+import '../control/chat_run_usage.dart' as _i6;
+import '../control/chat_error_code.dart' as _i7;
+import 'package:dextero_server/src/protocol/protocol.dart' as _i8;
 
 abstract class ChatEntry implements _i1.SerializableModel {
   ChatEntry._({
@@ -35,6 +38,8 @@ abstract class ChatEntry implements _i1.SerializableModel {
     this.toolCallId,
     this.toolName,
     this.approvalId,
+    this.usage,
+    this.errorCode,
   }) : eventVersion = eventVersion ?? 1,
        family = family ?? _i2.ChatEventFamily.task;
 
@@ -55,6 +60,8 @@ abstract class ChatEntry implements _i1.SerializableModel {
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    _i6.ChatRunUsage? usage,
+    _i7.ChatErrorCode? errorCode,
   }) = _ChatEntryImpl;
 
   factory ChatEntry.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -85,6 +92,16 @@ abstract class ChatEntry implements _i1.SerializableModel {
       toolCallId: jsonSerialization['toolCallId'] as String?,
       toolName: jsonSerialization['toolName'] as String?,
       approvalId: jsonSerialization['approvalId'] as String?,
+      usage: jsonSerialization['usage'] == null
+          ? null
+          : _i8.Protocol().deserialize<_i6.ChatRunUsage>(
+              jsonSerialization['usage'],
+            ),
+      errorCode: jsonSerialization['errorCode'] == null
+          ? null
+          : _i7.ChatErrorCode.fromJson(
+              (jsonSerialization['errorCode'] as String),
+            ),
     );
   }
 
@@ -120,6 +137,10 @@ abstract class ChatEntry implements _i1.SerializableModel {
 
   String? approvalId;
 
+  _i6.ChatRunUsage? usage;
+
+  _i7.ChatErrorCode? errorCode;
+
   /// Returns a shallow copy of this [ChatEntry]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -140,6 +161,8 @@ abstract class ChatEntry implements _i1.SerializableModel {
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    _i6.ChatRunUsage? usage,
+    _i7.ChatErrorCode? errorCode,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -161,6 +184,8 @@ abstract class ChatEntry implements _i1.SerializableModel {
       if (toolCallId != null) 'toolCallId': toolCallId,
       if (toolName != null) 'toolName': toolName,
       if (approvalId != null) 'approvalId': approvalId,
+      if (usage != null) 'usage': usage?.toJson(),
+      if (errorCode != null) 'errorCode': errorCode?.toJson(),
     };
   }
 
@@ -190,6 +215,8 @@ class _ChatEntryImpl extends ChatEntry {
     String? toolCallId,
     String? toolName,
     String? approvalId,
+    _i6.ChatRunUsage? usage,
+    _i7.ChatErrorCode? errorCode,
   }) : super._(
          eventVersion: eventVersion,
          family: family,
@@ -207,6 +234,8 @@ class _ChatEntryImpl extends ChatEntry {
          toolCallId: toolCallId,
          toolName: toolName,
          approvalId: approvalId,
+         usage: usage,
+         errorCode: errorCode,
        );
 
   /// Returns a shallow copy of this [ChatEntry]
@@ -230,6 +259,8 @@ class _ChatEntryImpl extends ChatEntry {
     Object? toolCallId = _Undefined,
     Object? toolName = _Undefined,
     Object? approvalId = _Undefined,
+    Object? usage = _Undefined,
+    Object? errorCode = _Undefined,
   }) {
     return ChatEntry(
       eventVersion: eventVersion ?? this.eventVersion,
@@ -248,6 +279,8 @@ class _ChatEntryImpl extends ChatEntry {
       toolCallId: toolCallId is String? ? toolCallId : this.toolCallId,
       toolName: toolName is String? ? toolName : this.toolName,
       approvalId: approvalId is String? ? approvalId : this.approvalId,
+      usage: usage is _i6.ChatRunUsage? ? usage : this.usage?.copyWith(),
+      errorCode: errorCode is _i7.ChatErrorCode? ? errorCode : this.errorCode,
     );
   }
 }

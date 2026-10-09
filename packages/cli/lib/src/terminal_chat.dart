@@ -181,7 +181,7 @@ final class TerminalChat {
       _plainHeaderRendered = true;
       _io.writeln(
         '${_status.name} ${_status.version} — '
-        '${_status.modelProvider} · ${_status.modelName}'
+        '${_status.selectedModelSummary}'
         '${_entries.isEmpty ? ' — no messages yet' : ''}',
       );
     }

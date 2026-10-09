@@ -180,7 +180,9 @@ sequence. Each selected capability needs a bounded end-to-end exit condition.
   authority need their own policy coverage.
 - **Runtime ecosystem and routing:** MCP and a dynamic tool registry;
   versioned adapter manifests, trust, lifecycle, and health; direct streaming
-  providers; project instructions, skills, and profiles. Route among permitted
+  providers; project instructions, skills, and profiles. Use the Anthropic
+  Message Batches API for latency-insensitive background work once such work
+  exists. Route among permitted
   models using explicit privacy, capability, latency, availability, and cost
   policy. Show provider, selection rationale, shared context, and cost without
   copying the full memory store to providers or letting extensions bypass
@@ -232,6 +234,9 @@ sequence. Each selected capability needs a bounded end-to-end exit condition.
   network binding.
 - [x] Provider-qualified Gemini/Codex model selection before the first
   message through Flutter and terminal clients.
+- [x] Direct Anthropic Messages API provider with streaming, retries, prompt
+  caching, per-run usage and cost receipts, credential-source display, and a
+  distinct out-of-credit state.
 - [x] Layered tests and network acceptance coverage.
 
 **Established outcome:** Flutter and terminal clients can observe the same

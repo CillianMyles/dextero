@@ -174,6 +174,12 @@ class _Header extends StatelessWidget {
     final status = controller.hostStatus;
     final badges = <Widget>[
       if (status != null) _ModelSelector(controller: controller),
+      if (status?.selectedModelOption case final option?)
+        _StatusBadge(
+          key: const Key('model-auth-source'),
+          icon: LucideIcons.keyRound,
+          label: option.authSource,
+        ),
       if (status != null)
         ShadTooltip(
           builder: (context) => Text(status.retentionNotice),
@@ -250,7 +256,7 @@ class _ModelSelector extends StatelessWidget {
                 children: [
                   Text(option.label),
                   Text(
-                    option.toolDescription,
+                    '${option.toolDescription} · ${option.authSource}',
                     style: ShadTheme.of(context).textTheme.small,
                   ),
                 ],
@@ -766,6 +772,33 @@ class _ActivityRow extends StatelessWidget {
                     _TechnicalDetail(label: 'Tool call', value: toolCallId),
                   if (entry.approvalId case final approvalId?)
                     _TechnicalDetail(label: 'Approval ID', value: approvalId),
+                  if (entry.usage case final usage?) ...[
+                    _TechnicalDetail(label: 'Provider', value: usage.provider),
+                    _TechnicalDetail(label: 'Model', value: usage.model),
+                    _TechnicalDetail(
+                      label: 'Auth source',
+                      value: usage.authSource,
+                    ),
+                    _TechnicalDetail(
+                      label: 'Tokens',
+                      value:
+                          '${usage.inputTokens} input · '
+                          '${usage.cacheReadInputTokens} cache read · '
+                          '${usage.cacheCreationInputTokens} cache write · '
+                          '${usage.outputTokens} output',
+                    ),
+                    _TechnicalDetail(
+                      label: 'Requests',
+                      value: '${usage.modelRequests}',
+                    ),
+                    _TechnicalDetail(
+                      label: 'Cost (USD)',
+                      value: switch (usage.costMicrosUsd) {
+                        final micros? => (micros / 1000000).toStringAsFixed(6),
+                        null => 'Unavailable',
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -786,7 +819,8 @@ class _ActivityRow extends StatelessWidget {
       ChatEntryStatus.cancelled => 'Approval cancelled',
       _ => 'Approval update',
     },
-    ChatEntryKind.error => 'Agent error',
+    ChatEntryKind.error => entry.errorCodeLabel ?? 'Agent error',
+    ChatEntryKind.usage => 'Run usage',
     ChatEntryKind.lifecycle => switch (entry.status) {
       ChatEntryStatus.queued => 'Queued',
       ChatEntryStatus.running => 'Agent activity',
@@ -826,7 +860,11 @@ class _ActivityRow extends StatelessWidget {
       ChatEntryStatus.cancelled => LucideIcons.circleStop,
       _ => LucideIcons.info,
     },
-    ChatEntryKind.error => LucideIcons.circleAlert,
+    ChatEntryKind.error =>
+      entry.errorCode == ChatErrorCode.creditExhausted
+          ? LucideIcons.wallet
+          : LucideIcons.circleAlert,
+    ChatEntryKind.usage => LucideIcons.receipt,
     _ => switch (entry.status) {
       ChatEntryStatus.queued => LucideIcons.clock3,
       ChatEntryStatus.running => LucideIcons.loaderCircle,

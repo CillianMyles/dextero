@@ -140,6 +140,79 @@ void main() {
     );
   });
 
+  test('prefers Anthropic when its key is configured', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'ANTHROPIC_API_KEY': 'sk-ant-test',
+      'GEMINI_API_KEY': 'test-key',
+    });
+
+    expect(configuration.provider, AgentProvider.anthropic);
+    expect(configuration.selectedModelId, 'anthropic:claude-haiku-4-5');
+    expect(configuration.availableOptions.map((option) => option.id), [
+      'anthropic:claude-haiku-4-5',
+      'anthropic:claude-sonnet-5-5',
+      'gemini:gemini-2.5-flash',
+      'codex:gpt-5.3-codex-spark',
+      'codex:default',
+    ]);
+    final anthropic = configuration.availableOptions.first;
+    expect(anthropic.label, 'Anthropic · claude-haiku-4-5');
+    expect(anthropic.authSource, 'Anthropic API key');
+    expect(anthropic.toolDescription, 'Dextero harness tools');
+    expect(configuration.availableOptions.last.authSource, 'Codex CLI login');
+    final agent = configuration.createAgent(
+      workspace: '.',
+      provider: AgentProvider.anthropic,
+      modelName: anthropicSonnetModel,
+    );
+    expect(
+      agent,
+      isA<ModelConversationAgent>()
+          .having((agent) => agent.providerName, 'providerName', 'Anthropic')
+          .having((agent) => agent.modelName, 'modelName', anthropicSonnetModel)
+          .having(
+            (agent) => agent.authSource,
+            'authSource',
+            anthropicAuthSource,
+          ),
+    );
+  });
+
+  test('supports Anthropic model overrides and requires its key', () {
+    final configuration = AgentRuntimeConfiguration.fromEnvironment(const {
+      'DEXTERO_MODEL_PROVIDER': 'anthropic',
+      'ANTHROPIC_API_KEY': 'sk-ant-test',
+      'DEXTERO_ANTHROPIC_MODEL': 'claude-opus-5-5',
+      'DEXTERO_ANTHROPIC_MODELS': 'claude-haiku-4-5',
+    });
+    expect(configuration.availableModels, [
+      'claude-opus-5-5',
+      'claude-haiku-4-5',
+    ]);
+    expect(
+      () => AgentRuntimeConfiguration.fromEnvironment(const {
+        'DEXTERO_MODEL_PROVIDER': 'anthropic',
+      }),
+      throwsStateError,
+    );
+    expect(
+      AgentRuntimeConfiguration.fromEnvironment(
+        const {},
+      ).availableOptions.map((option) => option.provider),
+      isNot(contains(AgentProvider.anthropic)),
+    );
+  });
+
+  test('rejects a malformed Anthropic base URL', () {
+    expect(
+      () => AgentRuntimeConfiguration.fromEnvironment(const {
+        'ANTHROPIC_API_KEY': 'sk-ant-test',
+        'ANTHROPIC_BASE_URL': 'api.anthropic.com',
+      }),
+      throwsArgumentError,
+    );
+  });
+
   test('rejects an unknown provider', () {
     expect(
       () => AgentRuntimeConfiguration.fromEnvironment(const {
