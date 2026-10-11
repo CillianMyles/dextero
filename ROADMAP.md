@@ -244,20 +244,24 @@ See [README.md](README.md) for current behaviour and security limitations.
 Give the continuous Dextero identity an embodied mobile interface before
 considering dedicated hardware.
 
-- [ ] Extend conversation entries and streams for audio input, partial and
-  final transcripts, streamed speech output, interruption, and modality
-  provenance.
-- [ ] Add a push-to-talk Flutter mobile interaction with clear listening,
+- [x] Accept push-to-talk audio, record final transcripts with voice modality
+  and transcription-engine provenance, and return spoken replies.
+- [ ] Extend entries and streams for partial transcripts, streamed speech
+  output, and interruption.
+- [x] Add a push-to-talk Flutter mobile interaction with clear listening,
   thinking, tool-use, approval, speaking, and failure states.
-- [ ] Keep the spoken interaction in the same conversation, memory, task,
+- [x] Keep the spoken interaction in the same conversation, memory, task,
   approval, and audit model as text rather than creating a voice-only session.
 - [ ] Add explicitly initiated image/camera context with visible capture state,
-  scoped authority, retention controls, and inspectable provenance.
+  scoped authority, retention controls, and inspectable provenance. The
+  capture boundary is documented in README.md.
 - [ ] Evaluate on-device and host-side speech recognition and synthesis against
-  privacy, latency, quality, battery, and offline-operation requirements.
+  privacy, latency, quality, battery, and offline-operation requirements. The
+  prototype uses host-side whisper.cpp and macOS `say`; Linux and Windows hosts
+  have no spoken replies yet.
 - [ ] Define a small paired-surface protocol for microphone, speaker, display,
   buttons, LEDs, and presence so a later room endpoint or wearable can reuse
-  the mobile interaction model.
+  the mobile interaction model. The voice subset is documented in README.md.
 - [ ] Prototype specialized hardware only after repeated phone use demonstrates
   what the dedicated device must improve.
 

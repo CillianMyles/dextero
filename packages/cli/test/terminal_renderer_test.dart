@@ -68,6 +68,53 @@ void main() {
     expect(rendered, '[dextero] Keep this visible');
     expect(rendered, isNot(contains('\x1b')));
   });
+
+  test('labels voice turns with their transcription provenance', () {
+    final entry = ChatEntry(
+      conversationId: 'conversation-1',
+      entryId: 'entry-0',
+      sequence: 0,
+      kind: ChatEntryKind.userMessage,
+      status: ChatEntryStatus.submitted,
+      content: 'What changed?',
+      createdAt: DateTime.utc(2026),
+      correlationId: 'cli-test-1',
+      source: ChatEntrySource.user,
+      truncated: false,
+      modality: ChatModality.voice,
+      transcriptionEngine: 'whisper.cpp\x1B[31m on this host',
+    );
+
+    expect(
+      const TerminalRenderer().plainEntryLine(entry),
+      '[you · voice] What changed?\n(transcribed by whisper.cpp on this host)',
+    );
+  });
+
+  test('describes agent activity in one status line', () {
+    const renderer = TerminalRenderer();
+
+    expect(renderer.activityNotice(AgentActivityState.idle), 'Ready');
+    expect(
+      renderer.activityNotice(const AgentActivityState(AgentActivity.thinking)),
+      'Dextero is thinking…',
+    );
+    expect(
+      renderer.activityNotice(
+        const AgentActivityState(AgentActivity.acting, toolName: 'read_file'),
+      ),
+      'Dextero is using read_file…',
+    );
+    expect(
+      renderer.activityNotice(
+        const AgentActivityState(
+          AgentActivity.awaitingApproval,
+          toolName: 'edit_file',
+        ),
+      ),
+      'Waiting for approval of edit_file; use the approve command shown above',
+    );
+  });
 }
 
 ChatEntry _entry({

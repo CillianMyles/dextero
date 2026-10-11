@@ -437,6 +437,78 @@ void main() {
       everyElement(SafeMetadata.identifier(rawToolCallId)),
     );
   });
+
+  test(
+    'keeps voice and text turns in one conversation and run model',
+    () async {
+      final store = InMemoryChatHistoryStore(
+        identifiers: _SequenceIdentifiers(),
+      );
+      addTearDown(store.close);
+      final service = ChatService(
+        store: store,
+        agent: const _StaticAgent('Done'),
+        identifiers: _SequenceIdentifiers(),
+      );
+      final conversation = await service.createConversation();
+
+      final voice = await service.submit(
+        conversationId: conversation.id,
+        message: ' What changed? ',
+        modality: ChatModality.voice,
+        transcriptionEngine: 'whisper.cpp (ggml-base.bin) on this host',
+      );
+      expect(service.hasActiveRun(conversation.id), isTrue);
+      await _waitForTerminal(store, conversation.id, voice.runId);
+      expect(service.hasActiveRun(conversation.id), isFalse);
+      final text = await service.submit(
+        conversationId: conversation.id,
+        message: 'And why?',
+      );
+      await _waitForTerminal(store, conversation.id, text.runId);
+
+      expect(voice.userEntry.content, 'What changed?');
+      expect(voice.userEntry.modality, ChatModality.voice);
+      expect(
+        voice.userEntry.transcriptionEngine,
+        'whisper.cpp (ggml-base.bin) on this host',
+      );
+      expect(text.userEntry.modality, ChatModality.text);
+      expect(text.userEntry.transcriptionEngine, isNull);
+      final users = (await store.history(
+        conversation.id,
+      )).where((entry) => entry.kind == ChatEntryKind.userMessage).toList();
+      expect(users.map((entry) => entry.sequence), [0, 4]);
+      expect(users.map((entry) => entry.conversationId).toSet(), {
+        conversation.id,
+      });
+    },
+  );
+
+  test('requires transcript provenance for voice messages only', () async {
+    final store = InMemoryChatHistoryStore();
+    addTearDown(store.close);
+    final service = ChatService(store: store, agent: const _StaticAgent('x'));
+    final conversation = await service.createConversation();
+
+    await expectLater(
+      service.submit(
+        conversationId: conversation.id,
+        message: 'Spoken',
+        modality: ChatModality.voice,
+      ),
+      throwsArgumentError,
+    );
+    await expectLater(
+      service.submit(
+        conversationId: conversation.id,
+        message: 'Typed',
+        transcriptionEngine: 'whisper.cpp',
+      ),
+      throwsArgumentError,
+    );
+    expect(await store.history(conversation.id), isEmpty);
+  });
 }
 
 final class _ApprovalAgent

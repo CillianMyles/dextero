@@ -29,7 +29,11 @@ abstract class HostStatus implements _i1.SerializableModel {
     required this.modelName,
     required this.availableModels,
     required this.modelOptions,
-  });
+    bool? voiceInputAvailable,
+    bool? voiceOutputAvailable,
+    this.voiceNotice,
+  }) : voiceInputAvailable = voiceInputAvailable ?? false,
+       voiceOutputAvailable = voiceOutputAvailable ?? false;
 
   factory HostStatus({
     required String name,
@@ -44,6 +48,9 @@ abstract class HostStatus implements _i1.SerializableModel {
     required String modelName,
     required List<String> availableModels,
     required List<_i2.ModelOption> modelOptions,
+    bool? voiceInputAvailable,
+    bool? voiceOutputAvailable,
+    String? voiceNotice,
   }) = _HostStatusImpl;
 
   factory HostStatus.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -70,6 +77,17 @@ abstract class HostStatus implements _i1.SerializableModel {
       modelOptions: _i3.Protocol().deserialize<List<_i2.ModelOption>>(
         jsonSerialization['modelOptions'],
       ),
+      voiceInputAvailable: jsonSerialization['voiceInputAvailable'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(
+              jsonSerialization['voiceInputAvailable'],
+            ),
+      voiceOutputAvailable: jsonSerialization['voiceOutputAvailable'] == null
+          ? null
+          : _i1.BoolJsonExtension.fromJson(
+              jsonSerialization['voiceOutputAvailable'],
+            ),
+      voiceNotice: jsonSerialization['voiceNotice'] as String?,
     );
   }
 
@@ -97,6 +115,12 @@ abstract class HostStatus implements _i1.SerializableModel {
 
   List<_i2.ModelOption> modelOptions;
 
+  bool voiceInputAvailable;
+
+  bool voiceOutputAvailable;
+
+  String? voiceNotice;
+
   /// Returns a shallow copy of this [HostStatus]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -113,6 +137,9 @@ abstract class HostStatus implements _i1.SerializableModel {
     String? modelName,
     List<String>? availableModels,
     List<_i2.ModelOption>? modelOptions,
+    bool? voiceInputAvailable,
+    bool? voiceOutputAvailable,
+    String? voiceNotice,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -130,6 +157,9 @@ abstract class HostStatus implements _i1.SerializableModel {
       'modelName': modelName,
       'availableModels': availableModels.toJson(),
       'modelOptions': modelOptions.toJson(valueToJson: (v) => v.toJson()),
+      'voiceInputAvailable': voiceInputAvailable,
+      'voiceOutputAvailable': voiceOutputAvailable,
+      if (voiceNotice != null) 'voiceNotice': voiceNotice,
     };
   }
 
@@ -138,6 +168,8 @@ abstract class HostStatus implements _i1.SerializableModel {
     return _i1.SerializationManager.encode(this);
   }
 }
+
+class _Undefined {}
 
 class _HostStatusImpl extends HostStatus {
   _HostStatusImpl({
@@ -153,6 +185,9 @@ class _HostStatusImpl extends HostStatus {
     required String modelName,
     required List<String> availableModels,
     required List<_i2.ModelOption> modelOptions,
+    bool? voiceInputAvailable,
+    bool? voiceOutputAvailable,
+    String? voiceNotice,
   }) : super._(
          name: name,
          version: version,
@@ -166,6 +201,9 @@ class _HostStatusImpl extends HostStatus {
          modelName: modelName,
          availableModels: availableModels,
          modelOptions: modelOptions,
+         voiceInputAvailable: voiceInputAvailable,
+         voiceOutputAvailable: voiceOutputAvailable,
+         voiceNotice: voiceNotice,
        );
 
   /// Returns a shallow copy of this [HostStatus]
@@ -185,6 +223,9 @@ class _HostStatusImpl extends HostStatus {
     String? modelName,
     List<String>? availableModels,
     List<_i2.ModelOption>? modelOptions,
+    bool? voiceInputAvailable,
+    bool? voiceOutputAvailable,
+    Object? voiceNotice = _Undefined,
   }) {
     return HostStatus(
       name: name ?? this.name,
@@ -201,6 +242,9 @@ class _HostStatusImpl extends HostStatus {
           availableModels ?? this.availableModels.map((e0) => e0).toList(),
       modelOptions:
           modelOptions ?? this.modelOptions.map((e0) => e0.copyWith()).toList(),
+      voiceInputAvailable: voiceInputAvailable ?? this.voiceInputAvailable,
+      voiceOutputAvailable: voiceOutputAvailable ?? this.voiceOutputAvailable,
+      voiceNotice: voiceNotice is String? ? voiceNotice : this.voiceNotice,
     );
   }
 }

@@ -3,7 +3,7 @@
 Dextero is an experimental local computer agent built with Dart, Flutter, and
 Serverpod. The current MVP provides one chat conversation backed by Codex or
 Gemini and shows the same ordered history in the Flutter app and terminal
-client.
+client. Optional push-to-talk voice turns join the same conversation.
 
 See [VISION.md](VISION.md) for product direction and [ROADMAP.md](ROADMAP.md)
 for planned work.
@@ -37,11 +37,14 @@ Requirements:
 - Dart 3.10+
 - Flutter with the intended target platform enabled
 - Chrome for web, Android Studio for Android, or Xcode for iOS and macOS
-- GTK 3 development libraries for Linux or Visual Studio with Desktop C++ for
-  Windows
+- GTK 3 and GStreamer development libraries for Linux
+  (`libgtk-3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev`) or
+  Visual Studio with Desktop C++ for Windows
 - GNU Make and Bash; on Windows, run the Make targets from MSYS2 or another
   Bash environment with `bash.exe` available on `PATH`
 - Codex CLI authenticated with `codex login`, or a Gemini API key
+- For voice: whisper.cpp (`whisper-cli`) and a ggml model; spoken replies
+  require a macOS host
 - OpenSSL and curl
 
 Start the server and web app:
@@ -163,6 +166,61 @@ make check
 
 Run `make help` for other commands.
 
+## Voice
+
+Voice is off unless the host has a whisper.cpp model:
+
+```sh
+brew install whisper-cpp
+mkdir -p ~/.cache/whisper-cpp
+curl -L -o ~/.cache/whisper-cpp/ggml-base.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+```
+
+Set `DEXTERO_WHISPER_MODEL` in `.env` to the model's absolute path; `make
+doctor` reports the result. Larger models transcribe more accurately but more
+slowly. Optional settings are `DEXTERO_WHISPER_CLI`,
+`DEXTERO_WHISPER_LANGUAGE` (default `auto`), `DEXTERO_SPEECH_OUTPUT=say|off`
+(default `say` on macOS, otherwise `off`), and `DEXTERO_SPEECH_VOICE`.
+
+In the app, the microphone button starts recording; send or discard the clip
+from the recording bar. Recording stops automatically after 60 seconds. The
+host transcribes the clip and submits the transcript as an ordinary message in
+the current conversation, marked as voice with its transcription engine. Tool
+use, approvals, cancellation, and history behave as for typed messages, and
+every client sees the same turn.
+
+A status row shows Ready, Listening, Transcribing, Thinking, Working (with the
+tool), Waiting for your approval, or Speaking. When a voice turn completes, the
+host speaks the final reply with macOS `say` and the app plays it; Stop or the
+microphone button interrupts playback. Replies to typed messages are not
+spoken. Spoken replies omit code blocks and stop after about 800 characters;
+the full reply stays in the conversation.
+
+The CLI accepts WAV, MP3, or FLAC recordings up to 2 MiB and can save the
+spoken reply. In the TUI, `/voice <file>` sends a recording.
+
+```sh
+make cli VOICE=question.wav REPLY_AUDIO=reply.wav
+```
+
+### Paired-surface protocol
+
+A later speaker, display, or wearable can use the same typed calls as the
+phone, with the same bearer token and no extra authority:
+
+1. `status` reports `voiceInputAvailable`, `voiceOutputAvailable`, and the
+   `voiceNotice` to show before recording.
+2. `submitVoiceMessage` sends one clip and returns the accepted voice turn.
+   Rejected audio raises `VoiceTurnException` with a displayable message.
+3. `streamHistory` delivers ordered events. The generated client's
+   `agentActivityOf` derives thinking, tool-use, and approval state from them.
+4. `speakReply` returns WAV audio for one assistant entry.
+5. `approveWork` and `cancelRun` work as for typed turns.
+
+Such a device needs a microphone, a speaker, an explicit push-to-talk control,
+and a visible recording indicator.
+
 ## Security
 
 The MVP uses a bootstrap bearer token; it does not yet provide device pairing
@@ -197,11 +255,27 @@ Gemini credentials remain in the server process and are sent in the
 `x-goog-api-key` request header. They are not placed in request URLs, chat
 history, or tool subprocess environments.
 
+### Voice privacy
+
+- Capture starts only from an explicit push-to-talk action. There is no wake
+  word, background recording, or ambient capture, and pairing grants no
+  microphone or camera access. Denying microphone permission leaves typed chat
+  working.
+- Audio goes only to the Dextero host. whisper.cpp and `say` run there in a
+  private temporary directory that is deleted after each call. Clips and
+  synthesized replies are not stored or logged; the app plays a reply from a
+  private temporary file that it deletes when playback ends.
+- The transcript is stored and sent to the selected model provider like a
+  typed message.
+- Camera context is not implemented. When added, an image must be attached by
+  an explicit per-turn action with a visible capture state, recorded with its
+  source in the same conversation, and grant no tool authority.
+
 ## Serverpod changes
 
 Models live in `packages/server/lib/src/control`. The control endpoint exposes
-typed `selectModel`, `submitMessage`, `history`, `streamHistory`, `approveWork`,
-and `cancelRun` operations.
+typed `selectModel`, `submitMessage`, `submitVoiceMessage`, `speakReply`,
+`history`, `streamHistory`, `approveWork`, and `cancelRun` operations.
 The status contract includes typed `modelOptions`; submissions require `modelProvider`
 as well as `modelName`. Update server and clients together for this contract change.
 Generated server, client, and test code is committed. After changing an

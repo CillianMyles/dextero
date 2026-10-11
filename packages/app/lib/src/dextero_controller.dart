@@ -14,6 +14,10 @@ abstract interface class ChatApi {
 
   Future<ChatSubmission> submit(ChatSubmitRequest request);
 
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request);
+
+  Future<SpokenReply> speakReply(String conversationId, String entryId);
+
   Future<bool> cancelRun(String conversationId, String runId);
 
   Future<bool> approveWork(
@@ -50,6 +54,14 @@ final class ServerpodChatApi implements ChatApi {
   @override
   Future<ChatSubmission> submit(ChatSubmitRequest request) =>
       _client.control.submitMessage(request);
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) =>
+      _client.control.submitVoiceMessage(request);
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) =>
+      _client.control.speakReply(conversationId, entryId);
 
   @override
   Future<bool> cancelRun(String conversationId, String runId) =>
@@ -307,6 +319,66 @@ final class DexteroController extends ChangeNotifier {
     }
   }
 
+  /// Sends a push-to-talk clip for host-side transcription and returns the
+  /// accepted run ID, or null when the turn was not accepted.
+  Future<String?> submitVoice(
+    Uint8List audio, {
+    required String mimeType,
+  }) async {
+    final status = _hostStatus;
+    if (status == null ||
+        audio.isEmpty ||
+        !status.voiceInputAvailable ||
+        !canSubmit) {
+      return null;
+    }
+
+    _submitting = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final submission = await _api.submitVoice(
+        VoiceSubmitRequest(
+          conversationId: status.conversationId,
+          audio: ByteData.sublistView(audio),
+          mimeType: mimeType,
+          modelName: status.modelName,
+          modelProvider: status.modelProvider,
+          correlationId: _correlationIdFactory(),
+        ),
+      );
+      _addEntry(submission.userEntry);
+      _activeRunId = submission.runId;
+      if (_terminalRunIds.contains(submission.runId)) _activeRunId = null;
+      _loadState = ChatLoadState.ready;
+      return submission.runId;
+    } on VoiceTurnException catch (error) {
+      _error = error.message;
+      return null;
+    } on Object catch (error) {
+      _error = 'Voice message failed: $error';
+      return null;
+    } finally {
+      _submitting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Fetches host-synthesized speech for one assistant reply.
+  Future<SpokenReply?> speakReply(String entryId) async {
+    final status = _hostStatus;
+    if (status == null || !status.voiceOutputAvailable) return null;
+    try {
+      return await _api.speakReply(status.conversationId, entryId);
+    } on VoiceTurnException catch (error) {
+      _error = error.message;
+    } on Object catch (error) {
+      _error = 'Spoken reply failed: $error';
+    }
+    notifyListeners();
+    return null;
+  }
+
   void _subscribeToHistory() {
     final status = _hostStatus;
     if (status == null) return;
@@ -441,5 +513,13 @@ final class _UnavailableChatApi implements ChatApi {
 
   @override
   Future<ChatSubmission> submit(ChatSubmitRequest request) async =>
+      _unavailable();
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) async =>
+      _unavailable();
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) async =>
       _unavailable();
 }

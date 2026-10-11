@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dextero_cli/dextero_cli.dart';
 import 'package:dextero_server/dextero_client.dart';
@@ -223,7 +224,7 @@ void main() {
     await tester.pump();
 
     expect(client.requests.single.message, 'Wait for the result');
-    expect(tester.terminalState.containsText('Dextero is working…'), isTrue);
+    expect(tester.terminalState.containsText('Dextero is thinking…'), isTrue);
 
     await tester.sendKeyEvent(
       const nocterm.KeyboardEvent(
@@ -234,6 +235,101 @@ void main() {
 
     expect(exitCode, 0);
   });
+
+  test('sends /voice recordings and narrates agent activity', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(110, 30),
+    );
+    addTearDown(tester.dispose);
+    final directory = Directory.systemTemp.createTempSync('dextero-tui-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final recording = File('${directory.path}/question.wav')
+      ..writeAsBytesSync([82, 73, 70, 70]);
+    final responses = StreamController<ChatEntry>();
+    final client = _FakeClient(responseStream: responses.stream);
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.enterText('/voice ${recording.path}');
+    await tester.sendEnter();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+
+    expect(client.voiceRequests.single.mimeType, 'audio/wav');
+    expect(client.requests, isEmpty);
+    expect(tester.terminalState.containsText('YOU voice'), isTrue);
+    expect(tester.terminalState.containsText('Check the build'), isTrue);
+    expect(
+      tester.terminalState.containsText('transcribed by whisper.cpp'),
+      isTrue,
+    );
+    expect(tester.terminalState.containsText('Dextero is thinking'), isTrue);
+
+    responses.add(
+      _entry(
+        sequence: 1,
+        id: 'tool-1',
+        kind: ChatEntryKind.toolCall,
+        status: ChatEntryStatus.running,
+        content: 'run_command started',
+        toolCallId: 'call-1',
+        toolName: 'run_command',
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(
+      tester.terminalState.containsText('Dextero is using run_command'),
+      isTrue,
+    );
+
+    responses
+      ..add(
+        _entry(
+          sequence: 2,
+          id: 'assistant-1',
+          kind: ChatEntryKind.assistantMessage,
+          status: ChatEntryStatus.completed,
+          content: 'Build passes',
+        ),
+      )
+      ..add(
+        _entry(
+          sequence: 3,
+          id: 'lifecycle-1',
+          kind: ChatEntryKind.lifecycle,
+          status: ChatEntryStatus.completed,
+          content: 'Response completed',
+        ),
+      );
+    await tester.pump();
+    await tester.pump();
+    expect(tester.terminalState.containsText('Ready'), isTrue);
+    await responses.close();
+  });
+
+  test('explains how to send a voice recording', () async {
+    final tester = await nocterm.NoctermTester.create(
+      size: const nocterm.Size(110, 24),
+    );
+    addTearDown(tester.dispose);
+    final client = _FakeClient();
+    await tester.pumpComponent(DexteroTui(client: client, onExit: (_) {}));
+    await tester.pump();
+    await tester.pump();
+
+    await tester.enterText('/voice');
+    await tester.sendEnter();
+    await tester.pump();
+
+    expect(
+      tester.terminalState.containsText('Send a recording with /voice'),
+      isTrue,
+    );
+    expect(client.voiceRequests, isEmpty);
+  });
 }
 
 final class _FakeClient implements TerminalChatClient {
@@ -242,6 +338,7 @@ final class _FakeClient implements TerminalChatClient {
   final List<ChatEntry> historyEntries;
   final Stream<ChatEntry>? responseStream;
   final requests = <ChatSubmitRequest>[];
+  final voiceRequests = <VoiceSubmitRequest>[];
   final cursors = <int>[];
   final modelSelections = <String>[];
 
@@ -310,6 +407,29 @@ final class _FakeClient implements TerminalChatClient {
       ),
     );
   }
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) async {
+    voiceRequests.add(request);
+    return ChatSubmission(
+      conversationId: request.conversationId,
+      runId: 'run-1',
+      correlationId: request.correlationId!,
+      userEntry: _entry(
+        sequence: historyEntries.length,
+        id: 'user-voice-1',
+        kind: ChatEntryKind.userMessage,
+        status: ChatEntryStatus.submitted,
+        content: 'Check the build',
+        modality: ChatModality.voice,
+        transcriptionEngine: 'whisper.cpp (ggml-base.bin) on this host',
+      ),
+    );
+  }
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) =>
+      throw UnimplementedError('The TUI does not play audio.');
 }
 
 HostStatus _status({String modelName = 'gemini-2.5-flash'}) => HostStatus(
@@ -354,6 +474,10 @@ ChatEntry _entry({
   required String content,
   String? approvalId,
   bool truncated = false,
+  String? toolCallId,
+  String? toolName,
+  ChatModality modality = ChatModality.text,
+  String? transcriptionEngine,
 }) => ChatEntry(
   conversationId: 'conversation-1',
   entryId: id,
@@ -369,4 +493,8 @@ ChatEntry _entry({
   truncated: truncated,
   runId: 'run-1',
   approvalId: approvalId,
+  toolCallId: toolCallId,
+  toolName: toolName,
+  modality: modality,
+  transcriptionEngine: transcriptionEngine,
 );

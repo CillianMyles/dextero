@@ -5,7 +5,8 @@ final class TerminalRenderer {
 
   String plainEntryLine(ChatEntry entry) {
     final label = switch (entry.kind) {
-      ChatEntryKind.userMessage => 'you',
+      ChatEntryKind.userMessage =>
+        entry.modality == ChatModality.voice ? 'you · voice' : 'you',
       ChatEntryKind.assistantMessage => 'dextero',
       ChatEntryKind.assistantDelta => 'model output',
       ChatEntryKind.toolCall ||
@@ -20,6 +21,10 @@ final class TerminalRenderer {
 
   String entryContent(ChatEntry entry) {
     final content = safeText(entry.content);
+    if (entry.transcriptionEngine case final engine?
+        when entry.modality == ChatModality.voice) {
+      return '$content\n(transcribed by ${safeText(engine)})';
+    }
     if (entry.kind != ChatEntryKind.approval ||
         entry.status != ChatEntryStatus.pending ||
         entry.runId == null ||
@@ -36,6 +41,19 @@ final class TerminalRenderer {
         'Run ID: $runId\n'
         'Approval ID: $approvalId\n'
         'Approve: make approve RUN_ID=$runId APPROVAL_ID=$approvalId';
+  }
+
+  /// One status line describing what the agent is doing.
+  String activityNotice(AgentActivityState state) {
+    final tool = state.toolName == null ? null : safeText(state.toolName!);
+    return switch (state.activity) {
+      AgentActivity.idle => 'Ready',
+      AgentActivity.thinking => 'Dextero is thinking…',
+      AgentActivity.acting => 'Dextero is using ${tool ?? 'a tool'}…',
+      AgentActivity.awaitingApproval =>
+        'Waiting for approval${tool == null ? '' : ' of $tool'}; '
+            'use the approve command shown above',
+    };
   }
 
   String safeText(String value) => value

@@ -19,7 +19,10 @@ import 'package:dextero_server/src/generated/control/chat_submission.dart'
     as _i5;
 import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
     as _i6;
-import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i7;
+import 'package:dextero_server/src/generated/control/voice_submit_request.dart'
+    as _i7;
+import 'package:dextero_server/src/generated/control/spoken_reply.dart' as _i8;
+import 'package:dextero_server/src/generated/control/chat_entry.dart' as _i9;
 import 'package:dextero_server/src/generated/protocol.dart';
 import 'package:dextero_server/src/generated/endpoints.dart';
 export 'package:serverpod_test/serverpod_test_public_exports.dart';
@@ -224,6 +227,72 @@ class _ControlEndpoint {
     });
   }
 
+  _i3.Future<_i5.ChatSubmission> submitVoiceMessage(
+    _i1.TestSessionBuilder sessionBuilder,
+    _i7.VoiceSubmitRequest request,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'control',
+            method: 'submitVoiceMessage',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'control',
+          methodName: 'submitVoiceMessage',
+          parameters: _i1.testObjectToJson({'request': request}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i5.ChatSubmission>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<_i8.SpokenReply> speakReply(
+    _i1.TestSessionBuilder sessionBuilder,
+    String conversationId,
+    String entryId,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'control',
+            method: 'speakReply',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'control',
+          methodName: 'speakReply',
+          parameters: _i1.testObjectToJson({
+            'conversationId': conversationId,
+            'entryId': entryId,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i8.SpokenReply>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
   _i3.Future<bool> cancelRun(
     _i1.TestSessionBuilder sessionBuilder,
     String conversationId,
@@ -296,7 +365,7 @@ class _ControlEndpoint {
     });
   }
 
-  _i3.Future<List<_i7.ChatEntry>> history(
+  _i3.Future<List<_i9.ChatEntry>> history(
     _i1.TestSessionBuilder sessionBuilder,
     String conversationId,
   ) async {
@@ -319,7 +388,7 @@ class _ControlEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i7.ChatEntry>>);
+                as _i3.Future<List<_i9.ChatEntry>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -327,12 +396,12 @@ class _ControlEndpoint {
     });
   }
 
-  _i3.Stream<_i7.ChatEntry> streamHistory(
+  _i3.Stream<_i9.ChatEntry> streamHistory(
     _i1.TestSessionBuilder sessionBuilder,
     String conversationId,
     int afterSequence,
   ) {
-    var _localTestStreamManager = _i1.TestStreamManager<_i7.ChatEntry>();
+    var _localTestStreamManager = _i1.TestStreamManager<_i9.ChatEntry>();
     _i1.callStreamFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
           (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(

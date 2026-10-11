@@ -1,0 +1,8 @@
+class: VoiceSubmitRequest
+fields:
+  conversationId: String
+  audio: ByteData
+  mimeType: String
+  modelName: String
+  modelProvider: String
+  correlationId: String?

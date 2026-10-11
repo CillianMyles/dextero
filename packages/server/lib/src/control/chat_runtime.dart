@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dextero_core/dextero_core.dart';
 
@@ -7,6 +8,7 @@ typedef ModelSelector = Future<void> Function(String modelName);
 /// Process-local dependencies used by Serverpod endpoint instances.
 abstract final class ChatRuntime {
   static ChatService? _service;
+  static VoiceService? _voice;
   static String? _conversationId;
   static String? _modelProvider;
   static String? _modelName;
@@ -20,6 +22,9 @@ abstract final class ChatRuntime {
 
   static ChatService get service =>
       _service ?? (throw StateError('The chat runtime is not initialized.'));
+
+  static VoiceService get voice =>
+      _voice ?? (throw StateError('The chat runtime is not initialized.'));
 
   static String get conversationId =>
       _conversationId ??
@@ -44,6 +49,7 @@ abstract final class ChatRuntime {
     List<String>? availableModels,
     ModelSelector? modelSelector,
     List<AgentModelOption>? modelOptions,
+    VoiceService? voiceService,
   }) {
     if (defaultConversationId.trim().isEmpty) {
       throw ArgumentError.value(
@@ -96,6 +102,7 @@ abstract final class ChatRuntime {
     _modelOptions = options;
     _qualifiedSelection = modelOptions != null;
     _service = chatService;
+    _voice = voiceService ?? VoiceService(store: chatService.store);
     _conversationId = defaultConversationId;
     _modelProvider = modelProvider;
     _modelName = modelName;
@@ -146,6 +153,47 @@ abstract final class ChatRuntime {
     required String modelProvider,
     String? correlationId,
   }) => _withOperationLock(() async {
+    _ensureSelectedModel(modelName, modelProvider);
+    return service.submit(
+      conversationId: conversationId,
+      message: message,
+      correlationId: correlationId,
+    );
+  });
+
+  /// Transcribes push-to-talk audio, then accepts the transcript as an
+  /// ordinary message in the same conversation.
+  static Future<ChatSubmission> submitVoice({
+    required String conversationId,
+    required Uint8List audio,
+    required String mimeType,
+    required String modelName,
+    required String modelProvider,
+    String? correlationId,
+  }) async {
+    _ensureSelectedModel(modelName, modelProvider);
+    if (await service.store.conversation(conversationId) == null) {
+      throw StateError('Unknown conversation: $conversationId');
+    }
+    if (service.hasActiveRun(conversationId)) {
+      throw StateError('A response is already running for this conversation.');
+    }
+    final transcript = await voice.transcribe(
+      SpeechAudio(bytes: audio, mimeType: mimeType),
+    );
+    return _withOperationLock(() async {
+      _ensureSelectedModel(modelName, modelProvider);
+      return service.submit(
+        conversationId: conversationId,
+        message: transcript.text,
+        correlationId: correlationId,
+        modality: ChatModality.voice,
+        transcriptionEngine: transcript.engine,
+      );
+    });
+  }
+
+  static void _ensureSelectedModel(String modelName, String modelProvider) {
     if (modelName != ChatRuntime.modelName ||
         modelProvider != ChatRuntime.modelProvider) {
       throw StateError(
@@ -153,12 +201,7 @@ abstract final class ChatRuntime {
         'Refresh the conversation before submitting.',
       );
     }
-    return service.submit(
-      conversationId: conversationId,
-      message: message,
-      correlationId: correlationId,
-    );
-  });
+  }
 
   static Future<T> _withOperationLock<T>(Future<T> Function() action) async {
     final previous = _operationLock;

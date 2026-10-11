@@ -15,6 +15,8 @@ import 'package:serverpod/serverpod.dart' as _i1;
 import '../control/control_endpoint.dart' as _i2;
 import 'package:dextero_server/src/generated/control/chat_submit_request.dart'
     as _i3;
+import 'package:dextero_server/src/generated/control/voice_submit_request.dart'
+    as _i4;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -60,6 +62,42 @@ class Endpoints extends _i1.EndpointDispatch {
               (endpoints['control'] as _i2.ControlEndpoint).submitMessage(
                 session,
                 params['request'],
+              ),
+        ),
+        'submitVoiceMessage': _i1.MethodConnector(
+          name: 'submitVoiceMessage',
+          params: {
+            'request': _i1.ParameterDescription(
+              name: 'request',
+              type: _i1.getType<_i4.VoiceSubmitRequest>(),
+              nullable: false,
+            ),
+          },
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['control'] as _i2.ControlEndpoint).submitVoiceMessage(
+                session,
+                params['request'],
+              ),
+        ),
+        'speakReply': _i1.MethodConnector(
+          name: 'speakReply',
+          params: {
+            'conversationId': _i1.ParameterDescription(
+              name: 'conversationId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'entryId': _i1.ParameterDescription(
+              name: 'entryId',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call: (_i1.Session session, Map<String, dynamic> params) async =>
+              (endpoints['control'] as _i2.ControlEndpoint).speakReply(
+                session,
+                params['conversationId'],
+                params['entryId'],
               ),
         ),
         'cancelRun': _i1.MethodConnector(

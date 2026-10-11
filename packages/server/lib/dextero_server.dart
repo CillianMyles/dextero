@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dextero_core/dextero_core.dart';
 import 'package:serverpod/serverpod.dart';
@@ -35,6 +36,9 @@ Future<void> run(List<String> arguments) async {
   final agentConfiguration = AgentRuntimeConfiguration.fromEnvironment(
     Platform.environment,
   );
+  final speechConfiguration = SpeechRuntimeConfiguration.fromEnvironment(
+    Platform.environment,
+  );
   final store = InMemoryChatHistoryStore();
   final service = ChatService(
     store: store,
@@ -51,6 +55,7 @@ Future<void> run(List<String> arguments) async {
     bindAddress: bindAddress,
     availableModels: agentConfiguration.availableModels,
     modelOptions: agentConfiguration.availableOptions,
+    voiceService: speechConfiguration.createService(store),
     modelSelector: (modelId) {
       final option = agentConfiguration.availableOptions.singleWhere(
         (option) => option.id == modelId,
@@ -84,6 +89,7 @@ Future<Serverpod> startControlServer({
   List<String>? availableModels,
   ModelSelector? modelSelector,
   List<AgentModelOption>? modelOptions,
+  VoiceService? voiceService,
 }) async {
   if (token.length < 32) {
     throw ArgumentError.value(
@@ -100,7 +106,11 @@ Future<Serverpod> startControlServer({
     availableModels: availableModels,
     modelSelector: modelSelector,
     modelOptions: modelOptions,
+    voiceService: voiceService,
   );
+  // Voice clips arrive base64-encoded inside the JSON request body.
+  final voiceRequestBytes =
+      (ChatRuntime.voice.maxAudioBytes * 4 / 3).ceil() + 64 * 1024;
   final config = apiPort == null
       ? null
       : ServerpodConfig.defaultConfig().copyWith(
@@ -116,6 +126,9 @@ Future<Serverpod> startControlServer({
     Protocol(),
     Endpoints(),
     config: config,
+    configOverride: (config) => config.copyWith(
+      maxRequestSize: max(config.maxRequestSize, voiceRequestBytes),
+    ),
     authenticationHandler: DexteroTokenAuthenticator(token).authenticate,
   );
   final effectiveBindAddress = bindAddress ?? InternetAddress.loopbackIPv4;

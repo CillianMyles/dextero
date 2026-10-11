@@ -2,6 +2,8 @@ control:
   - status:
   - selectModel:
   - submitMessage:
+  - submitVoiceMessage:
+  - speakReply:
   - cancelRun:
   - approveWork:
   - history:

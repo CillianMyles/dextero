@@ -9,6 +9,10 @@ abstract interface class TerminalChatClient {
 
   Future<ChatSubmission> submit(ChatSubmitRequest request);
 
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request);
+
+  Future<SpokenReply> speakReply(String conversationId, String entryId);
+
   Future<bool> cancelRun(String conversationId, String runId);
 
   Future<bool> approveWork(
@@ -48,6 +52,14 @@ final class ServerpodTerminalChatClient implements TerminalChatClient {
   @override
   Future<ChatSubmission> submit(ChatSubmitRequest request) =>
       _client.control.submitMessage(request);
+
+  @override
+  Future<ChatSubmission> submitVoice(VoiceSubmitRequest request) =>
+      _client.control.submitVoiceMessage(request);
+
+  @override
+  Future<SpokenReply> speakReply(String conversationId, String entryId) =>
+      _client.control.speakReply(conversationId, entryId);
 
   @override
   Future<bool> cancelRun(String conversationId, String runId) =>
